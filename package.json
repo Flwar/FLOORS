@@ -1,0 +1,34 @@
+{
+  "name": "floors",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "build": "npm run build -w client",
+    "start": "npm run start -w server",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "typecheck": "tsc -p shared && tsc -p server && tsc -p client",
+    "smoke": "tsx tools/smoke.ts",
+    "latency": "tsx tools/latency.ts",
+    "combat": "tsx tools/combat.ts",
+    "journey": "tsx tools/journey.ts",
+    "boss": "tsx tools/boss.ts",
+    "interest": "tsx tools/interest.ts",
+    "moves": "tsx tools/moves.ts",
+    "events": "tsx tools/events.ts",
+    "trade": "tsx tools/trade.ts",
+    "settings": "tsx tools/settings.ts"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.3",
+    "playwright-core": "^1.63.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

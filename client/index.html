@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Floors</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2l12 7v14l-12 7-12-7V9z' fill='%23e8c55a'/%3E%3Cpath d='M16 8l6 4v8l-6 4-6-4v-8z' fill='%231d1a17'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="login" class="hidden">
+      <div class="login-card">
+        <div class="title">FLOORS</div>
+        <div class="subtitle">An online action RPG. Climb.</div>
+        <form>
+          <input id="login-user" placeholder="Adventurer name" autocomplete="username" maxlength="16" />
+          <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password" maxlength="128" />
+          <div class="login-error"></div>
+          <div class="row"><button type="submit">Enter the world</button><button type="button" id="login-create" class="ghost">Create adventurer</button></div>
+        </form>
+        <div class="login-foot">Your character, gear and progress are saved on the server.</div>
+      </div>
+    </div>
+    <div id="hud">
+      <div id="vignette"></div>
+      <div id="flash"></div>
+      <div id="zone-banner"><div class="zone-name"></div><div class="zone-kind"></div></div>
+      <div id="boss" class="hidden">
+        <div class="boss-name"></div>
+        <div class="boss-bar"><div class="boss-fill"></div><div class="boss-trail"></div></div>
+        <div class="boss-posture"><div class="posture-fill"></div></div>
+      </div>
+      <div id="net"><span id="online">–</span> online · <span id="ping">–</span> ms</div>
+      <div id="vitals">
+        <div class="level"><span id="level">1</span></div>
+        <div class="bars">
+          <div class="bar hp"><div class="trail"></div><div class="fill"></div><span class="val"></span></div>
+          <div class="bar stamina"><div class="fill"></div></div>
+        </div>
+      </div>
+      <div id="actions">
+        <div class="slot" id="slot-skill1"><span class="key">1</span><span class="name"></span><div class="cd"></div></div>
+        <div class="slot" id="slot-skill2"><span class="key">2</span><span class="name"></span><div class="cd"></div></div>
+        <div class="slot potion" id="slot-potion"><span class="key">R</span><span class="name">Tonic</span><span class="count"></span></div>
+        <div class="weapon" id="weapon-name"></div>
+      </div>
+      <div id="hint">LMB attack · RMB heavy · Space dodge · Q parry · F interact · I pack · J quests · M map · Esc settings</div>
+      <div id="status"></div>
+      <div id="death" class="hidden"><div class="title">You have fallen</div><div class="sub"></div><button id="respawn-now">Return now</button></div>
+    </div>
+    <div id="ui"></div>
+    <div id="prompt-f" class="hidden"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

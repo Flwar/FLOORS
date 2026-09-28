@@ -1,0 +1,513 @@
+import * as Phaser from "phaser";
+import { itemBase, QUESTS, RARITY_COLORS, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import type { Drop } from "../../../server/src/state.ts";
+import { RES } from "../art/characters.ts";
+import { itemIconCanvas } from "../ui/icons.ts";
+import type { InvView } from "../ui/ui.ts";
+import { HumanoidRig, locomotionPose, restPose } from "./rig.ts";
+
+interface NpcView {
+  def: NpcDef;
+  rig: HumanoidRig;
+  label: Phaser.GameObjects.Text;
+  marker: Phaser.GameObjects.Text;
+  phase: number;
+}
+
+interface ObjView {
+  def: WorldObject;
+  img: Phaser.GameObjects.Image;
+  state: string;
+}
+
+interface DropView {
+  img: Phaser.GameObjects.Image;
+  beam?: Phaser.GameObjects.Image;
+  label: Phaser.GameObjects.Text;
+  born: number;
+}
+
+export interface Interactable {
+  kind: "npc" | "object" | "drop" | "player" | "ally";
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+}
+
+/** NPCs, interactive objects and loot on the ground. */
+export class WorldObjects {
+  private npcs: NpcView[] = [];
+  private objs: ObjView[] = [];
+  private drops = new Map<string, DropView>();
+  merchantActive = false;
+
+  constructor(private scene: Phaser.Scene, private map: WorldMap) {
+    paintObjects(scene);
+    for (const def of map.npcs) {
+      const rig = new HumanoidRig(scene, { key: `npc:${def.id}`, skin: def.look.skin, hair: def.look.hair, cloth: def.look.cloth, trim: def.look.trim, helm: def.look.helm ?? "none", bulk: 1 }, "none", 0, 1);
+      const label = scene.add.text(def.x, def.y - 40, def.name, { fontFamily: "Georgia, serif", fontSize: "17px", color: "#fff1c0", stroke: "#1d1a17", strokeThickness: 4 }).setOrigin(0.5, 1).setScale(0.5);
+      const marker = scene.add.text(def.x, def.y - 52, "", { fontFamily: "Georgia, serif", fontSize: "34px", color: "#ffd24a", stroke: "#1d1a17", strokeThickness: 5, fontStyle: "bold" }).setOrigin(0.5, 1).setScale(0.5);
+      this.npcs.push({ def, rig, label, marker, phase: Math.random() * 1000 });
+    }
+    for (const def of map.objects) {
+      const img = scene.add.image(def.x, def.y + 10, texFor(def, "")).setOrigin(0.5, 1).setScale(1 / RES).setDepth(def.y + 10);
+      // "?" forces the first update to apply the real state (visibility, texture).
+      this.objs.push({ def, img, state: "?" });
+    }
+  }
+
+  /** Per-frame: idle NPCs, quest markers, object states, drop bobbing. */
+  update(dtMs: number, inv: InvView | undefined, stage: string, playerX: number, playerY: number) {
+    for (const n of this.npcs) {
+      const visible = n.def.role !== "merchant" || this.merchantActive;
+      n.rig.root.setVisible(visible);
+      n.label.setVisible(visible);
+      n.marker.setVisible(visible);
+      if (!visible) continue;
+      n.phase += dtMs;
+      const face = Math.atan2(playerY - n.def.y, playerX - n.def.x);
+      const near = Math.hypot(playerX - n.def.x, playerY - n.def.y) < 140;
+      const pose = locomotionPose(near ? face : Math.PI / 2, 0, n.phase, restPose(Math.PI / 2));
+      n.rig.apply(pose);
+      n.rig.root.setPosition(n.def.x, n.def.y).setDepth(n.def.y);
+      n.label.setDepth(n.def.y + 1);
+      const m = markerFor(n.def.id, inv);
+      n.marker.setText(m);
+      n.marker.setColor(m === "?" ? "#9fe0a6" : "#ffd24a");
+      n.marker.setPosition(n.def.x, n.def.y - 50 + Math.sin(n.phase / 300) * 2).setDepth(n.def.y + 2);
+    }
+    for (const o of this.objs) {
+      const st = objState(o.def, inv, stage);
+      if (st !== o.state) {
+        o.state = st;
+        o.img.setTexture(texFor(o.def, st));
+        o.img.setVisible(!(o.def.id === "ascent" && st !== "open"));
+      }
+      if (o.def.kind === "campfire" || (o.def.kind === "gate" && st === "open")) o.img.setAlpha(0.9 + Math.sin(performance.now() / 120 + o.def.x) * 0.1);
+    }
+    const t = performance.now();
+    for (const d of this.drops.values()) {
+      const age = t - d.born;
+      const bob = Math.sin(age / 350) * 2 - Math.max(0, 1 - age / 300) * 12;
+      d.img.setY(d.img.getData("y") + bob);
+      if (d.beam) d.beam.setAlpha(0.5 + Math.sin(age / 400) * 0.15);
+      const near = Math.hypot(playerX - d.img.x, playerY - d.img.getData("y")) < 90;
+      d.label.setVisible(near);
+    }
+  }
+
+  syncDrops(drops: Map<string, Drop> | undefined, myKey: string | undefined) {
+    const seen = new Set<string>();
+    drops?.forEach((d, id) => {
+      seen.add(id);
+      if (this.drops.has(id)) return;
+      const tex = d.kind === 1 ? "dropGold" : d.kind === 2 ? "dropBag" : this.iconTex(d.key, d.rarity);
+      const img = this.scene.add.image(d.x, d.y, tex).setOrigin(0.5, 1).setScale(d.kind === 0 ? 0.36 : 0.5).setDepth(d.y);
+      img.setData("y", d.y);
+      let beam: Phaser.GameObjects.Image | undefined;
+      if (d.kind === 0 && d.rarity >= 2) {
+        beam = this.scene.add.image(d.x, d.y, "lootBeam").setOrigin(0.5, 1).setScale(0.5, 0.5 + d.rarity * 0.15).setDepth(d.y - 1).setBlendMode(Phaser.BlendModes.ADD);
+        beam.setTint(Phaser.Display.Color.HexStringToColor(RARITY_COLORS[d.rarity]).color);
+      }
+      const mine = !d.owner || d.owner === myKey;
+      const name = d.kind === 1 ? `${d.qty} gold` : d.kind === 2 ? "Your belongings" : `${d.qty > 1 ? `${d.qty}× ` : ""}${itemName(d.key)}`;
+      const label = this.scene.add
+        .text(d.x, d.y - 22, name, { fontFamily: "Trebuchet MS", fontSize: "16px", color: d.kind === 0 ? RARITY_COLORS[d.rarity] : "#f2c94c", stroke: "#1d1a17", strokeThickness: 4 })
+        .setOrigin(0.5, 1)
+        .setScale(0.5)
+        .setDepth(1e6 - 2)
+        .setAlpha(mine ? 1 : 0.5)
+        .setVisible(false);
+      this.drops.set(id, { img, beam, label, born: performance.now() });
+    });
+    for (const [id, v] of this.drops) {
+      if (seen.has(id)) continue;
+      v.img.destroy();
+      v.beam?.destroy();
+      v.label.destroy();
+      this.drops.delete(id);
+    }
+  }
+
+  private iconTex(key: string, rarity: number) {
+    const tk = `icon:${key}:${rarity}`;
+    if (!this.scene.textures.exists(tk)) this.scene.textures.addCanvas(tk, itemIconCanvas(key, rarity));
+    return tk;
+  }
+
+  /** Everything the player could press F on, nearest first. */
+  interactables(x: number, y: number, drops: Map<string, Drop> | undefined, myKey: string | undefined): Interactable[] {
+    const out: (Interactable & { d: number })[] = [];
+    for (const n of this.npcs) {
+      if (n.def.role === "merchant" && !this.merchantActive) continue;
+      const d = Math.hypot(n.def.x - x, n.def.y - y);
+      if (d < 56) out.push({ kind: "npc", id: n.def.id, x: n.def.x, y: n.def.y - 44, label: `Talk to ${n.def.name}`, d });
+    }
+    for (const o of this.objs) {
+      if (o.def.id === "ascent" && o.state !== "open") continue;
+      const d = Math.hypot(o.def.x - x, o.def.y - y);
+      if (d < 56) out.push({ kind: "object", id: o.def.id, x: o.def.x, y: o.def.y - 36, label: objLabel(o.def, o.state), d });
+    }
+    drops?.forEach((dr, id) => {
+      if (dr.kind === 1) return;
+      const d = Math.hypot(dr.x - x, dr.y - y);
+      if (d < 44) out.push({ kind: "drop", id, x: dr.x, y: dr.y - 24, label: dr.kind === 2 ? (dr.owner === myKey ? "Recover your belongings" : "Someone's belongings") : `Pick up ${itemName(dr.key)}`, d: d - 10 });
+    });
+    return out.sort((a, b) => a.d - b.d);
+  }
+
+  destroy() {
+    for (const n of this.npcs) {
+      n.rig.destroy();
+      n.label.destroy();
+      n.marker.destroy();
+    }
+    for (const o of this.objs) o.img.destroy();
+    for (const d of this.drops.values()) {
+      d.img.destroy();
+      d.beam?.destroy();
+      d.label.destroy();
+    }
+  }
+}
+
+const itemName = (key: string) => itemBase(key)?.name ?? key;
+
+/** "!" = has a quest for you, "?" = something to hand in. */
+function markerFor(npc: string, inv?: InvView): string {
+  if (!inv) return "";
+  for (const q of QUESTS) {
+    const st = inv.quests[q.id];
+    if (!st || st.done) continue;
+    const stage = q.stages[st.stage];
+    if (stage.kind === "talk" && stage.npc === npc) return "?";
+    if (stage.kind === "collect" && q.giver === npc) {
+      let n = 0;
+      for (const it of inv.inventory) if (it?.key === stage.item) n += it.qty;
+      if (n >= stage.count) return "?";
+    }
+  }
+  for (const q of QUESTS) if (q.giver === npc && !inv.quests[q.id] && (!q.requires || inv.quests[q.requires]?.done)) return "!";
+  return "";
+}
+
+function objState(o: WorldObject, inv: InvView | undefined, stage: string): string {
+  switch (o.kind) {
+    case "chest":
+      return inv?.discovered.includes(`chest:${o.id}`) ? "open" : "";
+    case "waystone":
+      return inv?.discovered.includes(`ws:${o.id}`) ? "on" : "";
+    case "gate":
+      if (o.id === "ascent") return stage === "cleared" ? "open" : "";
+      if (o.id === "descent") return "open";
+      return (inv?.floor ?? 1) >= 2 ? "open" : "";
+    case "lore":
+      return inv?.discovered.includes(`lore:${o.id}`) ? "read" : "";
+    default:
+      return "";
+  }
+}
+
+function objLabel(o: WorldObject, state: string): string {
+  switch (o.kind) {
+    case "chest":
+      return state === "open" ? `${o.name} (empty)` : `Open ${o.name}`;
+    case "lore":
+      return `Read ${o.name}`;
+    case "waystone":
+      return state === "on" ? `Travel — ${o.name}` : `Attune ${o.name}`;
+    case "door":
+      return o.id === "exit" ? "Return to the surface" : `Unseal ${o.name}`;
+    case "gate":
+      return o.id === "ascent" ? "Ascend to Floor 2" : o.id === "descent" ? "Descend to Emberwatch" : state === "open" ? "Ascend to Floor 2" : `Examine ${o.name}`;
+    case "campfire":
+      return `Rest at ${o.name}`;
+    case "lever":
+      return `Pull the ${o.name}`;
+  }
+}
+
+function texFor(o: WorldObject, state: string): string {
+  switch (o.kind) {
+    case "chest":
+      return state === "open" ? "objChestOpen" : "objChest";
+    case "lore":
+      return "objLore";
+    case "waystone":
+      return state === "on" ? "objWaystoneOn" : "objWaystone";
+    case "door":
+      return o.id === "exit" ? "objStairs" : "objDoor";
+    case "gate":
+      return o.id === "ascent" ? "objBeam" : state === "open" ? "objArchOpen" : "objArch";
+    case "campfire":
+      return "objBrazier";
+    case "lever":
+      return "objLever";
+  }
+}
+
+function paintObjects(scene: Phaser.Scene) {
+  if (scene.textures.exists("objChest")) return;
+  const make = (key: string, w: number, h: number, paint: (g: CanvasRenderingContext2D) => void) => {
+    const tex = scene.textures.createCanvas(key, w, h)!;
+    const g = tex.getContext();
+    g.lineJoin = "round";
+    paint(g);
+    tex.refresh();
+  };
+  const O = "#1d1a17";
+  const chest = (open: boolean) => (g: CanvasRenderingContext2D) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(32, 58, 26, 6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.fillRect(6, 26, 52, 32);
+    g.fillStyle = "#8a5a34";
+    g.fillRect(9, 29, 46, 26);
+    g.fillStyle = "#c9a24a";
+    g.fillRect(9, 38, 46, 4);
+    if (open) {
+      g.fillStyle = O;
+      g.fillRect(6, 6, 52, 18);
+      g.fillStyle = "#6b4426";
+      g.fillRect(9, 9, 46, 13);
+      g.fillStyle = "#2a1c12";
+      g.fillRect(9, 26, 46, 8);
+    } else {
+      g.fillStyle = O;
+      g.beginPath();
+      g.roundRect(4, 12, 56, 18, [10, 10, 0, 0]);
+      g.fill();
+      g.fillStyle = "#a06a3e";
+      g.beginPath();
+      g.roundRect(7, 15, 50, 13, [8, 8, 0, 0]);
+      g.fill();
+      g.fillStyle = "#f2c94c";
+      g.fillRect(28, 26, 8, 10);
+    }
+  };
+  make("objChest", 64, 64, chest(false));
+  make("objChestOpen", 64, 64, chest(true));
+  make("objLore", 60, 90, (g) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(30, 84, 22, 6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.beginPath();
+    g.roundRect(10, 10, 40, 76, [18, 18, 4, 4]);
+    g.fill();
+    const sg = g.createLinearGradient(0, 10, 0, 86);
+    sg.addColorStop(0, "#b8b2a2");
+    sg.addColorStop(1, "#7a7466");
+    g.fillStyle = sg;
+    g.beginPath();
+    g.roundRect(13, 13, 34, 70, [15, 15, 3, 3]);
+    g.fill();
+    g.strokeStyle = "#9fe0ff";
+    g.lineWidth = 2.5;
+    g.shadowColor = "#9fe0ff";
+    g.shadowBlur = 8;
+    g.beginPath();
+    g.moveTo(22, 30); g.lineTo(38, 30); g.moveTo(30, 24); g.lineTo(30, 60); g.moveTo(22, 50); g.lineTo(38, 44);
+    g.stroke();
+  });
+  const waystone = (on: boolean) => (g: CanvasRenderingContext2D) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(36, 124, 30, 8, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.beginPath();
+    g.moveTo(14, 124); g.lineTo(22, 30); g.lineTo(36, 6); g.lineTo(50, 30); g.lineTo(58, 124);
+    g.fill();
+    const sg = g.createLinearGradient(14, 0, 58, 0);
+    sg.addColorStop(0, "#8a93a0");
+    sg.addColorStop(1, "#5a616c");
+    g.fillStyle = sg;
+    g.beginPath();
+    g.moveTo(18, 121); g.lineTo(25, 32); g.lineTo(36, 12); g.lineTo(47, 32); g.lineTo(54, 121);
+    g.fill();
+    g.fillStyle = on ? "#8fe3ff" : "#3a4a5a";
+    if (on) {
+      g.shadowColor = "#8fe3ff";
+      g.shadowBlur = 14;
+    }
+    g.beginPath();
+    g.moveTo(36, 40); g.lineTo(44, 58); g.lineTo(36, 76); g.lineTo(28, 58);
+    g.fill();
+  };
+  make("objWaystone", 72, 130, waystone(false));
+  make("objWaystoneOn", 72, 130, waystone(true));
+  make("objDoor", 180, 150, (g) => {
+    g.fillStyle = O;
+    g.beginPath();
+    g.roundRect(20, 20, 140, 128, [70, 70, 0, 0]);
+    g.fill();
+    g.fillStyle = "#4a3a2e";
+    g.beginPath();
+    g.roundRect(28, 28, 124, 118, [62, 62, 0, 0]);
+    g.fill();
+    g.strokeStyle = "#2a2018";
+    g.lineWidth = 3;
+    for (let x = 46; x < 150; x += 22) {
+      g.beginPath();
+      g.moveTo(x, 36);
+      g.lineTo(x, 146);
+      g.stroke();
+    }
+    g.fillStyle = "#7a7f86";
+    g.fillRect(28, 70, 124, 10);
+    g.fillRect(28, 110, 124, 10);
+    g.fillStyle = "#c9a24a";
+    g.beginPath();
+    g.arc(90, 96, 12, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.fillRect(87, 92, 6, 12);
+  });
+  make("objStairs", 120, 70, (g) => {
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = i % 2 ? "#6f6a60" : "#827c70";
+      g.fillRect(10 + i * 4, 10 + i * 11, 100 - i * 8, 11);
+    }
+    g.fillStyle = "rgba(255,230,160,0.35)";
+    g.fillRect(30, 0, 60, 16);
+  });
+  const arch = (open: boolean) => (g: CanvasRenderingContext2D) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(110, 214, 100, 12, 0, 0, Math.PI * 2);
+    g.fill();
+    if (open) {
+      const lg = g.createLinearGradient(0, 0, 0, 214);
+      lg.addColorStop(0, "rgba(255,245,200,0)");
+      lg.addColorStop(0.4, "rgba(255,235,170,0.6)");
+      lg.addColorStop(1, "rgba(255,220,140,0.9)");
+      g.fillStyle = lg;
+      g.fillRect(50, 0, 120, 214);
+    }
+    g.fillStyle = O;
+    g.beginPath();
+    g.moveTo(10, 214); g.lineTo(10, 90); g.quadraticCurveTo(110, -10, 210, 90); g.lineTo(210, 214); g.lineTo(170, 214); g.lineTo(170, 100);
+    g.quadraticCurveTo(110, 30, 50, 100); g.lineTo(50, 214);
+    g.fill();
+    g.fillStyle = "#c9c0ad";
+    g.beginPath();
+    g.moveTo(16, 210); g.lineTo(16, 92); g.quadraticCurveTo(110, -2, 204, 92); g.lineTo(204, 210); g.lineTo(176, 210); g.lineTo(176, 102);
+    g.quadraticCurveTo(110, 38, 44, 102); g.lineTo(44, 210);
+    g.fill();
+    g.fillStyle = open ? "#ffe08a" : "#6f7984";
+    for (let i = 0; i < 7; i++) {
+      const a = Math.PI + (i / 6) * Math.PI;
+      g.beginPath();
+      g.arc(110 + Math.cos(a) * 80, 98 + Math.sin(a) * 66, 5, 0, Math.PI * 2);
+      g.fill();
+    }
+    if (!open) {
+      g.fillStyle = "rgba(40,48,60,0.85)";
+      g.beginPath();
+      g.moveTo(50, 214); g.lineTo(50, 100); g.quadraticCurveTo(110, 30, 170, 100); g.lineTo(170, 214);
+      g.fill();
+      g.strokeStyle = "#8a93a0";
+      g.lineWidth = 3;
+      for (let x = 60; x < 170; x += 18) {
+        g.beginPath();
+        g.moveTo(x, 70);
+        g.lineTo(x, 214);
+        g.stroke();
+      }
+    }
+  };
+  make("objArch", 220, 220, arch(false));
+  make("objArchOpen", 220, 220, arch(true));
+  make("objBeam", 140, 420, (g) => {
+    const lg = g.createLinearGradient(0, 0, 0, 420);
+    lg.addColorStop(0, "rgba(255,250,220,0)");
+    lg.addColorStop(0.5, "rgba(255,240,190,0.7)");
+    lg.addColorStop(1, "rgba(255,225,150,0.95)");
+    g.fillStyle = lg;
+    g.beginPath();
+    g.moveTo(40, 0); g.lineTo(100, 0); g.lineTo(130, 420); g.lineTo(10, 420);
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,0.7)";
+    g.fillRect(62, 0, 16, 420);
+  });
+  make("objBrazier", 70, 110, (g) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(35, 104, 26, 6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.fillRect(28, 60, 14, 44);
+    g.beginPath();
+    g.moveTo(8, 50); g.lineTo(62, 50); g.lineTo(52, 70); g.lineTo(18, 70);
+    g.fill();
+    g.fillStyle = "#6f6a60";
+    g.beginPath();
+    g.moveTo(12, 53); g.lineTo(58, 53); g.lineTo(50, 67); g.lineTo(20, 67);
+    g.fill();
+    const fg = g.createRadialGradient(35, 40, 2, 35, 36, 26);
+    fg.addColorStop(0, "#fff6c8");
+    fg.addColorStop(0.4, "#ffb347");
+    fg.addColorStop(1, "rgba(232,98,44,0)");
+    g.fillStyle = fg;
+    g.beginPath();
+    g.moveTo(14, 52); g.quadraticCurveTo(20, 20, 35, 4); g.quadraticCurveTo(50, 20, 56, 52);
+    g.fill();
+  });
+  make("objLever", 50, 70, (g) => {
+    g.fillStyle = O;
+    g.fillRect(8, 50, 34, 16);
+    g.fillStyle = "#6f6a60";
+    g.fillRect(10, 52, 30, 12);
+    g.strokeStyle = O;
+    g.lineWidth = 7;
+    g.beginPath();
+    g.moveTo(25, 56); g.lineTo(36, 14);
+    g.stroke();
+    g.strokeStyle = "#9aa3ad";
+    g.lineWidth = 4;
+    g.stroke();
+    g.fillStyle = "#d8453c";
+    g.beginPath();
+    g.arc(37, 12, 7, 0, Math.PI * 2);
+    g.fill();
+  });
+  make("lootBeam", 40, 220, (g) => {
+    const lg = g.createLinearGradient(0, 0, 0, 220);
+    lg.addColorStop(0, "rgba(255,255,255,0)");
+    lg.addColorStop(1, "rgba(255,255,255,0.8)");
+    g.fillStyle = lg;
+    g.fillRect(12, 0, 16, 220);
+    g.fillStyle = "rgba(255,255,255,0.25)";
+    g.fillRect(4, 60, 32, 160);
+  });
+  make("dropGold", 48, 40, (g) => {
+    for (const [x, y] of [[16, 30], [30, 30], [23, 22]]) {
+      g.fillStyle = O;
+      g.beginPath();
+      g.ellipse(x, y, 10, 7, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#f2c94c";
+      g.beginPath();
+      g.ellipse(x, y - 1, 8, 5, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+  make("dropBag", 48, 48, (g) => {
+    g.fillStyle = O;
+    g.beginPath();
+    g.ellipse(24, 32, 18, 14, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(18, 10, 12, 14);
+    g.fillStyle = "#8a6a4a";
+    g.beginPath();
+    g.ellipse(24, 32, 15, 11, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#d8453c";
+    g.fillRect(17, 20, 14, 3);
+  });
+}
