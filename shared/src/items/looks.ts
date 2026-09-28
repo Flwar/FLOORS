@@ -2,10 +2,10 @@
  * Visible equipment styles. Each armour, helm and weapon names one of these, and the
  * index is synced on the player so everyone sees what you wear.
  */
-export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn"] as const;
+export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave"] as const;
 export type ArmorStyle = (typeof ARMOR_STYLES)[number];
 
-export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper"] as const;
+export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown"] as const;
 export type HelmStyle = (typeof HELM_STYLES)[number];
 
 export const WEAPON_ARTS = [
@@ -14,6 +14,14 @@ export const WEAPON_ARTS = [
   "dg_knives", "dg_fangs",
   "sp_hunting", "sp_pike",
   "st_oak", "st_ember",
+  // Added later: new indices only ever go at the end (the index is synced to clients).
+  "sword_steel", "sword_knight", "sword_frost",
+  "gs_zwei", "gs_exec",
+  "dg_kris", "dg_night",
+  "sp_glaive", "sp_trident",
+  "st_frost", "st_moon",
+  // Floor 2: the Stormglass set.
+  "sword_storm", "gs_storm", "dg_storm", "sp_storm", "st_storm",
 ] as const;
 export type WeaponArtKey = (typeof WEAPON_ARTS)[number];
 

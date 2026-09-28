@@ -1,14 +1,20 @@
 import {
-  ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, masteryProgress, masteryUnlocks, MAX_LEVEL, PERK_CHOICES, questDef, QUESTS, RARITY_COLORS,
+  ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, itemMasteryLevel, MAX_LEVEL, questDef, QUESTS, RARITY_COLORS,
   RARITY_NAMES, repairCost, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
+  masteryProgress, weaponMasteryDamage,
 } from "@floors/shared";
 import type { Room } from "@colyseus/sdk";
 import { sfx } from "../audio/sfx.ts";
 import { drawFigure, weaponSize, type WeaponArt } from "../art/characters.ts";
 import { personLook } from "../art/looks.ts";
-import { mainObjective } from "../render/objective.ts";
+import { countItem, trackedQuests } from "../render/objective.ts";
+import { iconImg, type UiIconName } from "./uiIcons.ts";
+import { renderSkills, type SkillView } from "./skills.ts";
+import { adminTabIsLive, renderAdmin, type AdminOverview } from "./admin.ts";
+import type { WorldMap } from "@floors/shared";
 import { settings } from "../settings.ts";
 import { goldIcon, itemIcon } from "./icons.ts";
+import { bankCell, buildPack, type PackFilter } from "./inventory.ts";
 
 export interface InvView {
   key: string;
@@ -19,9 +25,15 @@ export interface InvView {
   gold: number;
   inventory: (Item | null)[];
   equipment: Partial<Record<EquipSlot, Item>>;
-  mastery: Partial<Record<WeaponKey, number>>;
-  perks: string[];
-  pendingPerk?: number;
+  /** Learned skill-tree nodes. */
+  tree: string[];
+  points: { total: number; left: number };
+  resetCost: number;
+  loadout: Record<WeaponKey, [number, number]>;
+  /** Mastery of the weapon in hand. */
+  weaponMastery: { level: number; into: number; need: number };
+  /** Admin account: the admin panel (F10) is available. */
+  admin?: boolean;
   quests: Record<string, { stage: number; progress: number; done?: boolean }>;
   discovered: string[];
   bossKills: string[];
@@ -87,6 +99,7 @@ export class GameUI {
 
   constructor(private getRoom: () => Room | undefined) {
     this.root.append(this.tooltip, this.toasts, this.partyEl, this.trackerEl, this.xpBar);
+    this.trackerEl.addEventListener("click", () => this.toggle("quests"));
     const chat = el(`<div class="chat"></div>`);
     chat.append(this.chatLog, this.chatInput);
     this.root.append(chat);
@@ -130,8 +143,13 @@ export class GameUI {
       else this.toggle("settings");
       return;
     }
+    if ((e.code === "F10" || e.code === "Backquote") && this.inv?.admin) {
+      e.preventDefault();
+      this.toggle("admin");
+      return;
+    }
     const b = settings.value.bindings;
-    const panel = (["pack", "character", "quests", "map", "party"] as const).find((a) => b[a].includes(e.code));
+    const panel = (["pack", "character", "skills", "quests", "map", "party"] as const).find((a) => b[a].includes(e.code));
     if (!panel || e.repeat) return;
     e.preventDefault();
     this.toggle(panel === "pack" ? "inventory" : panel);
@@ -145,6 +163,7 @@ export class GameUI {
     this.root.querySelector(`.panel[data-id="${id}"]`)?.remove();
     if (!want) {
       if (id === "settings") this.capture?.stop();
+      if (id === "admin") clearInterval(this.adminTimer);
       this.open.delete(id);
       if (id === "dialog") this.mode = "none";
       this.updateBlock();
@@ -153,6 +172,11 @@ export class GameUI {
     }
     this.open.add(id);
     sfx.ui();
+    if (id === "admin") {
+      this.room?.send("admin:overview");
+      clearInterval(this.adminTimer);
+      this.adminTimer = setInterval(() => this.room?.send("admin:overview"), 2000);
+    }
     this.render(id);
     this.updateBlock();
   }
@@ -183,6 +207,10 @@ export class GameUI {
         return this.renderInventory();
       case "character":
         return this.renderCharacter();
+      case "skills":
+        return this.renderSkillsPanel();
+      case "admin":
+        return this.renderAdminPanel();
       case "quests":
         return this.renderQuests();
       case "map":
@@ -212,53 +240,39 @@ export class GameUI {
     return s;
   }
 
+  /** Pack state kept between renders: the active filter, and items already looked at. */
+  private packFilter: PackFilter = "all";
+  private packSeen?: Set<string>;
+
   private renderInventory() {
     const inv = this.inv;
     if (!inv) return;
-    const body = el(`<div class="inv"></div>`);
-    // Paper doll between the slots: helm and armour on the left, weapon and charm on the right.
-    const equip = el(`<div class="gear"><div class="gear-col"></div><div class="doll"></div><div class="gear-col"></div></div>`);
-    const cols = equip.querySelectorAll<HTMLElement>(".gear-col");
-    equip.querySelector(".doll")!.append(this.doll(inv.equipment, this.room?.sessionId));
-    const side: Record<EquipSlot, number> = { helm: 0, armor: 0, weapon: 1, charm: 1 };
-    for (const slot of ["helm", "armor", "weapon", "charm"] as EquipSlot[]) {
-      const it = inv.equipment[slot];
-      const cell = this.slotEl(it, slot);
-      cell.title = "";
-      if (it) {
-        cell.addEventListener("click", () => {
-          if (this.mode === "smith") return this.upgrade(it);
-          this.room?.send("unequip", slot);
-        });
-        cell.addEventListener("contextmenu", (e) => {
-          e.preventDefault();
-          this.room?.send("unequip", slot);
-        });
-      }
-      const row = el(`<div class="gear-slot"><span class="equip-name">${it ? esc(itemName(it)) : slot[0].toUpperCase() + slot.slice(1)}</span></div>`);
-      if (it) (row.firstElementChild as HTMLElement).style.color = RARITY_COLORS[it.rarity];
-      row.prepend(cell);
-      cols[side[slot]].append(row);
-    }
-    const stats = el(`<div class="inv-stats">
-      <div><b>${inv.derived.atk}</b> Power</div><div><b>${inv.derived.defense}</b> Defense</div>
-      <div><b>${inv.derived.hpMax}</b> Health</div><div><b>${inv.derived.staminaMax}</b> Stamina</div>
-      <div class="gold"><img src="${goldIcon()}" alt=""> ${inv.gold}</div></div>`);
-    const grid = el(`<div class="grid"></div>`);
-    inv.inventory.forEach((it) => {
-      const cell = this.slotEl(it);
-      if (it) {
-        cell.addEventListener("click", () => this.useItem(it));
-        cell.addEventListener("contextmenu", (e) => {
-          e.preventDefault();
-          this.itemMenu(it, e.clientX, e.clientY);
-        });
-      }
-      grid.append(cell);
+    // Everything carried when the pack is first opened counts as already seen.
+    if (!this.packSeen) this.packSeen = new Set(inv.inventory.filter((x): x is Item => !!x).map((x) => x.uid));
+    const body = buildPack({
+      inv,
+      mode: this.mode,
+      filter: this.packFilter,
+      setFilter: (f) => {
+        this.packFilter = f;
+        this.render("inventory");
+      },
+      seen: this.packSeen,
+      send: (type, msg) => this.room?.send(type, msg),
+      doll: (eq) => this.doll(eq, this.room?.sessionId),
+      use: (it) => this.useItem(it),
+      menu: (it, x, y) => this.itemMenu(it, x, y),
+      tooltip: (it, x, y) => this.showTooltip(it, x, y),
+      hideTooltip: () => this.hideTooltip(),
+      upgrade: (it) => this.upgrade(it),
+      toast: (text, kind) => this.toast(text, kind),
+      offer: (it) => {
+        if (!this.trade?.mine) return;
+        const uids = this.trade.mine.items.map((x) => x.uid);
+        if (!uids.includes(it.uid)) this.room?.send("trade:offer", { uids: [...uids, it.uid], gold: this.trade.mine.gold });
+      },
     });
-    const hint = this.mode === "trade" ? "Click items to add them to — or take them back from — your offer." : this.mode === "shop" || this.mode === "sell" ? "Click an item to sell it." : this.mode === "smith" ? "Click an item to upgrade it." : this.mode === "bank" ? "Click an item to store it." : "Click to equip or use · Right-click for more";
-    body.append(equip, stats, grid, el(`<div class="hint">${hint}</div>`));
-    this.panel("inventory", "Pack", body, "right");
+    this.panel("inventory", "Pack", body, "right pack-panel");
   }
 
   /** A character as others see them, wearing `eq`. `sid` picks their colours. */
@@ -339,25 +353,51 @@ export class GameUI {
 
   // --- Tooltip -------------------------------------------------------------------
 
+  /**
+   * Item card: rarity header, main stats with a comparison against what you wear now,
+   * weapon mastery, durability, the item's story and what it sells for.
+   */
   private showTooltip(it: Item, x: number, y: number) {
     const b = itemBase(it.key);
     if (!b) return;
     const st = itemStats(it);
+    const gear = b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm";
+    const kind = b.kind === "weapon" ? `${WEAPONS.find((w) => w.key === b.weapon)?.name}` : b.kind === "consumable" ? "Tonic" : b.kind === "key" ? "Keepsake" : b.kind[0].toUpperCase() + b.kind.slice(1);
+    // Compare against the item in the same slot (unless this is that item).
+    const worn = gear ? this.inv?.equipment[b.kind as EquipSlot] : undefined;
+    const cmp = worn && worn.uid !== it.uid ? itemStats(worn) : undefined;
+    const delta = (v: number, w: number | undefined) => {
+      if (w === undefined) return "";
+      const d = Math.round(v - w);
+      return d === 0 ? `<span class="tt-same">=</span>` : `<span class="${d > 0 ? "tt-up" : "tt-down"}">${d > 0 ? "▲" : "▼"} ${Math.abs(d)}</span>`;
+    };
+    const stat = (icon: UiIconName, v: number, label: string, w?: number, sign = false) =>
+      `<div class="tt-stat">${iconImg(icon, 16)}<b>${sign && v > 0 ? "+" : ""}${Math.round(v)}</b><span>${label}</span>${delta(v, w)}</div>`;
     const lines: string[] = [];
-    const kind = b.kind === "weapon" ? `${WEAPONS.find((w) => w.key === b.weapon)?.name}` : b.kind[0].toUpperCase() + b.kind.slice(1);
-    lines.push(`<div class="tt-name" style="color:${RARITY_COLORS[it.rarity]}">${esc(itemName(it))}</div>`);
-    lines.push(`<div class="tt-kind">${b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm" ? RARITY_NAMES[it.rarity] + " " : ""}${kind}</div>`);
-    if (b.kind === "weapon") lines.push(`<div>${Math.round(st.power)} Power</div>`);
-    if (st.defense) lines.push(`<div>${Math.round(st.defense)} Defense</div>`);
-    if (st.hp) lines.push(`<div>+${Math.round(st.hp)} Health</div>`);
-    if (st.stamina) lines.push(`<div>${st.stamina > 0 ? "+" : ""}${Math.round(st.stamina)} Stamina</div>`);
-    if (b.kind === "weapon") lines.push(`<div class="tt-dim">${esc(WEAPONS.find((w) => w.key === b.weapon)?.blurb ?? "")}</div>`);
-    if (b.effect) lines.push(`<div class="tt-effect">${esc(b.desc)}</div>`);
-    else lines.push(`<div class="tt-desc">${esc(b.desc)}</div>`);
-    if (b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm") lines.push(`<div class="tt-dim">Durability ${it.dur}%${it.dur <= 0 ? " — broken! Repair at the smith." : ""}</div>`);
-    if (b.bound) lines.push(`<div class="tt-dim">Bound — never lost on death.</div>`);
+    lines.push(`<div class="tt-head r${it.rarity}"><img src="${itemIcon(it.key, it.rarity)}" alt=""><div><div class="tt-name" style="color:${RARITY_COLORS[it.rarity]}">${esc(itemName(it))}</div>
+      <div class="tt-kind">${gear ? RARITY_NAMES[it.rarity] + " " : ""}${kind}${worn?.uid === it.uid ? " · <i>equipped</i>" : ""}</div></div></div>`);
+    const stats: string[] = [];
+    if (b.kind === "weapon") stats.push(stat("sword", st.power, "Power", cmp?.power));
+    if (st.defense || cmp?.defense) stats.push(stat("shield", st.defense, "Defense", cmp?.defense));
+    if (st.hp || cmp?.hp) stats.push(stat("heart", st.hp, "Health", cmp?.hp, true));
+    if (st.stamina || cmp?.stamina) stats.push(stat("stamina", st.stamina, "Stamina", cmp?.stamina, true));
+    if (stats.length) lines.push(`<div class="tt-stats">${stats.join("")}</div>`);
+    if (cmp) lines.push(`<div class="tt-cmp">Compared with your ${esc(itemName(worn!))}</div>`);
+    if (b.kind === "weapon") {
+      const mp = masteryProgress(it.mxp ?? 0);
+      const bonus = Math.round((weaponMasteryDamage(mp.level) - 1) * 100);
+      lines.push(`<div class="tt-mastery"><div class="tt-mrow">${iconImg("star", 14)}<span>Mastery ${mp.level}</span>${bonus ? `<b>+${bonus}% damage</b>` : ""}</div>
+        <div class="tt-bar"><i style="width:${Math.round((mp.into / mp.need) * 100)}%"></i></div><div class="tt-dim">This weapon grows stronger the more you fight with it.</div></div>`);
+      lines.push(`<div class="tt-dim">${esc(WEAPONS.find((w) => w.key === b.weapon)?.blurb ?? "")}</div>`);
+    }
+    lines.push(b.effect ? `<div class="tt-effect">${esc(b.desc)}</div>` : `<div class="tt-desc">${esc(b.desc)}</div>`);
+    if (gear) {
+      lines.push(`<div class="tt-dur"><span>Durability</span><div class="tt-bar dur${it.dur <= 25 ? " low" : ""}"><i style="width:${it.dur}%"></i></div><span>${it.dur}%</span></div>`);
+      if (it.dur <= 0) lines.push(`<div class="tt-warn">Broken — half strength until the smith repairs it.</div>`);
+    }
+    if (b.bound) lines.push(`<div class="tt-dim">Bound — never lost on death, can't be traded.</div>`);
     const price = sellPrice(it);
-    if (price) lines.push(`<div class="tt-dim">Sells for ${price} gold</div>`);
+    lines.push(`<div class="tt-foot">${price ? `<span class="tt-price"><img src="${goldIcon()}" alt="">${price}</span>` : "<span></span>"}<span class="tt-keys">${gear ? "Drag to equip" : b.kind === "consumable" ? `Drink with ${esc(keyLabel(settings.value.bindings.use[0]))}` : ""}</span></div>`);
     this.tooltip.innerHTML = lines.join("");
     this.tooltip.classList.remove("hidden");
     this.placeTooltip(x, y);
@@ -381,29 +421,19 @@ export class GameUI {
     const body = el(`<div class="char"></div>`);
     body.append(el(`<div class="char-top"><div class="char-name">${esc(inv.name)}</div><div>Level ${inv.level}${inv.level < MAX_LEVEL ? ` · ${inv.xp}/${inv.xpNext} XP` : " (max)"}</div>
       <div class="tt-dim">Kills ${inv.stats.kills} · Parries ${inv.stats.parries} (${inv.stats.perfects} perfect) · Deaths ${inv.stats.deaths}</div></div>`));
-    // Perks
-    const perks = el(`<div class="section"><h4>Perks</h4></div>`);
-    for (const choice of PERK_CHOICES) {
-      const picked = choice.options.find((o) => inv.perks.includes(o.id));
-      const row = el(`<div class="perk-row${choice.level > inv.level ? " locked" : ""}"><span class="lvl">Lv ${choice.level}</span></div>`);
-      for (const o of choice.options) {
-        const btn = el(`<button class="perk${picked?.id === o.id ? " picked" : ""}" ${picked || choice.level > inv.level ? "disabled" : ""}><b>${esc(o.name)}</b><span>${esc(o.desc)}</span></button>`);
-        btn.addEventListener("click", () => this.room?.send("perk", o.id));
-        row.append(btn);
-      }
-      perks.append(row);
-    }
-    // Mastery
-    const mastery = el(`<div class="section"><h4>Weapon mastery</h4></div>`);
-    for (const w of WEAPONS) {
-      const xp = inv.mastery[w.key] ?? 0;
-      const pr = masteryProgress(xp);
-      const unlocks = masteryUnlocks(w.key);
-      const row = el(`<div class="mastery"><div class="m-head"><b>${w.name}</b><span>Mastery ${pr.level}</span></div><div class="m-bar"><div style="width:${Math.round((pr.into / pr.need) * 100)}%"></div></div><div class="m-unlocks"></div></div>`);
-      const list = row.querySelector(".m-unlocks")!;
-      for (const u of unlocks) list.append(el(`<span class="${u.level <= pr.level ? "got" : ""}" title="${esc(u.desc)}">${u.level}·${esc(u.name)}</span>`));
+    // Skills: a pointer to the skill tree.
+    const sk = el(`<div class="section char-skills"><h4>Skills</h4><div class="cs-row">${iconImg("xp", 22)}<span>${inv.points.left ? `<b>${inv.points.left}</b> skill point${inv.points.left === 1 ? "" : "s"} to spend` : "All skill points spent"} · ${inv.tree.length} learned</span><button>Open skill tree (${esc(keyLabel(settings.value.bindings.skills[0]))})</button></div></div>`);
+    sk.querySelector("button")!.addEventListener("click", () => this.toggle("skills", true));
+    // Weapon mastery: each weapon grows stronger the more you fight with it.
+    const mastery = el(`<div class="section"><h4>Weapon mastery</h4><div class="tt-dim">Every weapon keeps its own mastery: +3% damage per level, and a glow at 10.</div></div>`);
+    const weapons = [inv.equipment.weapon, ...inv.inventory].filter((it): it is Item => !!it && itemBase(it.key)?.kind === "weapon");
+    for (const it of weapons) {
+      const lvl = itemMasteryLevel(it.mxp);
+      const pr = it === inv.equipment.weapon ? inv.weaponMastery : { level: lvl, into: 0, need: 1 };
+      const row = el(`<div class="mastery"><div class="m-head"><img src="${itemIcon(it.key, it.rarity)}" alt=""><b style="color:${RARITY_COLORS[it.rarity]}">${esc(itemName(it))}</b>${it === inv.equipment.weapon ? '<span class="m-hand">in hand</span>' : ""}<span>Mastery ${lvl}</span></div>${it === inv.equipment.weapon && lvl < 10 ? `<div class="m-bar"><div style="width:${Math.round((pr.into / pr.need) * 100)}%"></div></div>` : ""}</div>`);
       mastery.append(row);
     }
+    const perks = sk;
     const got = new Set(inv.achievements ?? []);
     const ach = el(`<div class="section"><h4>Achievements (${got.size}/${ACHIEVEMENTS.length})</h4><div class="achievements"></div></div>`);
     const list = ach.querySelector(".achievements")!;
@@ -434,23 +464,91 @@ export class GameUI {
   /** Names of NPCs on the current map (quest givers), set by the scene. */
   npcName?: (id: string) => string | undefined;
 
+  /** Last seen step of each tracked quest, so an advanced step can flash. */
+  private trackerSteps = new Map<string, string>();
+
   private renderTracker() {
     const inv = this.inv;
     if (!inv) return;
-    const active = QUESTS.filter((q) => inv.quests[q.id] && !inv.quests[q.id].done).slice(0, 3);
-    // Never leave a player without a next step: point at the next main quest's giver.
-    const main = mainObjective(inv);
-    const next = main?.offered
-      ? `<div class="t-q main"><div class="t-name">Next: ${esc(main.quest.name)}</div><div class="t-stage">Speak to ${esc(this.npcName?.(main.quest.giver) ?? "the quest giver in Emberwatch")}</div></div>`
-      : "";
-    this.trackerEl.innerHTML = next + active
-      .map((q) => {
-        const st = inv.quests[q.id];
-        const stage = q.stages[st.stage];
-        const prog = stage.kind === "kill" || stage.kind === "parry" ? ` ${st.progress}/${stage.count}` : "";
-        return `<div class="t-q${q.main ? " main" : ""}"><div class="t-name">${esc(q.name)}</div><div class="t-stage">${esc(stage.text)}${prog}</div></div>`;
-      })
-      .join("");
+    const list = trackedQuests(inv);
+    if (!list.length) {
+      this.trackerEl.innerHTML = "";
+      return;
+    }
+    const who = (id: string, floor = 1) => this.npcName?.(id) ?? (floor >= 2 ? "the Herald's people at Skyreach Landing (Floor 2)" : "the quest giver in Emberwatch");
+    const cards = list.map((t) => {
+      const q = t.quest;
+      const st = t.stage;
+      const stepIdx = inv.quests[q.id]?.stage ?? -1;
+      let icon: UiIconName = "talk";
+      let text = "";
+      let prog = "";
+      let frac = -1;
+      if (t.offered) text = `Speak to ${who(q.giver, q.floor)}`;
+      else if (st) {
+        text = st.text;
+        switch (st.kind) {
+          case "talk":
+            icon = st.npc === q.giver || stepIdx === q.stages.length - 1 ? "turnin" : "talk";
+            break;
+          case "kill":
+          case "parry":
+            icon = st.kind === "kill" ? "kill" : "parry";
+            prog = `${Math.min(t.progress, st.count)}/${st.count}`;
+            frac = Math.min(1, t.progress / st.count);
+            break;
+          case "collect": {
+            const have = countItem(inv, st.item);
+            prog = `${Math.min(have, st.count)}/${st.count}`;
+            frac = Math.min(1, have / st.count);
+            if (have >= st.count) {
+              icon = "turnin";
+              text = `Hand them to ${who(q.giver)}`;
+            } else icon = "collect";
+            break;
+          }
+          case "interact":
+            icon = "search";
+            break;
+          case "visit":
+            icon = "visit";
+            break;
+          case "dungeon":
+            icon = "dungeon";
+            break;
+        }
+      }
+      const key = `${stepIdx}:${t.offered}`;
+      const prev = this.trackerSteps.get(q.id);
+      const advanced = prev !== undefined && prev !== key;
+      this.trackerSteps.set(q.id, key);
+      const steps = t.offered ? "New" : `Step ${stepIdx + 1}/${q.stages.length}`;
+      return `<div class="tq ${q.main ? "main" : "side"}${advanced ? " advanced" : ""}" data-q="${q.id}">
+        <div class="tq-head">${iconImg(q.main ? "main" : "side", 18)}<span class="tq-name">${esc(q.name)}</span><span class="tq-step">${steps}</span></div>
+        <div class="tq-obj">${iconImg(icon, 20)}<span class="tq-text">${esc(text)}</span>${prog ? `<b class="tq-prog">${prog}</b>` : ""}</div>
+        ${frac >= 0 ? `<div class="tq-bar"><i style="width:${Math.round(frac * 100)}%"></i></div>` : ""}
+        <div class="tq-where"><span class="tq-arrow">➤</span><span class="tq-dist"></span></div>
+      </div>`;
+    });
+    this.trackerEl.innerHTML = `<div class="tr-head">${iconImg("quest", 16)}<span>Quests</span><kbd>${esc(keyLabel(settings.value.bindings.quests[0]))}</kbd></div>${cards.join("")}`;
+  }
+
+  /** Live direction and distance for each tracked quest (called by the scene a few times a second). */
+  setTrackerWhere(list: { id: string; angle?: number; dist?: number; area?: string; here?: boolean }[]) {
+    for (const w of list) {
+      const card = this.trackerEl.querySelector<HTMLElement>(`.tq[data-q="${w.id}"]`);
+      if (!card) continue;
+      const arrow = card.querySelector<HTMLElement>(".tq-arrow")!;
+      const dist = card.querySelector<HTMLElement>(".tq-dist")!;
+      if (w.dist === undefined) {
+        card.classList.add("nowhere");
+        continue;
+      }
+      card.classList.remove("nowhere");
+      card.classList.toggle("here", !!w.here);
+      arrow.style.transform = `rotate(${w.angle ?? 0}rad)`;
+      dist.textContent = w.here ? `You're here${w.area ? ` · ${w.area}` : ""}` : `${w.dist} m${w.area ? ` · ${w.area}` : ""}`;
+    }
   }
 
   private renderXp() {
@@ -461,10 +559,25 @@ export class GameUI {
 
   // --- Map ---------------------------------------------------------------------------
 
+  /** Set by the scene: can the current map be opened (bought, charted)? */
+  mapAccess?: () => { ok: boolean; title?: string; text?: string };
+
   private renderMap() {
-    const body = el(`<div class="map"><canvas width="800" height="600"></canvas><div class="tt-dim">Areas you haven't discovered stay dark. Secrets are never marked.</div></div>`);
-    this.panel("map", "Map", body, "center");
-    this.mapRender?.(body.querySelector("canvas")!);
+    const access = this.mapAccess?.() ?? { ok: true };
+    if (!access.ok) {
+      const body = el(`<div class="nomap">${iconImg("map", 56)}<h3>${esc(access.title ?? "")}</h3><p>${esc(access.text ?? "")}</p></div>`);
+      this.panel("map", "Map", body, "center narrow");
+      return;
+    }
+    const body = el(`<div class="map"><canvas width="880" height="600"></canvas><div class="tt-dim">Unexplored land stays under the fog. Numbered pins are your quests.</div></div>`);
+    this.panel("map", "Map", body, "center xwide");
+    const canvas = body.querySelector("canvas")!;
+    this.mapRender?.(canvas);
+    if (this.inv?.admin && this.onMapTeleport) {
+      canvas.classList.add("teleport");
+      canvas.title = "Admin: click to teleport";
+      canvas.addEventListener("click", (ev) => this.onMapTeleport!(canvas, ev));
+    }
   }
 
   // --- Party -------------------------------------------------------------------------
@@ -675,7 +788,8 @@ export class GameUI {
       const list = el(`<div class="shop"></div>`);
       d.shop.forEach((entry, idx) => {
         const it: Item = { uid: "", key: entry.key, rarity: entry.rarity ?? 0, qty: 1, plus: 0, dur: 100, bonus: {} };
-        const row = el(`<div class="shop-row"><img src="${itemIcon(entry.key, it.rarity)}" alt=""><span style="color:${RARITY_COLORS[it.rarity]}">${esc(itemBase(entry.key)?.name ?? entry.key)}</span><b>${entry.price}g</b></div>`);
+        const owned = entry.key.startsWith("map_") && !!this.inv?.discovered.includes(`map:${entry.key.slice(4)}`);
+        const row = el(`<div class="shop-row${owned ? " owned" : ""}"><img src="${itemIcon(entry.key, it.rarity)}" alt=""><span style="color:${RARITY_COLORS[it.rarity]}">${esc(itemBase(entry.key)?.name ?? entry.key)}</span><b>${owned ? "Owned" : `${entry.price}g`}</b></div>`);
         row.addEventListener("mouseenter", (e) => this.showTooltip(it, e.clientX, e.clientY));
         row.addEventListener("mouseleave", () => this.hideTooltip());
         row.addEventListener("click", () => this.room?.send("shop:buy", { shop: shopKey, idx }));
@@ -706,17 +820,19 @@ export class GameUI {
 
   private renderBank() {
     const body = el(`<div class="inv"></div>`);
-    const grid = el(`<div class="grid bank"></div>`);
-    for (const it of this.bank) {
-      const cell = this.slotEl(it);
-      if (it) cell.addEventListener("click", () => this.room?.send("bank:withdraw", { uid: it.uid }));
-      grid.append(cell);
-    }
+    const grid = el(`<div class="pk-bag bank"></div>`);
+    const bctx = {
+      send: (type: string, msg?: unknown) => this.room?.send(type, msg),
+      tooltip: (it: Item, x: number, y: number) => this.showTooltip(it, x, y),
+      hideTooltip: () => this.hideTooltip(),
+      toast: (text: string, kind?: "good" | "error") => this.toast(text, kind),
+    };
+    for (const it of this.bank) grid.append(bankCell(bctx, it));
     const gold = el(`<div class="bank-gold"><img src="${goldIcon()}" alt=""> Stored: <b>${this.bankGold}</b>
       <button data-a="dep">Deposit all</button><button data-a="wd">Withdraw all</button></div>`);
     gold.querySelector('[data-a="dep"]')!.addEventListener("click", () => this.room?.send("bank:deposit", { gold: this.inv?.gold ?? 0 }));
     gold.querySelector('[data-a="wd"]')!.addEventListener("click", () => this.room?.send("bank:withdraw", { gold: this.bankGold }));
-    body.append(gold, grid, el(`<div class="hint">Stored items and gold are safe when you fall. Click to withdraw.</div>`));
+    body.append(gold, grid, el(`<div class="hint">Stored items and gold are safe when you fall. Drag items between storage and your pack, or click to move them.</div>`));
     this.panel("bank", "Storage", body, "left");
   }
 
@@ -760,7 +876,7 @@ export class GameUI {
     this.root.append(box);
   }
 
-  inspect(d: { name: string; level: number; equipment: Partial<Record<EquipSlot, Item>>; mastery: Partial<Record<WeaponKey, number>>; stats: InvView["stats"]; floor: number }, sid: string) {
+  inspect(d: { name: string; level: number; equipment: Partial<Record<EquipSlot, Item>>; mastery: number; tree: string[]; stats: InvView["stats"]; floor: number }, sid: string) {
     this.root.querySelector(".inspect")?.remove();
     const box = el(`<div class="lore inspect"><div class="lore-name">${esc(d.name)} — Level ${d.level}</div></div>`);
     const doll = el(`<div class="doll inspect-doll"></div>`);
@@ -769,8 +885,8 @@ export class GameUI {
     const eq = el(`<div class="equip inline"></div>`);
     for (const slot of EQUIP_SLOTS) eq.append(this.slotEl(d.equipment[slot], slot));
     box.append(eq);
-    const best = Object.entries(d.mastery).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))[0];
-    box.append(el(`<p class="tt-dim">${best ? `Favours the ${WEAPONS.find((w) => w.key === best[0])?.name} (mastery ${masteryProgress(best[1] ?? 0).level}) · ` : ""}Floor ${d.floor} reached · ${d.stats.perfects} perfect parries</p>`));
+    const wpn = d.equipment.weapon;
+    box.append(el(`<p class="tt-dim">${wpn ? `Fights with ${esc(itemName(wpn))} (mastery ${d.mastery}) · ` : ""}${d.tree.length} skills learned · Floor ${d.floor} reached · ${d.stats.perfects} perfect parries</p>`));
     const row = el(`<div class="row"></div>`);
     const tradeBtn = el(`<button>Trade</button>`);
     tradeBtn.addEventListener("click", () => {
@@ -857,32 +973,46 @@ export class GameUI {
     this.panel("trade", `Trade with ${t.partner ?? "?"}`, body, "left");
   }
 
-  perkPrompt() {
-    const inv = this.inv;
-    if (!inv?.pendingPerk || this.root.querySelector(".perk-prompt")) return;
-    const choice = PERK_CHOICES.find((c) => c.level === inv.pendingPerk);
-    if (!choice) return;
-    const box = el(`<div class="lore perk-prompt"><div class="lore-name">Level ${choice.level} — choose a perk</div></div>`);
-    for (const o of choice.options) {
-      const b = el(`<button class="perk"><b>${esc(o.name)}</b><span>${esc(o.desc)}</span></button>`);
-      b.addEventListener("click", () => {
-        this.room?.send("perk", o.id);
-        box.remove();
-        this.open.delete("perk");
-        this.updateBlock();
-      });
-      box.append(b);
-    }
-    const later = el(`<button class="wide">Decide later (Character panel)</button>`);
-    later.addEventListener("click", () => {
-      box.remove();
-      this.open.delete("perk");
-      this.updateBlock();
+  // --- Admin ----------------------------------------------------------------------
+
+  adminData?: AdminOverview;
+  adminMap?: WorldMap;
+  adminKind = "world";
+  private adminGod = false;
+  private adminTimer?: ReturnType<typeof setInterval>;
+  /** Set by the scene: teleport to where the admin clicked on the map. */
+  onMapTeleport?: (c: HTMLCanvasElement, ev: MouseEvent) => void;
+
+  setAdmin(d: AdminOverview) {
+    this.adminData = d;
+    if (this.open.has("admin") && adminTabIsLive()) this.render("admin");
+  }
+
+  private renderAdminPanel() {
+    if (!this.inv?.admin) return;
+    const scroll = this.root.querySelector('.panel[data-id="admin"] .adm-pane')?.scrollTop ?? 0;
+    const body = renderAdmin({
+      send: (type, msg) => this.room?.send(type, msg),
+      data: this.adminData,
+      map: this.adminMap,
+      kind: this.adminKind,
+      quests: this.inv.quests,
+      level: this.inv.level,
+      god: this.adminGod,
+      setGod: (on) => (this.adminGod = on),
+      rerender: () => this.render("admin"),
     });
-    box.append(later);
-    this.open.add("perk");
-    this.updateBlock();
-    this.root.append(box);
+    this.panel("admin", "Admin", body, "center xwide");
+    const pane = this.root.querySelector<HTMLElement>('.panel[data-id="admin"] .adm-pane');
+    if (pane) pane.scrollTop = scroll;
+  }
+
+  private renderSkillsPanel() {
+    const inv = this.inv;
+    if (!inv) return;
+    const b = settings.value.bindings;
+    const body = renderSkills(inv as unknown as SkillView, (type, msg) => this.room?.send(type, msg), [keyLabel(b.skill1[0]), keyLabel(b.skill2[0])]);
+    this.panel("skills", "Skills", body, "center xwide");
   }
 
   // --- Chat & toasts ------------------------------------------------------------------
@@ -938,17 +1068,24 @@ export class GameUI {
   }
 
   setInv(v: InvView) {
-    const firstPerk = !this.inv?.pendingPerk && v.pendingPerk;
+    const before = this.inv?.points.left;
     this.inv = v;
     this.refresh();
-    // Never interrupt play with a modal: announce the choice and let the player pick it in the Character panel.
-    if (firstPerk) this.toast(`Level ${v.pendingPerk} perk available — open Character (${keyLabel(settings.value.bindings.character[0])}) to choose`, "good");
-    document.getElementById("vitals")?.classList.toggle("perk-ready", !!v.pendingPerk);
+    // Never interrupt play with a modal: announce new skill points and let the player spend them when ready.
+    if (before !== undefined && v.points.left > before) {
+      this.toast(`You earned a skill point! Open Skills (${keyLabel(settings.value.bindings.skills[0])}) to learn something new`, "good");
+    }
+    document.getElementById("vitals")?.classList.toggle("perk-ready", v.points.left > 0);
+    if (v.admin && !document.getElementById("admin-btn")) {
+      const b = el(`<button id="admin-btn" title="Admin panel (F10 or &#96;)">ADMIN</button>`);
+      b.addEventListener("click", () => this.toggle("admin"));
+      this.root.append(b);
+    }
   }
 }
 
 export function roomName(room?: string) {
-  return room === "dungeon" ? "Undercroft" : room === "floor2" ? "Floor 2" : "Floor 1";
+  return room === "dungeon" ? "Undercroft" : room === "stormspire" ? "Stormspire" : room === "floor2" ? "Floor 2" : "Floor 1";
 }
 
 void repairCost;

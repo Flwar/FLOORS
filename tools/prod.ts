@@ -55,9 +55,11 @@ for (let i = 0; i < 100 && !inv; i++) await new Promise((r) => setTimeout(r, 50)
 const gold0 = inv?.gold;
 room.send("dev:give", { key: "sword_dawnbreaker" });
 room.send("dev:wear", { weapon: "sword_dawnbreaker", armor: "armor_dawn", helm: "helm_keeper" });
+room.send("admin:add", { gold: 100000 });
+room.send("admin:level", 12);
 await new Promise((r) => setTimeout(r, 800));
 const me = room.state.players.get(room.sessionId);
-check("dev commands disabled", inv?.equipment?.weapon?.key !== "sword_dawnbreaker" && me?.armorLook === 1 && inv?.gold === gold0, `weapon ${inv?.equipment?.weapon?.key}, armor look ${me?.armorLook}`);
+check("dev and admin commands refused for normal accounts", inv?.equipment?.weapon?.key !== "sword_dawnbreaker" && me?.armorLook === 1 && inv?.gold === gold0 && inv?.level === 1 && !inv?.admin, `weapon ${inv?.equipment?.weapon?.key}, armor look ${me?.armorLook}`);
 await Promise.race([room.leave().catch(() => {}), new Promise((r) => setTimeout(r, 1000))]);
 
 // Password guessing is slowed down: after 8 wrong tries the name is locked for a while,

@@ -206,7 +206,7 @@ export function buildFloor1(): WorldMap {
   m.prop("bench", 35, 83, 2, 1);
   m.prop("bench", 40, 76, 2, 1, 1);
   m.prop("lamp", 33, 75);
-  m.prop("lamp", 44, 74);
+  m.prop("lamp", 49, 76);
   m.prop("lamp", 33, 86);
   m.prop("lamp", 45, 88);
   m.prop("barrel", 28, 88);
@@ -267,10 +267,12 @@ export function buildFloor1(): WorldMap {
   for (let a = 0; a < Math.PI * 2; a += 0.02) {
     const x = Math.round(camp.cx + Math.cos(a) * camp.r);
     const y = Math.round(camp.cy + Math.sin(a) * camp.r * 0.85);
-    const gap = a > 2.2 && a < 2.75; // the gate faces the road
-    const gap2 = a > 0.1 && a < 0.35; // a narrow back way toward the ruins
+    const gap = a > 3.3 && a < 3.85; // the main gate, where the forest road arrives from the west
+    const gap2 = a > 1.2 && a < 1.45; // a narrow back way south, toward the ruins shortcut
     if (!gap && !gap2 && land(x, y)) m.set(x, y, Tile.Palisade);
   }
+  // The back way: a trail from the south gap down to the forest-ruins shortcut.
+  road([[114, 29], [115, 33], [118, 36]], 0);
   // The Forgotten Shrine: a secret clearing reachable through a single gap in the trees.
   road([[26, 22], [22, 17], [18, 12]], 0);
   m.fill(16, 10, 21, 15, Tile.StoneFloor);
@@ -425,7 +427,7 @@ export function buildFloor1(): WorldMap {
   spawn("w-glade", 84, 36, ["goblin", "goblin", "archer"], 3, 50);
   spawn("w-east", 96, 44, ["shieldbearer", "cutpurse"], 3, 40);
   spawn("w-north", 48, 12, ["wolf", "wolf", "wolf"], 3, 50);
-  spawn("w-camp-gate", 102, 28, ["shieldbearer", "archer"], 4, 40);
+  spawn("w-camp-gate", 99, 19, ["shieldbearer", "archer"], 4, 40);
   spawn("w-camp", 112, 24, ["cutpurse", "cutpurse", "archer", "shieldbearer"], 4, 60, 60, 0.1);
   spawn("w-grakk", 114, 18, ["grakk"], 5, 0, 300, 0);
   // Sunken Ruins (4–6).
@@ -445,5 +447,85 @@ export function buildFloor1(): WorldMap {
   spawn("c-crawler", 180, 132, ["brute"], 8, 0, 600, 1);
 
   m.spawn = { x: px(38), y: px(84) };
+  connectEverything(m);
   return m;
+}
+
+/**
+ * Guarantee that every NPC, object and enemy spawn can be walked to from the spawn point.
+ * Anything sealed off by scattered trees gets a small clearing and a trail cut through
+ * the trees (never through walls, palisades, water or rock) to the nearest open ground.
+ */
+function connectEverything(m: WorldMap) {
+  const W = m.width;
+  const H = m.height;
+  const reach = new Uint8Array(W * H);
+  const flood = (start: number) => {
+    const stack = [start];
+    reach[start] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      const x = i % W;
+      const y = (i - x) / W;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const j = ny * W + nx;
+        if (reach[j] || m.isSolidTile(nx, ny)) continue;
+        reach[j] = 1;
+        stack.push(j);
+      }
+    }
+  };
+  flood(Math.floor(m.spawn.y / TILE) * W + Math.floor(m.spawn.x / TILE));
+  const points = [...m.npcs, ...m.objects, ...m.spawns].map((q) => ({ tx: Math.floor(q.x / TILE), ty: Math.floor(q.y / TILE), spawn: "enemies" in q }));
+  for (const pt of points) {
+    const near = () => {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (reach[(pt.ty + dy) * W + pt.tx + dx]) return true;
+      return false;
+    };
+    if (near()) continue;
+    // A clearing where the thing stands (roomier for enemy groups).
+    const r = pt.spawn ? 2 : 1;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (m.get(pt.tx + dx, pt.ty + dy) === Tile.Tree) m.set(pt.tx + dx, pt.ty + dy, Tile.TallGrass);
+    // Cheapest way out through trees (Dijkstra; open ground is cheap, trees cost more).
+    const cost = new Float64Array(W * H).fill(Infinity);
+    const from = new Int32Array(W * H).fill(-1);
+    const start = pt.ty * W + pt.tx;
+    cost[start] = 0;
+    const open: number[] = [start];
+    let goal = -1;
+    while (open.length) {
+      let bi = 0;
+      for (let k = 1; k < open.length; k++) if (cost[open[k]] < cost[open[bi]]) bi = k;
+      const i = open.splice(bi, 1)[0];
+      if (reach[i]) {
+        goal = i;
+        break;
+      }
+      const x = i % W;
+      const y = (i - x) / W;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const t = m.get(nx, ny);
+        const step = t === Tile.Tree ? 4 : m.isSolidTile(nx, ny) ? Infinity : 1;
+        const j = ny * W + nx;
+        if (cost[i] + step < cost[j]) {
+          cost[j] = cost[i] + step;
+          from[j] = i;
+          open.push(j);
+        }
+      }
+    }
+    if (goal < 0) continue;
+    for (let i = goal; i !== -1; i = from[i]) {
+      const x = i % W;
+      const y = (i - x) / W;
+      if (m.get(x, y) === Tile.Tree) m.set(x, y, Tile.TallGrass);
+    }
+    flood(start);
+  }
 }

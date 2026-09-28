@@ -1,0 +1,46 @@
+/* Admin panel (admin accounts only). */
+.admin { display: flex; flex-direction: column; gap: 10px; }
+.adm-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.adm-tab { padding: 6px 12px; font-size: 13px; background: rgba(255, 255, 255, 0.06); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(232, 197, 90, 0.2); }
+.adm-tab.on { background: linear-gradient(#b8433a, #7a2a22); color: #fff; box-shadow: none; }
+.adm-pane { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 260px); overflow: auto; padding-right: 4px; }
+.adm-pane h4 { margin: 8px 0 2px; font-weight: normal; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-dim); }
+.adm-note { font-size: 12px; color: var(--ink-dim); }
+.adm-row { display: flex; align-items: center; gap: 10px; }
+.adm-label { width: 120px; flex: none; font-size: 13px; color: var(--ink-dim); }
+.adm-ctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 1; }
+.admin button { padding: 5px 10px; font-size: 12.5px; }
+.admin button.danger { background: linear-gradient(#d8665a, #a8342c); color: #fff; }
+.admin button.dis { opacity: 0.35; pointer-events: none; }
+.admin button.on { background: linear-gradient(#8fe38a, #3f9a44); color: #102010; }
+.admin input, .admin select { font: inherit; font-size: 13px; background: rgba(0, 0, 0, 0.45); color: var(--ink); border: 1px solid rgba(232, 197, 90, 0.35); border-radius: 6px; padding: 5px 8px; }
+.admin input[type=number] { width: 64px; }
+.adm-check { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.adm-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+.adm-mastery { display: flex; gap: 3px; }
+.adm-mastery button { padding: 4px 8px; }
+.adm-player { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; align-items: center; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 6px 8px; }
+.adm-pname span { font-size: 12px; color: var(--ink-dim); }
+.adm-hp { position: relative; height: 14px; background: rgba(0, 0, 0, 0.5); border-radius: 7px; overflow: hidden; }
+.adm-hp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#e8554a, #a8322a); }
+.adm-hp span { position: relative; display: block; text-align: center; font-size: 10px; line-height: 14px; }
+.adm-pact { display: flex; gap: 4px; }
+.adm-search { width: 100%; }
+.adm-rarity { display: flex; gap: 4px; }
+.adm-rarity button { background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.adm-rarity button.on { box-shadow: inset 0 0 0 2px currentColor; background: rgba(255, 255, 255, 0.1); }
+.adm-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.adm-item { display: flex; flex-direction: column; align-items: center; gap: 2px; background: rgba(255, 255, 255, 0.05); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(232, 197, 90, 0.18); padding: 6px 4px; }
+.adm-item img { width: 44px; height: 44px; }
+.adm-item span { font-size: 11.5px; text-align: center; line-height: 1.2; }
+.adm-item small { font-size: 10px; color: var(--ink-dim); }
+.adm-quest { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 6px 8px; font-size: 13px; }
+.adm-qs { margin-left: 8px; font-size: 11px; color: var(--ink-dim); }
+.adm-qs.on { color: #9fd3ff; }
+.adm-qs.done { color: #9fe0a6; }
+.adm-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 13px; }
+.adm-stats div { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding: 3px 0; }
+.adm-stats span { color: var(--ink-dim); }
+#admin-btn { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); padding: 4px 12px; font: bold 12px "Trebuchet MS", sans-serif; letter-spacing: 0.08em;
+  background: linear-gradient(#b8433a, #7a2a22); color: #fff; border-radius: 6px; pointer-events: auto; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+.map canvas.teleport { cursor: crosshair; }

@@ -2,7 +2,7 @@ import { makeItem, rollRarity, TILE } from "@floors/shared";
 import type { WorldRoom } from "../rooms/WorldRoom.ts";
 import type { EnemyData } from "./sim.ts";
 
-interface EventDef {
+export interface EventDef {
   id: string;
   name: string;
   announce: string;
@@ -11,9 +11,11 @@ interface EventDef {
   where: () => { x: number; y: number };
   enemies?: { key: string; elite?: boolean; level: number; hpScale?: number }[];
   reward: { xp: number; gold: number; loot?: boolean };
+  /** Item keys a participant may win (defaults to Floor 1 gear). */
+  lootPool?: string[];
 }
 
-const EVENTS: EventDef[] = [
+export const FLOOR1_EVENTS: EventDef[] = [
   {
     id: "frenzy",
     name: "Frenzied Pack",
@@ -54,13 +56,51 @@ const EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 2: storms, a great pride, and the wandering merchant. */
+export const FLOOR2_EVENTS: EventDef[] = [
+  {
+    id: "stormfront",
+    name: "Stormfront",
+    announce: "A stormfront breaks over the Gilded Terraces — storm adepts ride the lightning down!",
+    durationMs: 5 * 60_000,
+    where: () => [{ x: 80, y: 74 }, { x: 96, y: 62 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "stormadept", level: 9 }, { key: "stormadept", level: 9 }, { key: "stormadept", level: 9 },
+      { key: "skyguard", level: 9 }, { key: "skyguard", level: 9 }, { key: "sentinel", level: 10, elite: true },
+    ],
+    reward: { xp: 450, gold: 160, loot: true },
+    lootPool: ["mat_stormglass", "mat_gilded", "charm_gale", "sword_knight", "helm_greathelm", "armor_brigandine"],
+  },
+  {
+    id: "pride",
+    name: "The Golden Pride",
+    announce: "A great sky-lynx pride is hunting the western terraces!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 62, y: 76 }),
+    enemies: [
+      { key: "skylynx", level: 9 }, { key: "skylynx", level: 9 }, { key: "skylynx", level: 9 }, { key: "skylynx", level: 9 },
+      { key: "skylynx", level: 10, elite: true, hpScale: 1.5 },
+    ],
+    reward: { xp: 380, gold: 130, loot: true },
+    lootPool: ["mat_feather", "mat_pelt", "charm_wolf", "daggers_night", "spear_glaive"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has set up at Skyreach Landing — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 86, y: 127 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {
   private active?: { def: EventDef; until: number; enemies: Set<string>; contributors: Set<string> };
   private nextAt: number;
   merchantStock: { key: string; rarity: number; price: number }[] = [];
 
-  constructor(private room: WorldRoom) {
+  constructor(private room: WorldRoom, private defs: EventDef[] = FLOOR1_EVENTS) {
     this.nextAt = 3 * 60_000;
   }
 
@@ -71,12 +111,12 @@ export class WorldEvents {
       return;
     }
     if (now >= this.nextAt && this.room.state.players.size > 0) {
-      this.start(EVENTS[Math.floor(Math.random() * EVENTS.length)].id);
+      this.start(this.defs[Math.floor(Math.random() * this.defs.length)].id);
     }
   }
 
   start(id: string) {
-    const def = EVENTS.find((e) => e.id === id);
+    const def = this.defs.find((e) => e.id === id);
     if (!def || this.active) return;
     const now = this.room.sim.now;
     const at = def.where();
@@ -144,7 +184,7 @@ export class WorldEvents {
       ch.addXp(a.def.reward.xp);
       ch.data.gold += a.def.reward.gold;
       if (a.def.reward.loot) {
-        const pool = ["charm_amber", "charm_wolf", "armor_chain", "armor_ranger", "helm_iron", "helm_horned", "sword_iron"];
+        const pool = a.def.lootPool ?? ["charm_amber", "charm_wolf", "armor_chain", "armor_ranger", "helm_iron", "helm_horned", "sword_iron"];
         const it = makeItem(pool[Math.floor(Math.random() * pool.length)], rollRarity(1.4, 1));
         if (!ch.addItem(it)) ch.data.bank[ch.data.bank.indexOf(null)] = it;
         this.room.clients.getById(sid)?.send("looted", { key: it.key, rarity: it.rarity, qty: 1 });

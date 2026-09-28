@@ -5,7 +5,8 @@ export type QuestStage =
   | { kind: "interact"; objects: string[]; text: string }
   | { kind: "parry"; count: number; text: string }
   | { kind: "visit"; zone: string; text: string }
-  | { kind: "dungeon"; text: string };
+  /** Enter a boss dungeon; `dungeon` is its room kind ("dungeon" is the Undercroft). */
+  | { kind: "dungeon"; text: string; dungeon: "dungeon" | "stormspire" };
 
 export interface QuestDef {
   id: string;
@@ -19,6 +20,8 @@ export interface QuestDef {
   stages: QuestStage[];
   rewards: { xp: number; gold: number; items?: { key: string; rarity?: number; qty?: number }[]; unlockFloor?: number };
   main?: boolean;
+  /** The floor the quest's giver is on (default 1). */
+  floor?: number;
 }
 
 export const QUESTS: QuestDef[] = [
@@ -87,7 +90,7 @@ export const QUESTS: QuestDef[] = [
     pitch: "Use the key. Beneath the ruins waits a Warden, and past it — if the old tablets are right — the Keeper of the First Gate. Take friends. Rest at the braziers.",
     thanks: "The Warden has fallen. Only the Keeper remains between us and the Floor above.",
     stages: [
-      { kind: "dungeon", text: "Unseal the Undercroft (Sunken Ruins court)" },
+      { kind: "dungeon", dungeon: "dungeon", text: "Unseal the Undercroft (Sunken Ruins court)" },
       { kind: "kill", enemy: ["warden"], count: 1, text: "Defeat the Undercroft Warden" },
       { kind: "talk", npc: "guildmaster", text: "Return to Guildmaster Rhea" },
     ],
@@ -151,6 +154,123 @@ export const QUESTS: QuestDef[] = [
       { kind: "talk", npc: "scholar", text: "Return to Scholar Ione" },
     ],
     rewards: { xp: 280, gold: 90, items: [{ key: "tonic", qty: 3 }] },
+  },
+  // --- Floor 2: the Gilded Terraces ------------------------------------------------------
+  {
+    id: "f2_arrival",
+    name: "Above the Clouds",
+    giver: "herald",
+    main: true,
+    floor: 2,
+    requires: "q_keeper",
+    pitch: "Welcome to the Gilded Terraces. Before anything else, learn how this floor fights. The sky lynxes hunt the terraces in prides — thin them, and you'll understand why nobody walks alone up here.",
+    thanks: "You move like someone who's done this before. Good. The Causeway is next.",
+    stages: [
+      { kind: "visit", zone: "gilded-terraces", text: "Walk out onto the Gilded Terraces" },
+      { kind: "kill", enemy: ["skylynx"], count: 6, text: "Hunt sky lynxes on the terraces" },
+      { kind: "talk", npc: "herald", text: "Report to Lumen at Skyreach Landing" },
+    ],
+    rewards: { xp: 500, gold: 150, items: [{ key: "tonic", qty: 3 }] },
+  },
+  {
+    id: "f2_causeway",
+    name: "The Broken Causeway",
+    giver: "herald",
+    main: true,
+    floor: 2,
+    requires: "f2_arrival",
+    pitch: "East of the terraces, the Causeway hangs by old wards. Wake the last wardstone at its far end, and break the Aegis knights who guard the bridges. Keep your footing — the Windcallers love a long drop.",
+    thanks: "The wards are singing again. Something up in the Heights heard them too.",
+    stages: [
+      { kind: "visit", zone: "shattered-causeway", text: "Cross onto the Shattered Causeway" },
+      { kind: "interact", objects: ["causeway-ward"], text: "Wake the wardstone at the Causeway's far end" },
+      { kind: "kill", enemy: ["aegis"], count: 3, text: "Break the Gilded Aegis knights" },
+      { kind: "talk", npc: "herald", text: "Return to Lumen" },
+    ],
+    rewards: { xp: 700, gold: 220 },
+  },
+  {
+    id: "f2_storm",
+    name: "Voice of the Storm",
+    giver: "herald",
+    main: true,
+    floor: 2,
+    requires: "f2_causeway",
+    pitch: "North, in the Stormveil Heights, a shrine still speaks the storm's name. Read it. Then find the Storm Colossus in the Thunder Ring — the seal on its chest opens the Stormspire.",
+    thanks: "Vaelra. So that's the name. The seal will open her door. Rest first — she won't be kind.",
+    stages: [
+      { kind: "visit", zone: "stormveil", text: "Climb into the Stormveil Heights" },
+      { kind: "interact", objects: ["storm-shrine"], text: "Read the Shrine of the Storm" },
+      { kind: "kill", enemy: ["colossus"], count: 1, text: "Defeat the Storm Colossus in the Thunder Ring" },
+      { kind: "talk", npc: "herald", text: "Bring the Stormspire Seal to Lumen" },
+    ],
+    rewards: { xp: 1100, gold: 320 },
+  },
+  {
+    id: "f2_spire",
+    name: "The Stormspire",
+    giver: "herald",
+    main: true,
+    floor: 2,
+    requires: "f2_storm",
+    pitch: "The Stormspire's gate waits at the top of the Heights. Inside, Vaelra, Keeper of the Storm. Learn her, the way you learned Aurelion — and the stair above will open.",
+    thanks: "The storm is quiet. For the first time in a hundred years, the Terraces can hear themselves. Look up, climber.",
+    stages: [
+      { kind: "dungeon", dungeon: "stormspire", text: "Enter the Stormspire" },
+      { kind: "kill", enemy: ["vaelra"], count: 1, text: "Defeat Vaelra, Keeper of the Storm" },
+      { kind: "talk", npc: "herald", text: "Return to Lumen" },
+    ],
+    rewards: { xp: 2400, gold: 700 },
+  },
+  {
+    id: "f2_feathers",
+    name: "Feathers for Fletching",
+    giver: "quarter",
+    floor: 2,
+    requires: "q_keeper",
+    pitch: "My fletchers need galefeathers. The Windcallers and the lynxes both carry them. Six should do.",
+    thanks: "Perfect. These'll fly true. Take this for your trouble.",
+    stages: [{ kind: "collect", item: "mat_feather", count: 6, consume: true, text: "Bring Iven 6 Galefeathers" }],
+    rewards: { xp: 320, gold: 140, items: [{ key: "tonic", qty: 2 }] },
+  },
+  {
+    id: "f2_plate",
+    name: "Gilded Plate",
+    giver: "skysmith",
+    floor: 2,
+    requires: "q_keeper",
+    pitch: "The Sentinels and the Aegis knights wear plate older than this Landing. Bring me five pieces and I'll forge you something worth carrying.",
+    thanks: "Ha! Look at that grain. Here — the first thing I made from it.",
+    stages: [{ kind: "collect", item: "mat_gilded", count: 5, consume: true, text: "Bring Brannoc 5 Gilded Plate" }],
+    rewards: { xp: 360, gold: 100, items: [{ key: "sword_knight", rarity: 2 }] },
+  },
+  {
+    id: "f2_aviary",
+    name: "The Lost Aviary",
+    giver: "gardener",
+    floor: 2,
+    requires: "q_keeper",
+    pitch: "My grandmother kept great golden birds in an aviary off the gardens' edge. No one's found it since the Sentinels woke. Would you look?",
+    thanks: "It's still there… Thank you. Take her old charm — she'd want it used.",
+    stages: [
+      { kind: "interact", objects: ["aviary-nest"], text: "Find the lost aviary beyond the Sunken Gardens" },
+      { kind: "talk", npc: "gardener", text: "Tell Maelis what you found" },
+    ],
+    rewards: { xp: 380, gold: 160, items: [{ key: "charm_gale", rarity: 2 }] },
+  },
+  {
+    id: "f2_sentinels",
+    name: "Silence the Sentinels",
+    giver: "gardener",
+    floor: 2,
+    requires: "f2_aviary",
+    pitch: "The Sentinels were built to tend the gardens. Now they crush anything that walks there. Put three of them to rest.",
+    thanks: "The gardens are quieter already. Maybe the birds will come back.",
+    stages: [
+      { kind: "kill", enemy: ["sentinel"], count: 3, text: "Put 3 Gilded Sentinels to rest" },
+      { kind: "talk", npc: "gardener", text: "Return to Maelis" },
+    ],
+    rewards: { xp: 450, gold: 180, items: [{ key: "mat_stormglass", qty: 3 }] },
   },
 ];
 

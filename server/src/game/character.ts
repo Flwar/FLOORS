@@ -1,6 +1,7 @@
 import {
-  baseHp, baseStamina, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemStats, makeItem, masteryDamage, masteryLevel, masteryMods, MAX_LEVEL, Mod,
-  perkById, PERK_CHOICES, WEAPON_ARTS, WEAPONS, xpToNext, type EquipSlot, type PlayerSettings, type Item, type ItemEffect, type WeaponKey,
+  baseHp, baseStamina, cannotLearn, combatBonus, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemMasteryLevel, itemStats, learnedSkills, makeItem, masteryProgress,
+  MAX_LEVEL, Mod, NO_SKILL, QUEST_SKILL_POINTS, skillPointsTotal, treeMods, treeNode, TREES, WEAPON_ARTS, WEAPONS, xpToNext,
+  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type WeaponKey,
 } from "@floors/shared";
 import type { Player } from "../state.ts";
 
@@ -25,14 +26,23 @@ export interface CharacterData {
   inventory: (Item | null)[];
   bank: (Item | null)[];
   equipment: Partial<Record<EquipSlot, Item>>;
+  /** Legacy (per weapon type); mastery now lives on each weapon item. */
   mastery: Partial<Record<WeaponKey, number>>;
+  /** Legacy perk picks; they became General skill-tree nodes. */
   perks: string[];
+  /** Learned skill-tree nodes. */
+  tree?: string[];
+  /** Skill points from quests (levels give the rest). */
+  bonusPoints?: number;
+  /** Equipped skills per weapon type: skill-pool indices, NO_SKILL for empty. */
+  loadout?: Partial<Record<WeaponKey, [number, number]>>;
   quests: Record<string, QuestState>;
   discovered: string[];
   bossKills: string[];
   /** Highest floor unlocked. */
   floor: number;
-  pos?: { room: string; x: number; y: number; hp?: number };
+  /** Where the character is. `via`: arrive at this object (a gate) instead of x/y. */
+  pos?: { room: string; x: number; y: number; hp?: number; via?: string };
   stats: { kills: number; deaths: number; parries: number; perfects: number; playMs: number };
   achievements: string[];
   /** Volumes, zoom and key bindings (sanitized), so they follow the player between machines. */
@@ -75,8 +85,9 @@ export interface Derived {
   mods: number;
   effects: Set<ItemEffect>;
   weaponKey: WeaponKey;
+  /** Mastery level of the weapon in hand. */
   mastery: number;
-  mdmg: ReturnType<typeof masteryDamage>;
+  mdmg: ReturnType<typeof combatBonus>;
 }
 
 /**
@@ -87,6 +98,8 @@ export class Character {
   derived!: Derived;
   dirty = true;
   unbrokenReadyAt = 0;
+  /** Set when a gate sends the character to another floor: where they will appear. */
+  travelTo?: { room: string; via: string; pos?: CharacterData["pos"] };
 
   constructor(public data: CharacterData, readonly accountId: number | null) {
     this.normalize();
@@ -103,6 +116,17 @@ export class Character {
     d.stats ??= { kills: 0, deaths: 0, parries: 0, perfects: 0, playMs: 0 };
     d.achievements ??= [];
     if (!d.equipment.weapon) d.equipment.weapon = makeItem("sword_rusty", 0);
+    // Skill tree migration: old perks become General nodes, quest points are credited,
+    // and the old per-type mastery moves onto the weapon in hand.
+    if (!d.tree) {
+      d.tree = d.perks.filter((id) => treeNode(id));
+      d.bonusPoints = Object.entries(QUEST_SKILL_POINTS).reduce((n, [id, pts]) => n + (d.quests[id]?.done ? pts : 0), 0);
+      const w = d.equipment.weapon!;
+      const wk = itemBase(w.key)?.weapon;
+      if (wk && w.mxp === undefined && d.mastery[wk]) w.mxp = d.mastery[wk];
+    }
+    d.bonusPoints ??= 0;
+    d.loadout ??= {};
   }
 
   get weaponKey(): WeaponKey {
@@ -110,7 +134,65 @@ export class Character {
   }
 
   hasPerk(id: string) {
-    return this.data.perks.includes(id);
+    return this.data.tree!.includes(id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Skill tree
+
+  skillPoints() {
+    const total = skillPointsTotal(this.data.level, this.data.bonusPoints ?? 0);
+    const used = this.data.tree!.filter((id) => treeNode(id)).length;
+    return { total, left: Math.max(0, total - used) };
+  }
+
+  learn(id: string): string | undefined {
+    const d = this.data;
+    const err = cannotLearn(id, d.tree!, d.level, this.skillPoints().left);
+    if (err) return err;
+    d.tree!.push(id);
+    // A new skill goes straight into an empty slot.
+    const n = treeNode(id)!;
+    if (n.kind === "skill" && n.tree !== "general") {
+      const lo = this.loadoutFor(n.tree);
+      const empty = lo.indexOf(NO_SKILL);
+      if (empty >= 0) lo[empty] = n.skill!;
+    }
+    this.recompute();
+    return undefined;
+  }
+
+  /** Unlearn everything (for a fee), refunding every point. */
+  resetTree() {
+    this.data.tree = [];
+    this.data.loadout = {};
+    this.recompute();
+  }
+
+  resetCost() {
+    return 20 * this.data.level;
+  }
+
+  /** The two equipped skills for a weapon type, cleaned of anything not learned. */
+  loadoutFor(wk: WeaponKey): [number, number] {
+    const d = this.data;
+    const known = learnedSkills(wk, d.tree!);
+    let lo = d.loadout![wk] ?? [NO_SKILL, NO_SKILL];
+    lo = lo.map((i) => (known.includes(i) ? i : NO_SKILL)) as [number, number];
+    if (lo[0] !== NO_SKILL && lo[0] === lo[1]) lo[1] = NO_SKILL;
+    d.loadout![wk] = lo;
+    return lo;
+  }
+
+  equipSkill(wk: WeaponKey, slot: number, index: number): string | undefined {
+    if (slot !== 0 && slot !== 1) return "No such slot.";
+    const lo = this.loadoutFor(wk);
+    if (index !== NO_SKILL && !learnedSkills(wk, this.data.tree!).includes(index)) return "Learn that skill in the skill tree first.";
+    const other = 1 - slot;
+    if (index !== NO_SKILL && lo[other] === index) lo[other] = lo[slot];
+    lo[slot] = index;
+    this.recompute();
+    return undefined;
   }
 
   recompute() {
@@ -132,9 +214,8 @@ export class Character {
       if (eff) effects.add(eff);
     }
     const wk = this.weaponKey;
-    const mlevel = masteryLevel(d.mastery[wk] ?? 0);
-    let mods = masteryMods(wk, mlevel);
-    for (const id of d.perks) mods |= perkById(id)?.mod ?? 0;
+    const mlevel = itemMasteryLevel(d.equipment.weapon?.mxp);
+    let mods = treeMods(wk, d.tree!);
     if (effects.has("wideParry")) mods |= Mod.WideParry;
     if (effects.has("lightDodge")) mods |= Mod.LightDodge;
     if (effects.has("longDodge")) mods |= Mod.LongDodge;
@@ -151,7 +232,7 @@ export class Character {
       effects,
       weaponKey: wk,
       mastery: mlevel,
-      mdmg: masteryDamage(wk, mlevel),
+      mdmg: combatBonus(wk, d.tree!, mlevel),
     };
     this.dirty = true;
   }
@@ -174,6 +255,9 @@ export class Character {
     p.armorLook = d.equipment.armor ? itemBase(d.equipment.armor.key)?.look ?? 0 : 0;
     p.helmLook = d.equipment.helm ? itemBase(d.equipment.helm.key)?.look ?? 0 : 0;
     p.mods = dv.mods;
+    const lo = this.loadoutFor(dv.weaponKey);
+    p.sk1 = lo[0];
+    p.sk2 = lo[1];
     p.potions = this.count("tonic");
   }
 
@@ -314,36 +398,28 @@ export class Character {
     return gained;
   }
 
-  /** Returns true when a mastery level was gained. */
+  /** Mastery goes to the weapon in hand. Returns true when it gained a level. */
   addMastery(amount: number): boolean {
-    const wk = this.weaponKey;
-    const before = masteryLevel(this.data.mastery[wk] ?? 0);
-    this.data.mastery[wk] = (this.data.mastery[wk] ?? 0) + amount;
-    const after = masteryLevel(this.data.mastery[wk]!);
+    const w = this.data.equipment.weapon;
+    if (!w) return false;
+    const before = itemMasteryLevel(w.mxp);
+    w.mxp = Math.round(((w.mxp ?? 0) + amount) * 100) / 100;
     this.dirty = true;
-    if (after > before) {
+    if (itemMasteryLevel(w.mxp) > before) {
       this.recompute();
       return true;
     }
     return false;
   }
 
-  /** Perk choices currently available (levels reached without a pick). */
-  pendingPerkLevel(): number | undefined {
-    for (const choice of PERK_CHOICES) {
-      if (choice.level > this.data.level) break;
-      if (!choice.options.some((o) => this.data.perks.includes(o.id))) return choice.level;
+  /** Highest mastery level of any weapon this character owns. */
+  bestMastery() {
+    const d = this.data;
+    let best = 0;
+    for (const it of [...Object.values(d.equipment), ...d.inventory, ...d.bank]) {
+      if (it && itemBase(it.key)?.kind === "weapon") best = Math.max(best, itemMasteryLevel(it.mxp));
     }
-    return undefined;
-  }
-
-  choosePerk(id: string): string | undefined {
-    const lvl = this.pendingPerkLevel();
-    const choice = PERK_CHOICES.find((c) => c.level === lvl);
-    if (!choice || !choice.options.some((o) => o.id === id)) return "That perk isn't available.";
-    this.data.perks.push(id);
-    this.recompute();
-    return undefined;
+    return best;
   }
 
   /** Snapshot for the owning client's UI. */
@@ -357,9 +433,11 @@ export class Character {
       gold: d.gold,
       inventory: d.inventory,
       equipment: d.equipment,
-      mastery: d.mastery,
-      perks: d.perks,
-      pendingPerk: this.pendingPerkLevel(),
+      tree: d.tree,
+      points: this.skillPoints(),
+      resetCost: this.resetCost(),
+      loadout: Object.fromEntries(WEAPONS.map((w) => [w.key, this.loadoutFor(w.key)])),
+      weaponMastery: masteryProgress(this.data.equipment.weapon?.mxp ?? 0),
       quests: d.quests,
       discovered: d.discovered,
       bossKills: d.bossKills,

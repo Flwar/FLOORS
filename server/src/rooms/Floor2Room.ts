@@ -1,61 +1,44 @@
-import type { Client } from "colyseus";
-import { buildFloor2Landing, type WorldMap } from "@floors/shared";
+import { buildFloor2, type WorldMap } from "@floors/shared";
 import type { Character } from "../game/character.ts";
-import { GameRoom } from "./GameRoom.ts";
+import { FLOOR2_EVENTS, type EventDef } from "../game/events.ts";
+import { WorldRoom } from "./WorldRoom.ts";
 
-/** Skyreach Landing — the reward for clearing Floor 1: the first glimpse of Floor 2. */
-export class Floor2Room extends GameRoom {
+const RUMOURS = [
+  "The Sentinels in the Sunken Gardens only wake when you step inside their walls. Mostly.",
+  "Somebody saw golden feathers blowing off the gardens' north-west edge. There's an island out there, behind the trees.",
+  "The Storm Colossus wears a seal on its chest. They say it opens the Stormspire.",
+  "Windcallers love the Causeway bridges. One gust and you're flat on your back — keep your feet.",
+  "The Aegis knights parry nothing, but their shields turn blows. Get around them.",
+  "Brannoc can work gilded plate like soft copper. Bring him some.",
+];
+
+/** Floor 2 — the Gilded Terraces: a full floor, open to those who beat the Keeper. */
+export class Floor2Room extends WorldRoom {
   readonly kind = "floor2" as const;
 
   protected buildMap(): WorldMap {
-    return buildFloor2Landing();
+    return buildFloor2();
   }
 
-  protected spawnPoint(_ch: Character, _respawn: boolean) {
-    const a = Math.random() * Math.PI * 2;
-    return { x: this.map.spawn.x + Math.cos(a) * 30, y: this.map.spawn.y + Math.sin(a) * 18 };
+  protected eventDefs(): EventDef[] {
+    return FLOOR2_EVENTS;
   }
 
-  protected setup() {
-    this.autoDispose = false;
-    this.onMessage("interact", (client, id: string) => this.interact(client, String(id)));
-  }
-
-  async onAuth(client: Client, options: Parameters<GameRoom["onAuth"]>[1]) {
-    const auth = await super.onAuth(client, options);
-    return auth;
+  protected rumours(): string[] {
+    return RUMOURS;
   }
 
   protected onPlayerJoined(sid: string, ch: Character) {
     const client = this.clients.getById(sid);
-    if (ch.data.floor < 2) {
+    if (ch.data.floor < 2 && !this.admins.has(sid)) {
       // Only climbers who beat the Keeper may stand here.
-      client?.send("travel", { room: "world" });
+      this.travel(sid, ch, "world");
       return;
     }
     if (!ch.data.discovered.includes("zone:skyreach")) {
       ch.data.discovered.push("zone:skyreach");
       ch.dirty = true;
+      client?.send("discover", { name: "Floor 2", secret: false, sub: "The Gilded Terraces" });
     }
-    client?.send("discover", { name: "Floor 2", secret: false, sub: "Skyreach Landing" });
-  }
-
-  /** Leaving the landing returns you to Emberwatch. */
-  protected onPlayerLeft(_sid: string, ch: Character) {
-    ch.data.pos = { room: "town", x: 0, y: 0, hp: ch.data.pos?.hp };
-  }
-
-  private interact(client: Client, id: string) {
-    const me = this.player(client);
-    if (!me) return;
-    const npc = this.map.npcs.find((n) => n.id === id);
-    if (npc && Math.hypot(npc.x - me.p.x, npc.y - me.p.y) < 60) {
-      client.send("dialog", { npc: npc.id, name: npc.name, role: npc.role, greeting: npc.greeting, offers: [], done: [], services: [] });
-      return;
-    }
-    const obj = this.map.object(id);
-    if (!obj || Math.hypot(obj.x - me.p.x, obj.y - me.p.y) > 60) return;
-    if (obj.kind === "lore") client.send("lore", { name: obj.name, text: obj.text });
-    if (obj.id === "descent") client.send("travel", { room: "world" });
   }
 }

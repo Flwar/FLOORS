@@ -43,6 +43,8 @@ export const Player = schema(
     parryOk: t.uint8(),
     cd1: t.uint16(),
     cd2: t.uint16(),
+    sk1: t.uint8(),
+    sk2: t.uint8(),
     potions: t.uint8(),
     /** Weapon mastery 10: the weapon glows. */
     mastered: t.boolean(),
@@ -55,7 +57,7 @@ export type Player = SchemaType<typeof Player>;
 export const PREDICTED_FIELDS = [
   "x", "y", "dir", "gait", "aim", "stamina", "staminaMax", "staminaDelay", "exhausted",
   "act", "actTick", "actMove", "actAim", "actSeq", "combo", "comboTimer", "buf", "bufAim", "bufAge",
-  "dodgeDx", "dodgeDy", "kbx", "kby", "hurtDur", "weapon", "mods", "parryOk", "cd1", "cd2", "potions",
+  "dodgeDx", "dodgeDy", "kbx", "kby", "hurtDur", "weapon", "mods", "parryOk", "cd1", "cd2", "sk1", "sk2", "potions",
 ] as const;
 
 export const Enemy = schema(

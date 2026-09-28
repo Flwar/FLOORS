@@ -1,7 +1,7 @@
 import { Room, ServerError, type AuthContext, type Client } from "colyseus";
 import { StateView } from "@colyseus/schema";
 import {
-  Act, EAct, EFlag, itemBase, killXp, masteryLevel, newAchievements, PATCH_RATE, rollLoot, sanitizeSettings, TICK_RATE, TILE, type EquipSlot, type Item, type PlayerSim, type WorldMap,
+  Act, EAct, EFlag, enemyXp, EQUIP_SLOTS, itemBase, killXp, makeItem, masteryWorth, MAX_LEVEL, newAchievements, QUESTS, TREES, WEAPONS, PATCH_RATE, rollLoot, sanitizeSettings, TICK_RATE, TILE, type EquipSlot, type Item, type PlayerSim, type WorldMap,
 } from "@floors/shared";
 import { db } from "../db.ts";
 import { Character, newCharacter, type CharacterData } from "../game/character.ts";
@@ -9,6 +9,7 @@ import { online, roomSenders, sendToKey, broadcastAll } from "../game/registry.t
 import { acceptInvite, declineInvite, invite, kick, leaveParty, memberOffline, partyMembers, partyOf, promote, syncParty } from "../game/parties.ts";
 import { RESPAWN_DELAY_MS, Sim, type EnemyData, type PlayerData, type RewindLike } from "../game/sim.ts";
 import { Trades } from "../game/trade.ts";
+import { canRegisterAdminName, isAdminName } from "../game/admin.ts";
 import { loginFailsByIp, loginFailsByName, signupsByIp } from "../game/limiter.ts";
 import { Drop, Player, PlayerInput, WorldState } from "../state.ts";
 
@@ -32,6 +33,8 @@ interface AuthData {
   accountId: number | null;
   name: string;
   token?: string;
+  /** Admin account (panel + dev commands, also in production). */
+  admin?: boolean;
 }
 
 interface DropData {
@@ -76,7 +79,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
   private lastSave = 0;
   private partyTickAt = 0;
   private reviving = new Map<string, { by: string; until: number }>();
-  abstract readonly kind: "world" | "dungeon" | "floor2";
+  abstract readonly kind: "world" | "dungeon" | "floor2" | "stormspire";
 
   protected abstract buildMap(options: Record<string, unknown>): WorldMap;
   /** Where a character appears when joining / respawning. */
@@ -105,8 +108,10 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       // The training yard teaches the basics (up to mastery 3) at a quarter rate; mastery is earned in danger.
       const practice = ed.def.behavior === "dummy" || ed.def.behavior === "sparring";
       if (practice && (pd.ch?.derived.mastery ?? 1) >= 3) return;
-      if (pd.ch?.addMastery(Math.round(practice ? amount * 0.25 : amount))) {
-        this.clients.getById(pd.sid)?.send("mastery", { weapon: pd.ch.weaponKey, level: pd.ch.derived.mastery });
+      const gain = practice ? amount * 0.25 : (amount / Math.max(1, ed.e.hpMax)) * masteryWorth(ed.def, (ed.e.flags & EFlag.Elite) !== 0);
+      if (pd.ch?.addMastery(gain)) {
+        const w = pd.ch.data.equipment.weapon;
+        this.clients.getById(pd.sid)?.send("mastery", { weapon: w ? itemBase(w.key)?.name : pd.ch.weaponKey, level: pd.ch.derived.mastery });
       }
     };
     this.sim.onParry = (pd, perfect) => {
@@ -146,6 +151,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     }, TICK_RATE);
 
     this.registerMessages();
+    this.registerAdmin();
     this.setup(options);
   }
 
@@ -156,7 +162,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     if (options.token) {
       const acc = db.sessionAccount(String(options.token));
       if (!acc) throw new ServerError(401, "Your session expired. Please log in again.");
-      return { key: `a:${acc.id}`, accountId: acc.id, name: acc.username, token: options.token };
+      return { key: `a:${acc.id}`, accountId: acc.id, name: acc.username, token: options.token, admin: isAdminName(acc.username) };
     }
     if (options.username && options.password) {
       const username = String(options.username).trim();
@@ -167,6 +173,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       const nameKey = username.toLowerCase();
       if (options.register) {
         if (!DEV && signupsByIp.blocked(ip)) throw new ServerError(429, "Too many new adventurers from here. Try again later.");
+        if (!DEV && isAdminName(username) && !canRegisterAdminName(context?.ip)) throw new ServerError(403, "That name is reserved.");
         const res = db.createAccount(username, password);
         if ("error" in res) throw new ServerError(400, res.error);
         if (!DEV) signupsByIp.hit(ip);
@@ -185,12 +192,12 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         }
         loginFailsByName.clear(nameKey);
       }
-      return { key: `a:${acc.id}`, accountId: acc.id, name: acc.username, token: db.createSession(acc.id) };
+      return { key: `a:${acc.id}`, accountId: acc.id, name: acc.username, token: db.createSession(acc.id), admin: isAdminName(acc.username) };
     }
     if (DEV && options.guest) {
       const name = cleanName(options.guest) ?? "Guest";
       // Dev guests are keyed by name so they keep their character across rooms (in memory only).
-      return { key: `g:${name}`, accountId: null, name };
+      return { key: `g:${name}`, accountId: null, name, admin: isAdminName(name) };
     }
     throw new ServerError(401, "Please log in.");
   }
@@ -239,7 +246,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     // and an undefined value would poison client prediction and animation.
     Object.assign(p, {
       dir: 2, gait: 0, aim: 64, act: Act.None, actTick: 0, actMove: 0, actAim: 64, actSeq: 0, combo: 0, comboTimer: 0,
-      buf: 0, bufAim: 0, bufAge: 0, dodgeDx: 0, dodgeDy: 1, kbx: 0, kby: 0, hurtDur: 0, parryOk: 0, cd1: 0, cd2: 0,
+      buf: 0, bufAim: 0, bufAge: 0, dodgeDx: 0, dodgeDy: 1, kbx: 0, kby: 0, hurtDur: 0, parryOk: 0, cd1: 0, cd2: 0, sk1: 255, sk2: 255,
       staminaDelay: 0, exhausted: false, weaponRarity: 0, weaponLook: 0, armorLook: 0, helmLook: 0, mastered: false, party: "", potions: 0,
     });
     ch.applyTo(p);
@@ -251,21 +258,27 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     pd.ch = ch;
     this.syncDerived(pd);
     if (auth.token) client.send("session", { token: auth.token, name: auth.name });
-    client.send("inv", ch.view({ key: auth.key }));
+    if (auth.admin) this.admins.add(client.sessionId);
+    client.send("inv", ch.view({ key: auth.key, admin: !!auth.admin }));
     client.send("settings", ch.data.settings ?? null);
     ch.dirty = false;
     this.onPlayerJoined(client.sessionId, ch);
+    // Joining can move quests on (entering a dungeon). Send that now: during a room switch the
+    // old room still holds this character and could flush the change to the departing client.
+    if (ch.dirty) client.send("inv", ch.view({ key: auth.key, admin: !!auth.admin }));
     syncParty(partyOf(auth.key));
     console.log(`[${this.kind}] ${p.name} joined (${this.clients.length} here, ${online.size} online)`);
   }
 
   onLeave(client: Client) {
     const sid = client.sessionId;
+    this.admins.delete(sid);
     const key = this.keys.get(sid);
     const entry = key ? online.get(key) : undefined;
     const pd = this.sim.players.get(sid);
     // Leaving mid-fight doesn't save you: the body stays in the world for a few seconds.
-    if (pd && !entry?.superseded && pd.combatUntil > this.sim.now && pd.p.act !== Act.Dead && this.kind === "world") {
+    // (Not in instances: an empty instance is disposed, and its timers with it.)
+    if (pd && !entry?.superseded && pd.combatUntil > this.sim.now && pd.p.act !== Act.Dead && (this.kind === "world" || this.kind === "floor2")) {
       const timer = this.clock.setTimeout(() => {
         this.linkdead.delete(sid);
         this.finalizeLeave(sid);
@@ -338,7 +351,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         {
           kills: d.stats.kills, perfects: d.stats.perfects, parries: d.stats.parries, deaths: d.stats.deaths,
           discovered: d.discovered, bossKills: d.bossKills, gold: d.gold, level: d.level, floor: d.floor,
-          maxMastery: Math.max(0, ...Object.values(d.mastery).map((xp) => masteryLevel(xp ?? 0))),
+          maxMastery: ch.bestMastery(),
         },
         d.achievements,
       );
@@ -347,7 +360,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         this.clients.getById(sid)?.send("achievement", a);
       }
       if (earned.length) this.save(sid);
-      this.clients.getById(sid)?.send("inv", ch.view({ key: this.keys.get(sid) }));
+      this.clients.getById(sid)?.send("inv", ch.view({ key: this.keys.get(sid), admin: this.admins.has(sid) }));
     }
   }
 
@@ -364,6 +377,159 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     client.send("notice", { text, kind });
   }
 
+  // ---------------------------------------------------------------------------
+  // Admin
+
+  /** Session ids of admins in this room. */
+  protected admins = new Set<string>();
+  private startedAt = Date.now();
+
+  protected isAdmin(client: Client) {
+    return this.admins.has(client.sessionId);
+  }
+
+  /** Dev/test commands: open to everyone in development, and to admins in production. */
+  protected onDev<T>(type: string, fn: (client: Client, msg: T) => void) {
+    this.onMessage(type, (client, msg: T) => {
+      if (DEV || this.admins.has(client.sessionId)) fn(client, msg);
+    });
+  }
+
+  private adminOverview() {
+    const players = [...online.values()].map((o) => {
+      const st = o.status?.() ?? { hp: 0, hpMax: 1, dead: false, x: 0, y: 0, room: "world" };
+      return {
+        key: o.key, name: o.ch.data.name, level: o.ch.data.level, room: st.room, here: o.roomId === this.roomId,
+        hp: st.hp, hpMax: st.hpMax, dead: st.dead, x: Math.round(st.x), y: Math.round(st.y), gold: o.ch.data.gold, guest: o.accountId === null,
+      };
+    });
+    const mem = process.memoryUsage();
+    return {
+      players,
+      server: {
+        uptimeMs: Date.now() - this.startedAt, online: online.size, room: this.kind, roomId: this.roomId, clients: this.clients.length,
+        enemies: this.sim.enemies.size, drops: this.state.drops?.size ?? 0, memMb: Math.round(mem.rss / 1048576), dev: DEV,
+      },
+    };
+  }
+
+  private registerAdmin() {
+    type Me = NonNullable<ReturnType<GameRoom["player"]>>;
+    const on = <T>(type: string, fn: (client: Client, msg: T, me: Me) => void) =>
+      this.onMessage(`admin:${type}`, (client, msg: T) => {
+        if (!this.isAdmin(client)) return;
+        const me = this.player(client);
+        if (!me) return;
+        fn(client, msg, me);
+        me.ch.dirty = true;
+      });
+    const target = (key: unknown) => {
+      const o = online.get(String(key));
+      if (!o || o.roomId !== this.roomId) return undefined;
+      const pd = this.sim.players.get(o.sid);
+      return pd ? { o, pd } : undefined;
+    };
+    const place = (pd: PlayerData, x: number, y: number) => {
+      pd.p.x = Math.fround(x);
+      pd.p.y = Math.fround(y);
+    };
+    on("overview", (c) => c.send("admin:overview", this.adminOverview()));
+    on<{ x: number; y: number }>("tp", (_c, m, me) => {
+      if (Number.isFinite(m?.x) && Number.isFinite(m?.y)) place(me.pd, m.x, m.y);
+    });
+    on<string>("goto", (c, key, me) => {
+      const t = target(key);
+      if (t) return place(me.pd, t.pd.p.x + 30, t.pd.p.y);
+      // On another floor: travel there and step out beside them. Dungeon instances are
+      // private to their party, so those wait until the player comes out.
+      const st = online.get(String(key))?.status?.();
+      const open = (k: string) => k === "world" || k === "floor2";
+      if (!st || !open(st.room) || !open(this.kind)) return this.notify(c, "They're inside a dungeon. Wait for them to come out.", "error");
+      me.ch.travelTo = { room: st.room, via: "", pos: { room: st.room, x: st.x + 30, y: st.y, hp: me.p.hp } };
+      c.send("travel", { room: st.room });
+    });
+    on<string>("bring", (c, key, me) => {
+      const t = target(key);
+      if (!t) return this.notify(c, "They're in another area.", "error");
+      place(t.pd, me.p.x + 30, me.p.y);
+      this.clients.getById(t.o.sid) && this.notify(this.clients.getById(t.o.sid)!, "An admin brought you here.");
+    });
+    on<string>("heal", (c, key, me) => {
+      const pd = key ? target(key)?.pd : me.pd;
+      if (!pd) return this.notify(c, "They're in another area.", "error");
+      pd.p.hp = pd.p.hpMax;
+      (pd.p as unknown as PlayerSim).stamina = pd.p.staminaMax;
+    });
+    on<string>("kick", (c, key) => {
+      const o = online.get(String(key));
+      if (!o) return;
+      if (o.sid === c.sessionId) return this.notify(c, "You can't kick yourself.", "error");
+      o.client.leave(4003, "Removed by an admin.");
+      this.notify(c, `Kicked ${o.ch.data.name}.`, "good");
+    });
+    on<boolean>("god", (c, onOff, me) => {
+      me.pd.invulnUntil = onOff ? Number.MAX_SAFE_INTEGER : 0;
+      this.notify(c, onOff ? "God mode on: nothing can hurt you." : "God mode off.", "good");
+    });
+    on<number>("level", (_c, lvl, me) => {
+      const d = me.ch.data;
+      d.level = Math.max(1, Math.min(MAX_LEVEL, Math.round(Number(lvl) || 1)));
+      d.xp = 0;
+      me.ch.recompute();
+      me.p.hp = me.ch.derived.hpMax;
+    });
+    on<{ gold?: number; xp?: number; points?: number }>("add", (_c, m, me) => {
+      const d = me.ch.data;
+      if (Number.isFinite(m?.gold)) d.gold = Math.max(0, d.gold + Math.round(m.gold!));
+      if (Number.isFinite(m?.xp)) me.ch.addXp(Math.max(0, Math.round(m.xp!)));
+      if (Number.isFinite(m?.points)) d.bonusPoints = Math.max(0, (d.bonusPoints ?? 0) + Math.round(m.points!));
+      me.ch.recompute();
+    });
+    on<{ key: string; rarity?: number; qty?: number }>("give", (c, m, me) => {
+      const base = itemBase(String(m?.key));
+      if (!base) return;
+      const it = makeItem(base.key, Math.max(0, Math.min(4, Math.round(m.rarity ?? base.rarity ?? 0))), Math.max(1, Math.min(99, Math.round(m.qty ?? 1))));
+      if (!me.ch.addItem(it)) this.notify(c, "Your pack is full.", "error");
+    });
+    on<number>("mastery", (_c, lvl, me) => {
+      const w = me.ch.data.equipment.weapon;
+      if (!w) return;
+      const T = [0, 60, 150, 280, 450, 680, 950, 1300, 1700, 2200];
+      w.mxp = T[Math.max(1, Math.min(10, Math.round(Number(lvl) || 1))) - 1];
+      me.ch.recompute();
+    });
+    on("learnall", (_c, _m, me) => {
+      const d = me.ch.data;
+      for (const tree of Object.values(TREES)) for (const n of tree) if (!d.tree!.includes(n.id)) d.tree!.push(n.id);
+      d.bonusPoints = Math.max(d.bonusPoints ?? 0, d.tree!.length - d.level);
+      me.ch.recompute();
+    });
+    on("resettree", (_c, _m, me) => me.ch.resetTree());
+    on("reveal", (_c, _m, me) => {
+      const d = me.ch.data;
+      for (const z of this.map.zones) if (!d.discovered.includes(`zone:${z.id}`)) d.discovered.push(`zone:${z.id}`);
+      for (const o of this.map.objects) if (o.kind === "waystone" && !d.discovered.includes(`ws:${o.id}`)) d.discovered.push(`ws:${o.id}`);
+      const map = this.kind === "floor2" ? "map:floor2" : "map:floor1";
+      if (!d.discovered.includes(map)) d.discovered.push(map);
+    });
+    on<number>("floor", (_c, f, me) => {
+      me.ch.data.floor = Math.max(1, Math.min(2, Math.round(Number(f) || 1)));
+    });
+    on<{ id: string; action: "start" | "complete" | "reset" }>("quest", (c, m, me) => {
+      const q = QUESTS.find((x) => x.id === m?.id);
+      if (!q) return;
+      const d = me.ch.data;
+      if (m.action === "reset") delete d.quests[q.id];
+      else if (m.action === "start") d.quests[q.id] = { stage: 0, progress: 0 };
+      else d.quests[q.id] = { stage: q.stages.length - 1, progress: 0, done: true };
+      this.notify(c, `${q.name}: ${m.action}`, "good");
+    });
+    on<string>("announce", (_c, text) => {
+      const t = String(text ?? "").trim().slice(0, 200);
+      if (t) broadcastAll("announce", { text: t });
+    });
+  }
+
   private registerMessages() {
     this.onMessage("equip", (client, uid: string) => {
       const me = this.player(client);
@@ -378,12 +544,108 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       const err = me.ch.unequip(slot);
       if (err) this.notify(client, err, "error");
     });
-    this.onMessage("perk", (client, id: string) => {
+    // Drag and drop in the pack: move to a slot (swapping, or merging a stack).
+    this.onMessage("inv:move", (client, msg: { from?: unknown; to?: unknown }) => {
+      const me = this.player(client);
+      const inv = me?.ch.data.inventory;
+      const from = Number(msg?.from);
+      const to = Number(msg?.to);
+      if (!me || !inv || !Number.isInteger(from) || !Number.isInteger(to) || from === to) return;
+      if (from < 0 || to < 0 || from >= inv.length || to >= inv.length || !inv[from]) return;
+      const a = inv[from]!;
+      const b = inv[to];
+      const stack = itemBase(a.key)?.stack ?? 1;
+      if (b && b.key === a.key && stack > 1 && b.qty < stack) {
+        const moved = Math.min(stack - b.qty, a.qty);
+        b.qty += moved;
+        a.qty -= moved;
+        if (a.qty <= 0) inv[from] = null;
+      } else {
+        inv[from] = b ?? null;
+        inv[to] = a;
+      }
+      me.ch.dirty = true;
+    });
+    // Drag an equipped item onto a pack slot: into it if empty, or swap with a matching item there.
+    this.onMessage("inv:unequipTo", (client, msg: { slot?: unknown; to?: unknown }) => {
+      const me = this.player(client);
+      const slot = String(msg?.slot) as EquipSlot;
+      const to = Number(msg?.to);
+      if (!me || !EQUIP_SLOTS.includes(slot)) return;
+      if (me.p.act !== Act.None && me.p.act !== Act.Dead) return this.notify(client, "Not while fighting.", "error");
+      const inv = me.ch.data.inventory;
+      const worn = me.ch.data.equipment[slot];
+      if (!worn || !Number.isInteger(to) || to < 0 || to >= inv.length) return;
+      const there = inv[to];
+      if (!there) {
+        if (slot === "weapon") return this.notify(client, "You always keep a weapon in hand.", "error");
+        inv[to] = worn;
+        delete me.ch.data.equipment[slot];
+      } else if (itemBase(there.key)?.kind === slot) {
+        me.ch.data.equipment[slot] = there;
+        inv[to] = worn;
+      } else {
+        const err = me.ch.unequip(slot);
+        if (err) this.notify(client, err, "error");
+        return;
+      }
+      me.ch.recompute();
+      me.ch.dirty = true;
+    });
+    // Tidy the pack: gear first (best first), then tonics, materials, keepsakes; stacks merged.
+    this.onMessage("inv:sort", (client) => {
       const me = this.player(client);
       if (!me) return;
-      const err = me.ch.choosePerk(String(id));
+      const inv = me.ch.data.inventory;
+      const order = ["weapon", "armor", "helm", "charm", "consumable", "material", "artifact", "key"];
+      const items = inv.filter((x): x is Item => !!x);
+      const merged: Item[] = [];
+      for (const it of items) {
+        const stack = itemBase(it.key)?.stack ?? 1;
+        let left = it.qty;
+        for (const m of merged) {
+          if (!left || stack <= 1 || m.key !== it.key || m.qty >= stack) continue;
+          const add = Math.min(stack - m.qty, left);
+          m.qty += add;
+          left -= add;
+        }
+        if (left > 0) merged.push({ ...it, qty: left });
+      }
+      const rank = (it: Item) => {
+        const b = itemBase(it.key);
+        return order.indexOf(b?.kind ?? "key");
+      };
+      merged.sort((a, b) => rank(a) - rank(b) || b.rarity - a.rarity || (itemBase(b.key)?.tier ?? 0) - (itemBase(a.key)?.tier ?? 0) || a.key.localeCompare(b.key));
+      for (let i = 0; i < inv.length; i++) inv[i] = merged[i] ?? null;
+      me.ch.dirty = true;
+    });
+    // Skill tree: learn a node, reset for a fee, choose which skills sit in the two slots.
+    this.onMessage("tree:learn", (client, id: string) => {
+      const me = this.player(client);
+      if (!me) return;
+      const err = me.ch.learn(String(id));
+      if (err) return this.notify(client, err, "error");
+      client.send("learned", { id: String(id) });
+      this.save(client.sessionId);
+    });
+    this.onMessage("tree:reset", (client) => {
+      const me = this.player(client);
+      if (!me) return;
+      const cost = me.ch.resetCost();
+      if (!me.ch.data.tree!.length) return this.notify(client, "You haven't learned anything to reset.", "error");
+      if (me.ch.data.gold < cost) return this.notify(client, `Resetting costs ${cost} gold.`, "error");
+      me.ch.data.gold -= cost;
+      me.ch.resetTree();
+      this.notify(client, "Skill points refunded. Spend them again in the skill tree.", "good");
+      this.save(client.sessionId);
+    });
+    this.onMessage("skills:equip", (client, msg: { weapon?: string; slot?: number; index?: number }) => {
+      const me = this.player(client);
+      if (!me) return;
+      const wk = WEAPONS.find((w) => w.key === msg?.weapon)?.key;
+      if (!wk) return;
+      const err = me.ch.equipSkill(wk, Number(msg.slot), Number(msg.index));
       if (err) this.notify(client, err, "error");
-      else this.save(client.sessionId);
     });
     this.onMessage("pickup", (client, id: string) => this.pickup(client, String(id)));
     this.onMessage("discard", (client, uid: string) => {
@@ -410,6 +672,13 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     this.onMessage("party:leave", (c) => leaveParty(keyOf(c)));
     this.onMessage("party:kick", (c, name: string) => report(c, kick(keyOf(c), String(name ?? ""))));
     this.onMessage("party:promote", (c, name: string) => report(c, promote(keyOf(c), String(name ?? ""))));
+    // The first-play tutorial was finished or skipped: never show it to this character again.
+    this.onMessage("tutorial:done", (c) => {
+      const ch = this.chars.get(c.sessionId);
+      if (!ch || ch.data.discovered.includes("tutorial:done")) return;
+      ch.data.discovered.push("tutorial:done");
+      ch.dirty = true;
+    });
     this.onMessage("settings", (c, raw: unknown) => {
       const ch = this.chars.get(c.sessionId);
       if (!ch) return;
@@ -419,7 +688,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     this.onMessage("inspect", (c, sid: string) => {
       const ch = this.chars.get(String(sid));
       if (!ch) return;
-      c.send("inspect", { sid: String(sid), name: ch.data.name, level: ch.data.level, equipment: ch.data.equipment, mastery: ch.data.mastery, perks: ch.data.perks, stats: ch.data.stats, bossKills: ch.data.bossKills, floor: ch.data.floor });
+      c.send("inspect", { sid: String(sid), name: ch.data.name, level: ch.data.level, equipment: ch.data.equipment, mastery: ch.derived.mastery, tree: ch.data.tree, stats: ch.data.stats, bossKills: ch.data.bossKills, floor: ch.data.floor });
     });
     this.onMessage("revive", (c, sid: string) => {
       const me = this.player(c);
@@ -595,6 +864,13 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
   // ---------------------------------------------------------------------------
   // Kills, XP, death
 
+  /** Minibosses and bosses felled, for achievements and the character sheet (world and dungeon alike). */
+  private recordBoss(ch: Character, def: EnemyData["def"]) {
+    if (!def.boss || ch.data.bossKills.includes(def.key)) return;
+    ch.data.bossKills.push(def.key);
+    ch.dirty = true;
+  }
+
   private rewardKill(ed: EnemyData) {
     const def = ed.def;
     const e = ed.e;
@@ -608,7 +884,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       if (!top || amt > top.amt) top = { sid, amt };
       // Everyone who meaningfully helped gets full experience: fighting together is never a penalty.
       if (amt < total * 0.1 && amt < 15) continue;
-      const xp = killXp(def.xp * (e.flags & EFlag.Elite ? 2.5 : 1), e.level, ch.data.level);
+      const xp = killXp(enemyXp(def) * (e.flags & EFlag.Elite ? 2.5 : 1), e.level, ch.data.level);
       const levels = ch.addXp(xp);
       ch.data.stats.kills++;
       this.clients.getById(sid)?.send("xp", { amount: xp, x: e.x, y: e.y });
@@ -618,6 +894,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         this.save(sid);
       }
       this.onKillRewards(ch, ed);
+      this.recordBoss(ch, def);
       // Bosses reward everyone who fought with their own loot.
       if (def.boss) this.dropLoot(ed, sid);
     }
@@ -633,10 +910,11 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         const mpd = this.sim.players.get(entry.sid);
         if (!mpd || mpd.p.act === Act.Dead || Math.hypot(mpd.p.x - e.x, mpd.p.y - e.y) > 1000) continue;
         rewarded.add(entry.sid);
-        const xp = Math.round(killXp(def.xp * (e.flags & EFlag.Elite ? 2.5 : 1), e.level, entry.ch.data.level) * 0.6);
+        const xp = Math.round(killXp(enemyXp(def) * (e.flags & EFlag.Elite ? 2.5 : 1), e.level, entry.ch.data.level) * 0.6);
         if (entry.ch.addXp(xp)) this.emitNear("levelup", { p: entry.sid, level: entry.ch.data.level, x: mpd.p.x, y: mpd.p.y }, mpd.p.x, mpd.p.y);
         this.clients.getById(entry.sid)?.send("xp", { amount: xp, x: e.x, y: e.y, party: true });
         this.onKillRewards(entry.ch, ed);
+        this.recordBoss(entry.ch, def);
         if (def.boss) this.dropLoot(ed, entry.sid);
       }
     }

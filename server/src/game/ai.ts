@@ -435,7 +435,7 @@ export class EnemyAI {
 
   private summon(ed: EnemyData) {
     const sim = this.sim;
-    const key = ed.def.key === "grakk" ? ["cutpurse", "goblin"] : ["stalker", "stalker"];
+    const key = ed.def.minions ?? (ed.def.key === "grakk" ? ["cutpurse", "goblin"] : ["stalker", "stalker"]);
     for (const k of key) {
       if (ed.minions.size >= 3) break;
       const spot = this.freeSpotNear(ed.e.x, ed.e.y, 70, 120);

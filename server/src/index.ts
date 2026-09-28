@@ -5,6 +5,7 @@ import express from "express";
 import { SERVER_PORT } from "@floors/shared";
 import { DungeonRoom } from "./rooms/DungeonRoom.ts";
 import { Floor2Room } from "./rooms/Floor2Room.ts";
+import { StormspireRoom } from "./rooms/StormspireRoom.ts";
 import { WorldRoom } from "./rooms/WorldRoom.ts";
 
 // The built client (npm run build), served from the same port so players need one address.
@@ -16,6 +17,7 @@ const server = defineServer({
     world: defineRoom(WorldRoom),
     dungeon: defineRoom(DungeonRoom),
     floor2: defineRoom(Floor2Room),
+    stormspire: defineRoom(StormspireRoom),
   },
   express: serveClient
     ? (app) => {

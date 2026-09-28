@@ -23,12 +23,19 @@ export interface LootTable {
 
 const T1_GEAR: PoolEntry[] = [
   { key: "sword_rusty", w: 3 }, { key: "greatsword_iron", w: 2 }, { key: "daggers_twin", w: 2 }, { key: "spear_hunting", w: 2 }, { key: "staff_oak", w: 2 },
-  { key: "armor_padded", w: 3 }, { key: "armor_leather", w: 2 }, { key: "helm_cap", w: 3 }, { key: "helm_hood", w: 2 },
+  { key: "armor_padded", w: 3 }, { key: "armor_leather", w: 2 }, { key: "helm_cap", w: 3 }, { key: "helm_hood", w: 2 }, { key: "helm_bandana", w: 2 },
   { key: "charm_wolf", w: 1 }, { key: "charm_amber", w: 1 },
 ];
 const T2_GEAR: PoolEntry[] = [
   { key: "sword_iron", w: 3 }, { key: "greatsword_bandit", w: 2 }, { key: "daggers_stalker", w: 2 }, { key: "spear_iron", w: 2 }, { key: "staff_ember", w: 2 },
   { key: "armor_chain", w: 2 }, { key: "armor_ranger", w: 1.5 }, { key: "helm_iron", w: 2 }, { key: "helm_horned", w: 1 }, { key: "charm_duelist", w: 0.6 }, { key: "charm_feather", w: 0.6 }, { key: "charm_gale", w: 0.5 },
+  { key: "sword_steel", w: 1.5 }, { key: "greatsword_zwei", w: 1.2 }, { key: "daggers_kris", w: 1.2 }, { key: "staff_frost", w: 1.2 },
+  { key: "armor_scale", w: 1.5 }, { key: "helm_kettle", w: 1.5 }, { key: "helm_wizard", w: 1 },
+];
+/** The best of what Floor 1 hides: elites, bosses and the ruins drop these. */
+const T3_GEAR: PoolEntry[] = [
+  { key: "sword_knight", w: 2 }, { key: "greatsword_exec", w: 1.5 }, { key: "spear_glaive", w: 1.5 }, { key: "armor_brigandine", w: 1.5 }, { key: "helm_greathelm", w: 1.5 },
+  { key: "sword_frost", w: 0.6 }, { key: "daggers_night", w: 0.6 }, { key: "spear_trident", w: 0.6 }, { key: "staff_moon", w: 0.6 }, { key: "armor_shadow", w: 0.8 }, { key: "armor_arcanist", w: 0.8 },
 ];
 const TONIC: PoolEntry[] = [{ key: "tonic", w: 1 }];
 
@@ -38,9 +45,9 @@ export const LOOT: Record<string, LootTable> = {
   goblin: { gold: [2, 6], rolls: [{ chance: 0.3, pool: [{ key: "mat_scrap", w: 1 }] }, { chance: 0.08, pool: TONIC }, { chance: 0.06, pool: T1_GEAR }] },
   bandit: { gold: [4, 10], rolls: [{ chance: 0.35, pool: [{ key: "mat_scrap", w: 1 }] }, { chance: 0.1, pool: TONIC }, { chance: 0.07, pool: T1_GEAR }, { chance: 0.03, pool: T2_GEAR }] },
   brute: { gold: [8, 16], rolls: [{ chance: 0.7, pool: [{ key: "mat_scrap", w: 1 }], qty: [1, 3] }, { chance: 0.25, pool: [{ key: "mat_shard", w: 1 }] }, { chance: 0.14, pool: T2_GEAR }] },
-  cultist: { gold: [5, 11], rolls: [{ chance: 0.5, pool: [{ key: "mat_cloth", w: 1 }] }, { chance: 0.03, pool: [{ key: "art_idol", w: 1 }] }, { chance: 0.07, pool: [{ key: "staff_oak", w: 2 }, { key: "staff_ember", w: 1 }, { key: "helm_hood", w: 2 }, { key: "armor_robes", w: 1.5 }] }] },
-  ruins: { gold: [6, 12], rolls: [{ chance: 0.3, pool: [{ key: "mat_shard", w: 1 }] }, { chance: 0.02, pool: [{ key: "art_lens", w: 1 }] }, { chance: 0.09, pool: [{ key: "daggers_stalker", w: 2 }, ...T2_GEAR] }] },
-  elite: { gold: [14, 28], rolls: [{ chance: 0.65, pool: [...T1_GEAR, ...T2_GEAR], boost: 1.2 }, { chance: 0.4, pool: [{ key: "mat_shard", w: 1 }] }, { chance: 0.3, pool: TONIC }] },
+  cultist: { gold: [5, 11], rolls: [{ chance: 0.5, pool: [{ key: "mat_cloth", w: 1 }] }, { chance: 0.03, pool: [{ key: "art_idol", w: 1 }] }, { chance: 0.07, pool: [{ key: "staff_oak", w: 2 }, { key: "staff_ember", w: 1 }, { key: "helm_hood", w: 2 }, { key: "armor_robes", w: 1.5 }, { key: "staff_frost", w: 1 }, { key: "helm_wizard", w: 1 }] }, { chance: 0.012, pool: [{ key: "armor_arcanist", w: 1 }, { key: "staff_moon", w: 1 }] }] },
+  ruins: { gold: [6, 12], rolls: [{ chance: 0.3, pool: [{ key: "mat_shard", w: 1 }] }, { chance: 0.02, pool: [{ key: "art_lens", w: 1 }] }, { chance: 0.09, pool: [{ key: "daggers_stalker", w: 2 }, ...T2_GEAR] }, { chance: 0.02, pool: T3_GEAR }] },
+  elite: { gold: [14, 28], rolls: [{ chance: 0.65, pool: [...T1_GEAR, ...T2_GEAR], boost: 1.2 }, { chance: 0.08, pool: T3_GEAR }, { chance: 0.4, pool: [{ key: "mat_shard", w: 1 }] }, { chance: 0.3, pool: TONIC }] },
   grakk: {
     gold: [70, 100],
     guaranteed: [{ key: "key_ruins", once: true }],
@@ -48,6 +55,7 @@ export const LOOT: Record<string, LootTable> = {
       { chance: 1, pool: T2_GEAR, boost: 1.5, minRarity: Rarity.Rare },
       { chance: 0.18, pool: [{ key: "sword_emberbrand", w: 1 }] },
       { chance: 0.35, pool: [{ key: "helm_horned", w: 1 }], minRarity: Rarity.Rare },
+      { chance: 0.3, pool: T3_GEAR },
       { chance: 1, pool: TONIC, qty: [1, 2] },
     ],
   },
@@ -58,6 +66,7 @@ export const LOOT: Record<string, LootTable> = {
       { chance: 0.25, pool: [{ key: "greatsword_warden", w: 1 }] },
       { chance: 0.15, pool: [{ key: "helm_circlet", w: 1 }, { key: "charm_secondwind", w: 1 }] },
       { chance: 0.22, pool: [{ key: "armor_warden", w: 1 }] },
+      { chance: 0.4, pool: T3_GEAR, boost: 1 },
       { chance: 1, pool: [{ key: "mat_shard", w: 1 }], qty: [2, 4] },
     ],
   },
@@ -69,6 +78,7 @@ export const LOOT: Record<string, LootTable> = {
       { chance: 0.3, pool: [{ key: "sword_dawnbreaker", w: 1 }] },
       { chance: 0.5, pool: [{ key: "helm_circlet", w: 1 }, { key: "charm_secondwind", w: 1 }] },
       { chance: 0.3, pool: [{ key: "armor_dawn", w: 1 }, { key: "helm_keeper", w: 1 }] },
+      { chance: 0.6, pool: T3_GEAR, boost: 2, minRarity: Rarity.Rare },
       { chance: 1, pool: [{ key: "mat_ember", w: 1 }], qty: [1, 2] },
     ],
   },
@@ -157,12 +167,15 @@ export function rollLoot(tableKey: string, opts: { elite?: boolean; owns?: (key:
 /** Shop stock for the General Store and the Blacksmith. */
 export const SHOPS: Record<string, { key: string; price: number; rarity?: number }[]> = {
   store: [
+    { key: "map_floor1", price: 35 },
     { key: "tonic", price: 18 },
     { key: "armor_padded", price: 14 },
     { key: "helm_cap", price: 16 },
     { key: "armor_leather", price: 55 },
     { key: "helm_hood", price: 45 },
     { key: "armor_ranger", price: 190 },
+    { key: "helm_bandana", price: 30 },
+    { key: "helm_wizard", price: 170 },
     { key: "charm_wolf", price: 80 },
   ],
   smith: [
@@ -174,6 +187,10 @@ export const SHOPS: Record<string, { key: string; price: number; rarity?: number
     { key: "armor_chain", price: 150 },
     { key: "helm_iron", price: 120 },
     { key: "armor_plate", price: 420 },
+    { key: "sword_steel", price: 260 },
+    { key: "greatsword_zwei", price: 290 },
+    { key: "helm_kettle", price: 210 },
+    { key: "armor_scale", price: 280 },
   ],
 };
 

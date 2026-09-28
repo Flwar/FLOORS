@@ -8,6 +8,8 @@ import {
   EAct,
   EFlag,
   ENEMIES,
+  enemyDamageScale,
+  enemyMaxHp,
   HazardKind,
   HitResult,
   impactMs,
@@ -64,6 +66,10 @@ export interface PlayerData {
   projSeq: number;
   specialSeq: number;
   combatUntil: number;
+  /** Fractional health regenerated out of combat, carried between ticks. */
+  regen: number;
+  /** Iron Skin: damage taken is halved until this time. */
+  guardUntil: number;
   invulnUntil: number;
   deadAt: number;
   atkMul: number;
@@ -116,6 +122,11 @@ export interface EnemyData {
   master?: string;
   removeAt: number;
   specialFired: number;
+  /** Venom Edge: poison ticking until this time. */
+  poisonUntil?: number;
+  poisonNext?: number;
+  poisonDmg?: number;
+  poisonBy?: string;
 }
 
 interface ProjData {
@@ -212,6 +223,8 @@ export class Sim {
       projSeq: -1,
       specialSeq: -1,
       combatUntil: 0,
+      regen: 0,
+      guardUntil: 0,
       invulnUntil: this.now + SAFE_RESPAWN_MS,
       deadAt: 0,
       atkMul: 1,
@@ -326,7 +339,8 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        pierce: pj.look === "wave",
         team: 0,
         owner: pd.sid,
         x: p.x + Math.cos(a) * 14,
@@ -372,7 +386,32 @@ export class Sim {
           }
           this.damageEnemy(ed, pd, m.damage, m.poise, m.knockback, ang, m);
         }
-        this.emit("fx", { k: m.special, x: p.x, y: p.y, r: (shape as { radius: number }).radius }, p.x, p.y);
+        const off = shape.kind === "circle" ? shape.offset : 0;
+        const cx = p.x + Math.cos(rad) * off;
+        const cy = p.y + Math.sin(rad) * off;
+        this.emit("fx", { k: m.vfx === "blizzard" ? "blizzard" : m.special, x: cx, y: cy, r: (shape as { radius: number }).radius }, cx, cy);
+        break;
+      }
+      case "rally": {
+        // Heal yourself 18% and allies in range 12%.
+        const r = (m.shape as { radius: number } | undefined)?.radius ?? 110;
+        for (const other of this.players.values()) {
+          const q = other.p;
+          if (q.act === Act.Dead || q.hp <= 0) continue;
+          const self = other === pd;
+          if (!self && Math.hypot(q.x - p.x, q.y - p.y) > r) continue;
+          const heal = Math.max(1, Math.min(q.hpMax - q.hp, Math.round(q.hpMax * (self ? 0.18 : 0.12))));
+          if (q.hp < q.hpMax) {
+            q.hp += heal;
+            this.emit("heal", { p: other.sid, d: heal, x: q.x, y: q.y }, q.x, q.y);
+          }
+        }
+        this.emit("fx", { k: m.vfx ?? "rally", x: p.x, y: p.y, r, p: pd.sid }, p.x, p.y);
+        break;
+      }
+      case "ironskin": {
+        pd.guardUntil = this.now + 5000;
+        this.emit("fx", { k: "ironskin", x: p.x, y: p.y, p: pd.sid, ms: 5000 }, p.x, p.y);
         break;
       }
     }
@@ -381,9 +420,10 @@ export class Sim {
   // ---------------------------------------------------------------------------
   // Damage
 
-  damageEnemy(ed: EnemyData, pd: PlayerData | undefined, base: number, poise: number, knockback: number, ang: number, m?: MoveDef) {
+  damageEnemy(ed: EnemyData, pd: PlayerData | undefined, base: number, poise: number, knockback: number, ang: number, m?: MoveDef, dot = false) {
     const e = ed.e;
     if (e.act === EAct.Dead || e.act === EAct.Spawn) return;
+    if (dot) return this.dotDamage(ed, pd, base);
     if (e.act === EAct.Leash) {
       this.emit("hit", { t: ed.id, d: 0, r: HitResult.Blocked, x: e.x, y: e.y }, e.x, e.y);
       return;
@@ -423,6 +463,15 @@ export class Sim {
       }
     }
     if (e.act === EAct.Stagger && pd?.ch?.hasPerk("executioner")) dmg *= 1.25;
+    if (e.act === EAct.Stagger && m?.vsStagger) dmg *= m.vsStagger;
+    if (m?.special === "venom" && pd) {
+      // Poison: a quarter of the hit again, every half second for six seconds.
+      ed.poisonUntil = this.now + 6000;
+      ed.poisonNext = Math.min(ed.poisonNext ?? Infinity, this.now + 500);
+      ed.poisonDmg = base * 0.25;
+      ed.poisonBy = pd.sid;
+      e.flags |= EFlag.Poisoned;
+    }
     if (attacker && attacker.act === Act.Light && pd?.ch?.hasPerk("momentum")) dmg *= 1 + Math.min(0.25, attacker.combo * 0.05);
     dmg *= 1 - def.armor;
     const amount = Math.max(1, Math.round(dmg));
@@ -650,6 +699,7 @@ export class Sim {
     }
     const mistimed = pd.timeline.length > 0 && pd.timeline[pd.timeline.length - 1].act === Act.Parry && p.act === Act.Parry;
     let amount = Math.max(1, Math.round((dmg * 100) / (100 + pd.defense)));
+    if (this.now < pd.guardUntil) amount = Math.max(1, Math.round(amount * 0.5));
     if (result === HitResult.Armor) amount = Math.round(amount * 0.75);
     p.hp = Math.max(0, p.hp - amount);
     if (p.hp <= 0 && pd.ch?.hasPerk("unbroken") && this.now >= pd.ch.unbrokenReadyAt) {
@@ -792,8 +842,7 @@ export class Sim {
   }
 
   enemyDamageMul(ed: EnemyData) {
-    const elite = ed.e.flags & EFlag.Elite ? 1.35 : 1;
-    return elite * (1 + (ed.e.level - 1) * 0.08);
+    return enemyDamageScale(ed.def, ed.e.level, (ed.e.flags & EFlag.Elite) !== 0);
   }
 
   /** Record an enemy attack reaching its active frames (called by the AI). */
@@ -855,6 +904,34 @@ export class Sim {
     this.onSpawn?.(hz, o.x, o.y);
     this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
+  }
+
+  /** Damage over time: no stagger, no knockback, no hitstop; small green numbers. */
+  private dotDamage(ed: EnemyData, pd: PlayerData | undefined, base: number) {
+    const e = ed.e;
+    const amount = Math.max(1, Math.round(base * (pd?.atkMul ?? 1) * (pd?.ch?.derived.mdmg.dmg ?? 1) * (1 - ed.def.armor)));
+    const dealt = Math.min(amount, e.hp);
+    e.hp = Math.max(0, e.hp - amount);
+    if (pd) ed.contrib.set(pd.sid, (ed.contrib.get(pd.sid) ?? 0) + dealt);
+    this.emit("hit", { t: ed.id, d: amount, r: HitResult.Hit, x: e.x, y: e.y, a: pd?.sid, dot: 1 }, e.x, e.y);
+    if (pd) this.onDamageDealt?.(pd, ed, dealt);
+    if (e.hp <= 0) this.killEnemy(ed, pd);
+  }
+
+  private updatePoison() {
+    for (const ed of this.enemies.values()) {
+      if (!ed.poisonUntil) continue;
+      if (this.now > ed.poisonUntil || ed.e.act === EAct.Dead) {
+        ed.poisonUntil = undefined;
+        ed.poisonNext = undefined;
+        ed.e.flags &= ~EFlag.Poisoned;
+        continue;
+      }
+      if (this.now >= (ed.poisonNext ?? 0)) {
+        ed.poisonNext = this.now + 500;
+        this.damageEnemy(ed, ed.poisonBy ? this.players.get(ed.poisonBy) : undefined, ed.poisonDmg ?? 1, 0, 0, 0, undefined, true);
+      }
+    }
   }
 
   private updateProjectiles() {
@@ -928,7 +1005,7 @@ export class Sim {
     e.y = Math.fround(y);
     e.aim = radToAim(Math.PI / 2);
     e.level = opts.level ?? 1;
-    const hpMax = Math.round(def.hp * (opts.elite ? 2.4 : 1) * (1 + (e.level - 1) * 0.12) * (opts.hpScale ?? 1));
+    const hpMax = enemyMaxHp(def, e.level, opts.elite, opts.hpScale);
     e.hpMax = Math.min(65535, hpMax);
     e.hp = e.hpMax;
     e.flags = opts.elite ? EFlag.Elite : 0;
@@ -962,11 +1039,21 @@ export class Sim {
     this.now = now;
     for (const ed of [...this.enemies.values()]) this.ai.update(ed, dt);
     this.updateProjectiles();
+    this.updatePoison();
     this.updateHazards();
     this.resolveIncoming();
     for (const pd of this.players.values()) {
       const p = pd.p as unknown as PlayerSim;
       if (p.act === Act.Dead && this.now - pd.deadAt > RESPAWN_DELAY_MS) this.respawn(pd);
+      // Out of combat, wounds close slowly (2% of max health a second, a few seconds after the last blow).
+      if (p.act !== Act.Dead && pd.p.hp > 0 && pd.p.hp < pd.p.hpMax && this.now > pd.combatUntil) {
+        pd.regen += pd.p.hpMax * 0.02 * dt;
+        if (pd.regen >= 1) {
+          const add = Math.floor(pd.regen);
+          pd.regen -= add;
+          pd.p.hp = Math.min(pd.p.hpMax, pd.p.hp + add);
+        }
+      } else pd.regen = 0;
       // Keep the server's view of hurt/knockdown timers moving even if the client stalls.
       if ((p.act === Act.Hurt || p.act === Act.Knockdown) && p.actTick > actionLength(p) + 30) p.act = Act.None;
     }

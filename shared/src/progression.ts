@@ -61,6 +61,13 @@ export const perkById = (id: string) => PERK_CHOICES.flatMap((c) => c.options).f
 
 export const MASTERY_MAX = 10;
 const MASTERY_THRESHOLDS = [0, 60, 150, 280, 450, 680, 950, 1300, 1700, 2200];
+/**
+ * Mastery for felling an enemy, whatever its health: a normal kill is worth 10, so the
+ * pace holds on every Floor (about 220 kills with one weapon for mastery 10). Damage
+ * earns its share, so a party splits it. Minibosses and bosses are worth a lot more.
+ */
+export const masteryWorth = (def: { boss?: { music?: string } }, elite: boolean) =>
+  def.boss ? (def.boss.music === "miniboss" ? 50 : 100) : elite ? 20 : 10;
 export const masteryLevel = (xp: number) => {
   let l = 1;
   for (let i = 1; i < MASTERY_THRESHOLDS.length; i++) if (xp >= MASTERY_THRESHOLDS[i]) l = i + 1;

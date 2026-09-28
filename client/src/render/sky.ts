@@ -9,8 +9,8 @@ export class Sky {
   private bg: Phaser.GameObjects.Graphics;
   private islands: Phaser.GameObjects.Image[] = [];
 
-  constructor(private scene: Phaser.Scene, tint: "day" | "dusk" | "gold" = "day") {
-    const colors = tint === "gold" ? [0xf7dca0, 0xa9c6e8] : tint === "dusk" ? [0x2a3350, 0x0e1320] : [0x8fc2e6, 0xd8ecf6];
+  constructor(private scene: Phaser.Scene, tint: "day" | "dusk" | "gold" | "storm" = "day") {
+    const colors = tint === "gold" ? [0xf7dca0, 0xa9c6e8] : tint === "storm" ? [0x5a6a86, 0x2a3350] : tint === "dusk" ? [0x2a3350, 0x0e1320] : [0x8fc2e6, 0xd8ecf6];
     this.bg = scene.add.graphics().setScrollFactor(0).setDepth(-100);
     this.bg.fillGradientStyle(colors[0], colors[0], colors[1], colors[1], 1);
     this.bg.fillRect(0, 0, 4000, 3000);

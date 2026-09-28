@@ -5,6 +5,7 @@ const HAIR = ["#3b2a20", "#6b4226", "#b8863b", "#d9c07a", "#2b2b30", "#8a3b2a", 
 const SKIN = ["#f1d0ae", "#d9a77c", "#a8744f", "#7a5236"];
 const HELM_KIND: Record<HelmStyle, HelmKind> = {
   none: "none", cap: "cap", hood: "hood", iron: "iron", circlet: "circlet", horned: "horned", keeper: "keeper",
+  bandana: "bandana", wizard: "wizard", kettle: "kettle", greathelm: "greathelm", winged: "winged", stormcrown: "stormcrown",
 };
 
 function hsv(h: number, s: number, v: number) {

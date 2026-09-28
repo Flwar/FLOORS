@@ -22,7 +22,9 @@
     "moves": "tsx tools/moves.ts",
     "events": "tsx tools/events.ts",
     "trade": "tsx tools/trade.ts",
-    "settings": "tsx tools/settings.ts"
+    "settings": "tsx tools/settings.ts",
+    "reach": "tsx tools/reach.ts",
+    "floor2": "tsx tools/floor2.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

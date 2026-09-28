@@ -17,6 +17,7 @@ const PROFILES: Record<string, Profile> = {
   caves: { bed: { type: "lowpass", freq: 160, q: 0.7, level: 0.09, wobble: 0.2 }, events: [{ kind: "drip", every: [1.2, 4], level: 0.06 }] },
   dungeon: { bed: { type: "lowpass", freq: 140, q: 0.8, level: 0.09, wobble: 0.15 }, events: [{ kind: "drip", every: [2, 6], level: 0.05 }, { kind: "creak", every: [14, 26], level: 0.04 }] },
   skyreach: { bed: { type: "highpass", freq: 1500, q: 0.4, level: 0.03, wobble: 0.6 }, events: [{ kind: "chime", every: [5, 11], level: 0.04 }] },
+  storm: { bed: { type: "bandpass", freq: 420, q: 0.5, level: 0.075, wobble: 0.9 }, events: [{ kind: "creak", every: [6, 14], level: 0.06 }, { kind: "chime", every: [12, 24], level: 0.03 }] },
 };
 
 class Ambience {

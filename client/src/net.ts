@@ -2,7 +2,7 @@ import { Client, type Room } from "@colyseus/sdk";
 import { SERVER_PORT } from "@floors/shared";
 import type { WorldState } from "../../server/src/state.ts";
 
-export type RoomKind = "world" | "dungeon" | "floor2";
+export type RoomKind = "world" | "dungeon" | "floor2" | "stormspire";
 
 const TOKEN_KEY = "floors.session";
 
@@ -23,6 +23,9 @@ export class Session {
   guest?: string;
   room?: Room<any, WorldState>;
   kind: RoomKind = "world";
+  /** Messages that arrived before the scene bound its handlers (see attach). */
+  private early: [string | number, unknown][] = [];
+  private catching = false;
 
   constructor() {
     const params = new URLSearchParams(location.search);
@@ -69,9 +72,26 @@ export class Session {
     void this.room?.leave(true);
   }
 
+  /** Replay what arrived before the scene was listening. Call once its handlers are bound. */
+  replayEarly(room: Room<any, WorldState>) {
+    this.catching = false;
+    const early = this.early;
+    this.early = [];
+    const r = room as unknown as { dispatchMessage(type: string | number, message: unknown): void };
+    for (const [type, m] of early) r.dispatchMessage(type, m);
+  }
+
   private attach(room: Room<any, WorldState>, kind: RoomKind) {
     this.room = room;
     this.kind = kind;
+    // The scene restarts a frame after a room change and only then binds its handlers, so the
+    // server's first messages (the character sheet, settings, quest updates) would be dropped.
+    // Keep them until the scene says it is listening.
+    this.early = [];
+    this.catching = true;
+    room.onMessage("*", (type: string | number, m: unknown) => {
+      if (this.catching && this.early.length < 256) this.early.push([type, m]);
+    });
     room.onMessage("session", (m: { token: string; name: string }) => {
       this.token = m.token;
       this.name = m.name;

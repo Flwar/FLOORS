@@ -83,8 +83,8 @@ await page.waitForTimeout(1200);
 const light = (await S("bindings.light")) as string[];
 const z2 = (await S("zoom")) as number;
 check("settings saved to the character", light.includes("KeyL") && Math.abs(z2 - z1) < 0.01, `light ${JSON.stringify(light)}, zoom ${z2.toFixed(2)}`);
-const hint = await page.locator("#hint").textContent();
-check("HUD hint shows bindings", !!hint && hint.includes("LMB attack"), hint ?? "");
+const potionKey = await page.locator("#slot-potion .key").textContent();
+check("HUD slots show bindings", potionKey === "R", `tonic slot key: ${potionKey}`);
 
 await page.evaluate(`window.__floors.debug.settings.resetBindings(); window.__floors.debug.settings.set({ zoom: 1.15 })`);
 await page.waitForTimeout(1000);

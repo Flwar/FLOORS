@@ -27,7 +27,6 @@ body { font-family: "Trebuchet MS", system-ui, sans-serif; color: var(--ink); us
 #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
 
 #net { position: absolute; top: 10px; right: 14px; font-size: 12px; color: var(--ink-dim); }
-#hint { position: absolute; bottom: 8px; right: 14px; font-size: 11px; color: var(--ink-dim); max-width: 60vw; text-align: right; }
 #status { position: absolute; top: 42%; width: 100%; text-align: center; font-size: 18px; }
 
 #vitals { position: absolute; left: 16px; bottom: 18px; display: flex; align-items: center; gap: 10px; }
@@ -80,6 +79,5 @@ body { font-family: "Trebuchet MS", system-ui, sans-serif; color: var(--ink); us
 #death .sub { font-size: 14px; color: var(--ink-dim); margin-top: 6px; }
 
 @media (max-width: 640px) {
-  #hint { display: none; }
   .slot { width: 44px; height: 44px; }
 }

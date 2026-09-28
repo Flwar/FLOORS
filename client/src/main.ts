@@ -1,5 +1,9 @@
 import "./hud.css";
 import "./ui.css";
+import "./skills.css";
+import "./admin.css";
+import "./inventory.css";
+import "./tutorial.css";
 import * as Phaser from "phaser";
 import { music } from "./audio/music.ts";
 import { sfx } from "./audio/sfx.ts";

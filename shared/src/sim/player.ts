@@ -14,9 +14,9 @@ import {
   getMove,
   MOVE_COMBO_HEAVY,
   MOVE_HEAVY,
-  MOVE_SKILL1,
-  MOVE_SKILL2,
+  MOVE_SKILL_BASE,
   moveLength,
+  NO_SKILL,
   WEAPONS,
   type MoveDef,
 } from "../combat/weapons.ts";
@@ -97,6 +97,9 @@ export interface PlayerSim {
   parryOk: number;
   cd1: number;
   cd2: number;
+  /** Equipped skills: indices into the weapon's skill pool (NO_SKILL when a slot is empty). */
+  sk1: number;
+  sk2: number;
   /** Healing tonics carried (server-driven; drinking needs one). */
   potions: number;
 }
@@ -209,8 +212,8 @@ function canStart(s: PlayerSim, want: number): boolean {
   const dodge = dodgeDef(s);
   if (want === Btn.Dodge && (s.exhausted || s.stamina <= 0)) return false;
   if (want === Btn.Heavy && s.exhausted) return false;
-  if (want === Btn.Skill1 && (!(s.mods & Mod.Skill1) || s.cd1 > 0)) return false;
-  if (want === Btn.Skill2 && (!(s.mods & Mod.Skill2) || s.cd2 > 0)) return false;
+  if (want === Btn.Skill1 && (s.sk1 === NO_SKILL || s.cd1 > 0)) return false;
+  if (want === Btn.Skill2 && (s.sk2 === NO_SKILL || s.cd2 > 0)) return false;
   if ((want === Btn.Skill1 || want === Btn.Skill2) && s.exhausted) return false;
   if (want === Btn.Use && s.potions <= 0) return false;
   switch (s.act) {
@@ -278,7 +281,7 @@ function startAction(s: PlayerSim, want: number, aim: number, cmd: PlayerCommand
     }
     case Btn.Skill1:
     case Btn.Skill2: {
-      const id = want === Btn.Skill1 ? MOVE_SKILL1 : MOVE_SKILL2;
+      const id = MOVE_SKILL_BASE + (want === Btn.Skill1 ? s.sk1 : s.sk2);
       const m = getMove(s.weapon, id);
       begin(s, Act.Skill, aim);
       s.actMove = id;

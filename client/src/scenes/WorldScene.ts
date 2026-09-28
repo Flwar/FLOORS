@@ -1,8 +1,8 @@
 import * as Phaser from "phaser";
 import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from "@colyseus/sdk";
 import {
-  Act, aimToRad, applyGates, buildFloor1, buildFloor2Landing, buildUndercroft, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
-  isActiveTick, itemBase, keyLabel, parryDef, PLAYER_RADIUS, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
+  Act, aimToRad, applyGates, buildFloor1, buildFloor2, buildStormspire, buildUndercroft, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
+  isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, treeNode, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
   WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone,
 } from "@floors/shared";
 import type { Enemy, Hazard, Player, Projectile, WorldState } from "../../../server/src/state.ts";
@@ -13,6 +13,8 @@ import { Hud } from "../hud.ts";
 import { Controls } from "../input.ts";
 import type { RoomKind, Session } from "../net.ts";
 import { weaponTrail } from "../art/characters.ts";
+import { skillIcon } from "../ui/skillIcons.ts";
+import { SkillFx } from "../render/skillFx.ts";
 import { settings } from "../settings.ts";
 import { EnemyView, PlayerView } from "../render/entities.ts";
 
@@ -24,14 +26,18 @@ function materialOf(ev: EnemyView): Material {
 }
 import { Fx } from "../render/fx.ts";
 import { Lighting, type Light } from "../render/lighting.ts";
-import { ObjectiveArrow, objectiveTarget } from "../render/objective.ts";
+import { QuestMarkers, questTarget, trackedQuests } from "../render/objective.ts";
+import { Ambient } from "../render/ambient.ts";
+import { Tutorial } from "../ui/tutorial.ts";
+import { drawParchmentMap } from "../render/mapArt.ts";
+import { mapClickToWorld, type AdminOverview } from "../ui/admin.ts";
 import { WorldObjects, type Interactable } from "../render/objects.ts";
 import { Sky } from "../render/sky.ts";
 import { Terrain } from "../render/terrain.ts";
 import { goldIcon, itemIcon } from "../ui/icons.ts";
 import type { DialogMsg, GameUI, InvView } from "../ui/ui.ts";
 
-const PREDICTED = ["x", "y", "dir", "gait", "aim", "stamina", "staminaMax", "staminaDelay", "exhausted", "act", "actTick", "actMove", "actAim", "actSeq", "combo", "comboTimer", "buf", "bufAim", "bufAge", "dodgeDx", "dodgeDy", "kbx", "kby", "hurtDur", "weapon", "mods", "parryOk", "cd1", "cd2", "potions"] as const;
+const PREDICTED = ["x", "y", "dir", "gait", "aim", "stamina", "staminaMax", "staminaDelay", "exhausted", "act", "actTick", "actMove", "actAim", "actSeq", "combo", "comboTimer", "buf", "bufAim", "bufAge", "dodgeDx", "dodgeDy", "kbx", "kby", "hurtDur", "weapon", "mods", "parryOk", "cd1", "cd2", "sk1", "sk2", "potions"] as const;
 const GOLD = 0xffd76a;
 const RED = 0xff4a3a;
 
@@ -46,7 +52,8 @@ export class WorldScene extends Phaser.Scene {
   private enemies = new Map<string, EnemyView>();
   private hud = new Hud();
   private controls!: Controls;
-  private objective!: ObjectiveArrow;
+  private markers!: QuestMarkers;
+  private whereAt = 0;
   private terrain!: Terrain;
   private fx!: Fx;
   private bars!: Phaser.GameObjects.Graphics;
@@ -63,6 +70,11 @@ export class WorldScene extends Phaser.Scene {
   /** Last time this client's attacks landed on each enemy (for kill confirmation). */
   private lastHitOn = new Map<string, number>();
   private dodgeSeen = new Map<string, number>();
+  private skillFx!: SkillFx;
+  /** Last skill (actSeq) whose release effect played, per player. */
+  private skillSeen = new Map<string, number>();
+  /** Iron Skin shimmer: until when, per player. */
+  private ironUntil = new Map<string, number>();
   private heartAt = 0;
   private bossSeen = new Set<string>();
   /** Zoom that fits the screen height; the player's zoom setting multiplies it. */
@@ -73,6 +85,8 @@ export class WorldScene extends Phaser.Scene {
   private ui!: GameUI;
   private kind: RoomKind = "world";
   private objects!: WorldObjects;
+  private ambient!: Ambient;
+  private tutorial?: Tutorial;
   private sky!: Sky;
   private lighting!: Lighting;
   private travelling = false;
@@ -100,19 +114,31 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    this.map = this.kind === "dungeon" ? buildUndercroft() : this.kind === "floor2" ? buildFloor2Landing() : buildFloor1();
-    this.sky = new Sky(this, this.kind === "dungeon" ? "dusk" : this.kind === "floor2" ? "gold" : "day");
+    this.map = this.kind === "dungeon" ? buildUndercroft() : this.kind === "stormspire" ? buildStormspire() : this.kind === "floor2" ? buildFloor2() : buildFloor1();
+    this.sky = new Sky(this, this.kind === "dungeon" ? "dusk" : this.kind === "stormspire" ? "storm" : this.kind === "floor2" ? "gold" : "day");
     this.terrain = new Terrain(this, this.map);
     this.objects = new WorldObjects(this, this.map);
+    this.ambient = new Ambient(this, this.map);
+    if (this.kind === "world") this.tutorial = new Tutorial(this, this.map, this.room, this.session.name ?? this.session.guest ?? "you");
     this.lighting = new Lighting(this);
     this.fx = new Fx(this);
+    this.skillFx = new SkillFx(this.fx, this);
+    this.hud.onEmptySkillSlot = () => this.ui.toggle("skills", true);
+    this.hud.potionIcon(itemIcon("tonic", 0));
     this.bars = this.add.graphics().setDepth(1e6 - 1);
-    this.objective = new ObjectiveArrow(this);
+    this.markers = new QuestMarkers(this);
     this.ui.npcName = (id) => this.map.npcs.find((n) => n.id === id)?.name;
     this.controls = new Controls(this);
     this.ui.onBlockChange = (b) => (this.controls.blocked = b);
     this.ui.onCapture = (on) => (this.controls.capturing = on);
     this.ui.mapRender = (c) => this.drawMap(c);
+    this.ui.mapAccess = () => this.mapAccess();
+    this.ui.adminMap = this.map;
+    this.ui.adminKind = this.kind;
+    this.ui.onMapTeleport = (c, ev) => {
+      this.room.send("admin:tp", mapClickToWorld(c, this.map, ev));
+      this.ui.toggle("map", false);
+    };
 
     this.predict = Predict.get(this.room, { mode: "lerp", delay: INTERP_DELAY });
     this.predict.attachAll("players", { fields: ["x", "y"], mode: "lerp" });
@@ -132,6 +158,7 @@ export class WorldScene extends Phaser.Scene {
     });
     // Dungeon portcullises: the same tiles change on server and client, so prediction stays exact.
     $.listen("gates", (mask) => {
+      this.objects.gates = mask as number;
       const m = this.map as WorldMap & { gates?: GateDef[] };
       if (!m.gates) return;
       applyGates(m as WorldMap & { gates: GateDef[] }, mask as number);
@@ -139,6 +166,7 @@ export class WorldScene extends Phaser.Scene {
     });
     this.bindEvents();
     this.bindUi();
+    this.session.replayEarly(this.room);
 
     const cam = this.cameras.main;
     cam.setBounds(-400, -300, this.map.width * TILE + 800, this.map.height * TILE + 600);
@@ -169,11 +197,13 @@ export class WorldScene extends Phaser.Scene {
     window.addEventListener("keydown", onKey);
     this.events.once("shutdown", () => {
       this.objects.destroy();
+      this.ambient.destroy();
+      this.tutorial?.destroy();
       window.removeEventListener("keydown", onKey);
       offSettings();
     });
     document.getElementById("respawn-now")!.onclick = () => this.room.send("respawnNow");
-    music.play(this.kind === "dungeon" ? "dungeon" : this.kind === "floor2" ? "skyreach" : "town");
+    music.play(this.kind === "dungeon" ? "dungeon" : this.kind === "stormspire" ? "storm" : this.kind === "floor2" ? "skyreach" : "town");
     if (import.meta.env.DEV) (window as unknown as { __floors: unknown }).__floors = this;
   }
 
@@ -261,6 +291,20 @@ export class WorldScene extends Phaser.Scene {
         this.fx.star(x + tip.x * k, y + tip.y * k - 4, color, 3 + Math.random() * 3, 420);
       }
       this.attackTrail(v, s, x, y);
+      if (s.act === Act.Skill) {
+        const m = getMove(s.weapon, s.actMove);
+        const a = aimToRad(s.actAim);
+        if (s.actTick < m.startup) this.skillFx.charge(m, x, y, s.actTick / Math.max(1, m.startup));
+        else {
+          if (this.skillSeen.get(sid) !== s.actSeq) {
+            this.skillSeen.set(sid, s.actSeq);
+            this.skillFx.fire(m, x, y, a, sid === this.room.sessionId, (ms, amt) => this.cameras.main.shake(ms, amt));
+          }
+          if (s.actTick < m.startup + m.active) this.skillFx.during(m, x, y, a);
+        }
+      }
+      const iron = this.ironUntil.get(sid);
+      if (iron && performance.now() < iron && Math.random() < delta / 240) this.fx.ring(x, y - 16, 0xc9d3dd, 14, 24, 380, 2);
       if (s.act === Act.Dodge && this.dodgeSeen.get(sid) !== s.actSeq) {
         this.dodgeSeen.set(sid, s.actSeq);
         this.fx.dust(x, y, 7, Math.atan2(s.dodgeDy, s.dodgeDx) + Math.PI);
@@ -275,6 +319,7 @@ export class WorldScene extends Phaser.Scene {
       const x = this.predict.value(e, "x");
       const y = this.predict.value(e, "y");
       v.update(e, x, y, view, delta);
+      if (e.flags & EFlag.Poisoned && Math.random() < delta / 180) this.fx.rise(x + (Math.random() - 0.5) * 12, y - 18, 0x8fe06a, 1, 6, 16, 700, 2.2);
       this.enemyTelegraph(id, e, v, x, y, view);
     });
 
@@ -292,9 +337,16 @@ export class WorldScene extends Phaser.Scene {
     const mx = this.me?.value("x") ?? 0;
     const my = this.me?.value("y") ?? 0;
     this.objects.update(delta, this.ui.inv, state.stage, mx, my);
+    const people: { x: number; y: number }[] = [];
+    state.players.forEach((pl) => people.push({ x: pl.x, y: pl.y }));
+    if (this.me) people.push({ x: mx, y: my });
+    this.ambient.update(delta, view, cam, people, this.zone?.id);
+    const tinv = this.ui.inv;
+    if (tinv) this.tutorial?.decide(tinv);
+    this.tutorial?.update(delta, this.me && tinv ? { me: { x: mx, y: my, s: this.me.state }, quests: tinv.quests, tree: tinv.tree ?? [] } : undefined);
     this.updatePrompt(mx, my);
     const alive = this.me && this.me.state.act !== Act.Dead;
-    this.objective.update(delta, mx, my, alive && this.ui.inv ? objectiveTarget(this.map, this.ui.inv, mx, my) : undefined);
+    this.updateQuestMarkers(delta, mx, my, !!alive, cam);
     this.updateLighting(delta);
     this.updateCamera(delta);
     this.updateHud();
@@ -328,6 +380,28 @@ export class WorldScene extends Phaser.Scene {
     el.style.top = `${(this.focus.y - cam.worldView.y) * cam.zoom}px`;
   }
 
+  /** Arrows and pins for every tracked quest, and live directions for the quest panel. */
+  private updateQuestMarkers(delta: number, mx: number, my: number, alive: boolean, cam: Phaser.Cameras.Scene2D.Camera) {
+    const inv = this.ui.inv;
+    const list = inv ? trackedQuests(inv) : [];
+    const targets = list.map((t) => (inv ? questTarget(this.map, inv, t, mx, my) : undefined));
+    this.markers.update(
+      delta, mx, my,
+      alive ? targets.map((tg, i) => (tg ? { x: tg.x, y: tg.y, main: list[i].quest.main === true, person: tg.person } : undefined)) : [],
+      cam.worldView,
+    );
+    if (performance.now() < this.whereAt) return;
+    this.whereAt = performance.now() + 200;
+    this.ui.setTrackerWhere(
+      list.map((t, i) => {
+        const tg = targets[i];
+        if (!tg) return { id: t.quest.id };
+        const d = Math.hypot(tg.x - mx, tg.y - my);
+        return { id: t.quest.id, angle: Math.atan2(tg.y - my, tg.x - mx), dist: Math.max(1, Math.round(d / TILE)), area: tg.area, here: d < 150 };
+      }),
+    );
+  }
+
   private applyKeyLabels(b: Bindings) {
     const set = (id: string, code: string | undefined) => {
       const k = document.querySelector(`#${id} .key`);
@@ -336,11 +410,6 @@ export class WorldScene extends Phaser.Scene {
     set("slot-skill1", b.skill1[0]);
     set("slot-skill2", b.skill2[0]);
     set("slot-potion", b.use[0]);
-    const hint = document.getElementById("hint");
-    if (hint) {
-      const k = (a: keyof Bindings) => keyLabel(b[a][0]);
-      hint.textContent = `${k("light")} attack · ${k("heavy")} heavy · ${k("dodge")} dodge · ${k("parry")} parry · ${k("interact")} interact · ${k("pack")} pack · ${k("quests")} quests · ${k("map")} map · Esc settings`;
-    }
   }
 
   private interact() {
@@ -424,6 +493,13 @@ export class WorldScene extends Phaser.Scene {
     const r = this.room;
     const ui = this.ui;
     r.onMessage("inv", (v: InvView) => ui.setInv(v));
+    r.onMessage("mapBought", () => sfx.chime(2));
+    r.onMessage("admin:overview", (m: AdminOverview) => ui.setAdmin(m));
+    r.onMessage("announce", (m: { text: string }) => {
+      this.hud.title("Announcement", m.text);
+      ui.toast(m.text, "good");
+      sfx.chime(1);
+    });
     r.onMessage("settings", (m: unknown) => settings.fromServer(m));
     r.onMessage("bank", (m: { bank: InvView["inventory"]; bankGold: number }) => ui.setBank(m.bank, m.bankGold));
     r.onMessage("dialog", (d: DialogMsg) => ui.showDialog(d));
@@ -439,7 +515,8 @@ export class WorldScene extends Phaser.Scene {
     r.onMessage("trade", (m) => ui.setTrade(m));
     r.onMessage("travel", (m: { room: RoomKind; roomId?: string; leader?: string }) => {
       if (m.roomId && m.leader && m.leader !== this.myPlayer?.name) {
-        if (!confirm(`${m.leader} has unsealed the Undercroft. Join your party below?`)) return;
+        const where = m.room === "stormspire" ? "opened the Stormspire" : "unsealed the Undercroft";
+        if (!confirm(`${m.leader} has ${where}. Join your party inside?`)) return;
       }
       void this.travelTo(m.room, m.roomId);
     });
@@ -478,8 +555,19 @@ export class WorldScene extends Phaser.Scene {
     });
     r.onMessage("mastery", (m: { weapon: string; level: number }) => {
       sfx.levelUp();
-      ui.toast(`${WEAPONS.find((w) => w.key === m.weapon)?.name} mastery ${m.level}!`, "good");
-      this.hud.title(`${WEAPONS.find((w) => w.key === m.weapon)?.name} Mastery ${m.level}`, "New techniques unlocked — see Character (C)");
+      const bonus = Math.round((m.level - 1) * 3);
+      ui.toast(`${m.weapon}: mastery ${m.level}! (+${bonus}% damage with it)`, "good");
+      this.hud.title(`${m.weapon} · Mastery ${m.level}`, m.level >= 10 ? "Mastered: this weapon now glows in your hands" : "This weapon hits harder the more you use it");
+    });
+    r.onMessage("learned", (m: { id: string }) => {
+      sfx.levelUp();
+      const p = this.me ? { x: this.me.value("x"), y: this.me.value("y") } : undefined;
+      if (p) {
+        this.fx.rise(p.x, p.y - 10, 0xf2d27a, 24, 14, 60, 1000, 2.2);
+        this.fx.ring(p.x, p.y - 8, 0xf2d27a, 8, 40, 500, 3);
+      }
+      const name = skillById(m.id)?.move.name ?? treeNode(m.id)?.name ?? "skill";
+      ui.toast(`Learned ${name}!`, "good");
     });
     r.onMessage("achievement", (a: { name: string; desc: string }) => {
       this.hud.title(`Achievement: ${a.name}`, a.desc);
@@ -547,70 +635,34 @@ export class WorldScene extends Phaser.Scene {
   // Map panel
 
   private drawMap(c: HTMLCanvasElement) {
-    const g = c.getContext("2d")!;
-    const m = this.map;
-    const s = Math.min(c.width / m.width, c.height / m.height);
-    c.height = Math.round(m.height * s);
     const inv = this.ui.inv;
-    const known = new Set(inv?.discovered ?? []);
-    const colors: Record<number, string> = {
-      [Tile.Grass]: "#5f9a48", [Tile.TallGrass]: "#5f9a48", [Tile.Flowers]: "#6aa650", [Tile.Path]: "#c9a86a", [Tile.Cobble]: "#9b968b",
-      [Tile.Wall]: "#6b645a", [Tile.Tree]: "#2f6a37", [Tile.Water]: "#3f86c0", [Tile.House]: "#a05a3a", [Tile.Rock]: "#3b3e46",
-      [Tile.CaveFloor]: "#62666f", [Tile.Sand]: "#d8c08a", [Tile.StoneFloor]: "#a89f8c", [Tile.RuinWall]: "#7a705e", [Tile.Palisade]: "#7a5433",
-      [Tile.Fence]: "#8a6a4a", [Tile.Cliff]: "#8a6e52", [Tile.Crystal]: "#8fe3ff", [Tile.Gate]: "#556", [Tile.Crop]: "#a8894f", [Tile.Prop]: "#8a7a64",
-    };
-    g.fillStyle = "#0b1016";
-    g.fillRect(0, 0, c.width, c.height);
-    for (let y = 0; y < m.height; y++) {
-      for (let x = 0; x < m.width; x++) {
-        const t = m.get(x, y);
-        if (t === Tile.Void) continue;
-        const z = m.zoneAt(x * TILE + 16, y * TILE + 16);
-        // Undiscovered regions stay dark; secrets are never revealed until visited.
-        const seen = !z || known.has(`zone:${z.id}`) || (z.id === "green-fields" && true);
-        if (z?.secret && !known.has(`zone:${z.id}`)) g.fillStyle = colors[Tile.Tree];
-        else g.fillStyle = colors[t] ?? "#555";
-        g.globalAlpha = seen ? 1 : 0.18;
-        g.fillRect(x * s, y * s, Math.ceil(s), Math.ceil(s));
-      }
-    }
-    g.globalAlpha = 1;
-    g.font = "bold 13px Georgia";
-    g.textAlign = "center";
-    for (const z of m.zones) {
-      if (z.id === "green-fields" || z.secret || !known.has(`zone:${z.id}`)) continue;
-      g.fillStyle = "#fff4d6";
-      g.strokeStyle = "#1d1a17";
-      g.lineWidth = 3;
-      const cx = ((z.x0 + z.x1) / 2) * s;
-      const cy = ((z.y0 + z.y1) / 2) * s;
-      g.strokeText(z.name, cx, cy);
-      g.fillText(z.name, cx, cy);
-    }
-    for (const o of m.objects) {
-      if (o.kind === "waystone" && known.has(`ws:${o.id}`)) {
-        g.fillStyle = "#8fe3ff";
-        g.fillRect((o.x / TILE) * s - 3, (o.y / TILE) * s - 3, 6, 6);
-      }
-      if (o.kind === "door" || (o.kind === "gate" && o.id === "ascent-gate")) {
-        g.fillStyle = "#ffd98a";
-        g.beginPath();
-        g.arc((o.x / TILE) * s, (o.y / TILE) * s, 4, 0, Math.PI * 2);
-        g.fill();
-      }
-    }
-    this.room.state.players.forEach((p, sid) => {
-      const mine = sid === this.room.sessionId;
-      const party = this.myPlayer?.party && p.party === this.myPlayer.party;
-      if (!mine && !party) return;
-      g.fillStyle = mine ? "#ffe08a" : "#9fe0ff";
-      g.beginPath();
-      g.arc((p.x / TILE) * s, (p.y / TILE) * s, mine ? 5 : 4, 0, Math.PI * 2);
-      g.fill();
-      g.strokeStyle = "#1d1a17";
-      g.lineWidth = 2;
-      g.stroke();
+    const me = this.me ? { x: this.me.value("x"), y: this.me.value("y"), face: aimToRad(this.me.state.aim) } : undefined;
+    const party: { x: number; y: number }[] = [];
+    this.room.state.players.forEach((pl, sid) => {
+      if (sid !== this.room.sessionId && this.myPlayer?.party && pl.party === this.myPlayer.party) party.push({ x: pl.x, y: pl.y });
     });
+    const pins: { x: number; y: number; main: boolean; label: string; n: number }[] = [];
+    if (inv) {
+      trackedQuests(inv).forEach((t, i) => {
+        const tg = questTarget(this.map, inv, t, me?.x ?? this.map.spawn.x, me?.y ?? this.map.spawn.y);
+        if (tg) pins.push({ x: tg.x, y: tg.y, main: t.quest.main === true, label: t.quest.name, n: i + 1 });
+      });
+    }
+    drawParchmentMap(c, this.map, { known: new Set(inv?.discovered ?? []), me, party, pins });
+  }
+
+  /** Whether this map can be opened: Floor 1 needs a bought map; the Undercroft was never charted. */
+  private mapAccess(): { ok: boolean; title?: string; text?: string } {
+    if (this.ui.inv?.admin) return { ok: true };
+    if (this.kind === "dungeon") return { ok: false, title: "The Undercroft was never charted", text: "No map covers these halls. Follow your quest markers and the torchlight." };
+    if (this.kind === "stormspire") return { ok: false, title: "The Stormspire was never charted", text: "Climb. Every hall leads upward, toward the eye of the storm." };
+    if (this.kind === "world" && !this.ui.inv?.discovered.includes("map:floor1")) {
+      return { ok: false, title: "You don't have a map of this floor", text: "Tilde sells one at the General Store in Emberwatch, for 35 gold. Until then, your quest markers show the way." };
+    }
+    if (this.kind === "floor2" && !this.ui.inv?.discovered.includes("map:floor2")) {
+      return { ok: false, title: "You don't have a map of the Gilded Terraces", text: "Quartermaster Iven sells one at Skyreach Landing, for 60 gold. Until then, your quest markers show the way." };
+    }
+    return { ok: true };
   }
 
   // ---------------------------------------------------------------------------
@@ -743,7 +795,7 @@ export class WorldScene extends Phaser.Scene {
 
   private bindEvents() {
     const me = () => this.room.sessionId;
-    this.room.onMessage("hit", (m: { t: string; d: number; c?: number; r: number; x: number; y: number; a?: string; hs?: number; im?: number; heavy?: number; mis?: number; ang?: number }) => {
+    this.room.onMessage("hit", (m: { t: string; d: number; c?: number; r: number; x: number; y: number; a?: string; hs?: number; im?: number; heavy?: number; mis?: number; ang?: number; dot?: number }) => {
       if (m.t.startsWith("p:")) {
         const sid = m.t.slice(2);
         const v = this.players.get(sid);
@@ -769,6 +821,10 @@ export class WorldScene extends Phaser.Scene {
       const e = this.room.state.enemies?.get(m.t);
       const ex = e ? this.predict.value(e, "x") : m.x;
       const ey = e ? this.predict.value(e, "y") : m.y;
+      if (m.dot) {
+        this.fx.number(ex, ey - 26, String(m.d), { color: "#a8e878", size: m.a === me() ? 9 : 7, bold: true }, Math.random() < 0.5 ? 0 : Math.PI, 650);
+        return;
+      }
       if (m.r === 4) {
         this.fx.text(ex, ey - 36, "Blocked", { color: "#c9d3dd", size: 9 }, 600);
         return;
@@ -864,8 +920,15 @@ export class WorldScene extends Phaser.Scene {
       if (m.p === me()) this.zone = undefined;
     });
     this.room.onMessage("impact", (m: { x: number; y: number }) => this.fx.burst(m.x, m.y, 0xc9e8ff, 6, 60, 2, 300));
-    this.room.onMessage("fx", (m: { k: string; x: number; y: number; r?: number; x2?: number; y2?: number }) => {
+    this.room.onMessage("fx", (m: { k: string; x: number; y: number; r?: number; x2?: number; y2?: number; p?: string; ms?: number }) => {
+      if (this.skillFx.event(m.k, m.x, m.y, m.r ?? 90)) return;
       switch (m.k) {
+        case "ironskin":
+          if (m.p) this.ironUntil.set(m.p, performance.now() + (m.ms ?? 5000));
+          this.fx.ring(m.x, m.y - 16, 0xe6ebef, 8, 34, 380, 5);
+          this.fx.burst(m.x, m.y - 16, 0xc9d3dd, 14, 80, 2.4, 500);
+          sfx.parry(false, m.x, m.y);
+          break;
         case "warcry":
           this.fx.ring(m.x, m.y - 10, 0xffc26b, 10, m.r ?? 90, 450, 5);
           sfx.roar(m.x, m.y);
@@ -989,14 +1052,21 @@ export class WorldScene extends Phaser.Scene {
           break;
         default: {
           if (t > h.delay + 250) return;
-          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : 0xd8402c;
+          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : 0xd8402c;
           g.fillStyle(color, 0.08 + 0.2 * k);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.fillStyle(color, 0.35);
           g.fillEllipse(h.x, h.y, h.radius * 2 * k, h.radius * 1.6 * k);
           g.lineStyle(2, color, 0.8);
           g.strokeEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
-          if (t >= h.delay && t < h.delay + 40) {
+          if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Lightning) {
+            // A bolt from the sky.
+            this.fx.bolt(h.x + (Math.random() - 0.5) * 30, h.y - 150, h.x, h.y - 4, 0x4f8fff, 220, 8, 16);
+            this.fx.bolt(h.x + (Math.random() - 0.5) * 30, h.y - 150, h.x, h.y - 4, 0xeaf6ff, 160, 3, 18);
+            this.fx.sparks(h.x, h.y - 6, -Math.PI / 2, 0xeaf6ff, 14, 240, Math.PI * 2);
+            this.fx.crack(h.x - 8, h.y, h.x + 8, h.y + 3, 0x2a2a3a, 900, 3);
+            sfx.hit(true, h.x, h.y, true, "metal");
+          } else if (t >= h.delay && t < h.delay + 40) {
             this.fx.burst(h.x, h.y - 6, color, 24, 160, 3, 600);
             sfx.boom(h.kind === HazardKind.Meteor, h.x, h.y);
             if (h.kind === HazardKind.Meteor) this.cameras.main.shake(160, 0.005);
@@ -1034,6 +1104,20 @@ export class WorldScene extends Phaser.Scene {
         case ProjKind.Reflected:
           this.fx.streak(tx, ty, x, y, GOLD, 80, 7);
           break;
+        case ProjKind.Wave: {
+          const bx = x - Math.cos(pr.angle) * 14;
+          const by = y - Math.sin(pr.angle) * 14;
+          this.fx.trail(bx, by, pr.angle - 1.0, pr.angle + 1.0, 10, 22, 0xcfe6ff, 70);
+          if (Math.random() < 0.4) this.fx.sparks(x, y, pr.angle + Math.PI, 0xeaf6ff, 1, 90);
+          break;
+        }
+        case ProjKind.Javelin: {
+          const jx = x - Math.cos(pr.angle) * 30;
+          const jy = y - Math.sin(pr.angle) * 30;
+          this.fx.streak(jx, jy, x, y, 0xb08a5a, 40, 3.5);
+          this.fx.streak(x - Math.cos(pr.angle) * 8, y - Math.sin(pr.angle) * 8, x, y, 0xffffff, 40, 4);
+          break;
+        }
         default:
           this.fx.streak(tx, ty, x, y, 0x8fd3ff, 90, 8);
           this.fx.burst(x, y, 0xe8f7ff, 1, 10, 2.4, 160);
@@ -1144,7 +1228,12 @@ export class WorldScene extends Phaser.Scene {
     this.hud.vitals(p.hp, p.hpMax, s.stamina, s.staminaMax, s.exhausted, p.level);
     const w = WEAPONS[s.weapon];
     this.hud.weapon(w.name);
-    this.hud.skills([w.skills[0].name, w.skills[1].name], [s.cd1, s.cd2], [w.skills[0].cooldown ?? 1, w.skills[1].cooldown ?? 1], [(s.mods & 4) !== 0, (s.mods & 8) !== 0]);
+    const quick = s.mods & Mod.QuickCast ? 0.75 : 1;
+    const slot = (idx: number, cd: number) => {
+      const m = idx !== NO_SKILL ? w.skills[idx] : undefined;
+      return { icon: m?.id ? skillIcon(m.id, 52) : undefined, name: m?.name ?? "", cd, max: Math.round((m?.cooldown ?? 1) * quick) };
+    };
+    this.hud.skills([slot(s.sk1, s.cd1), slot(s.sk2, s.cd2)], (this.ui.inv?.points.left ?? 0) > 0);
     this.hud.potions(s.potions);
     const frac = p.hpMax ? p.hp / p.hpMax : 1;
     if (s.act !== Act.Dead && p.hp > 0 && frac < 0.3 && performance.now() > this.heartAt) {
@@ -1167,7 +1256,8 @@ export class WorldScene extends Phaser.Scene {
       this.hud.zone(zone);
       const mood = zone.music ?? (this.kind === "dungeon" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
-      ambience.play(mood === "miniboss" || mood === "boss" ? (this.kind === "dungeon" ? "dungeon" : "forest") : mood);
+      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm" };
+      ambience.play(mood === "miniboss" || mood === "boss" ? (this.kind === "dungeon" ? "dungeon" : this.kind === "floor2" || this.kind === "stormspire" ? "storm" : "forest") : bed[mood] ?? mood);
       sfx.setRoom(this.kind === "dungeon" || zone.dark ? "cave" : zone.safe ? "town" : "open");
     }
     // Boss bar for the nearest engaged boss.

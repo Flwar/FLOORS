@@ -6,7 +6,7 @@
 export const BIND_ACTIONS = [
   "up", "down", "left", "right", "sprint",
   "light", "heavy", "dodge", "parry", "skill1", "skill2", "use",
-  "interact", "pack", "character", "quests", "map", "party",
+  "interact", "pack", "character", "skills", "quests", "map", "party",
 ] as const;
 export type BindAction = (typeof BIND_ACTIONS)[number];
 export type Bindings = Record<BindAction, string[]>;
@@ -15,11 +15,11 @@ export const BIND_LABELS: Record<BindAction, string> = {
   up: "Move up", down: "Move down", left: "Move left", right: "Move right", sprint: "Sprint",
   light: "Attack (combo)", heavy: "Heavy attack", dodge: "Dodge", parry: "Parry", skill1: "Weapon skill 1", skill2: "Weapon skill 2",
   use: "Drink tonic", interact: "Interact / pick up / revive",
-  pack: "Pack", character: "Character", quests: "Quests", map: "Map", party: "Party",
+  pack: "Pack", character: "Character", skills: "Skills", quests: "Quests", map: "Map", party: "Party",
 };
 
 /** Actions that open menus or talk to the world; these take keyboard keys only. */
-export const MENU_ACTIONS: readonly BindAction[] = ["interact", "pack", "character", "quests", "map", "party"];
+export const MENU_ACTIONS: readonly BindAction[] = ["interact", "pack", "character", "skills", "quests", "map", "party"];
 
 /** KeyboardEvent.code values, or "Mouse<button>" (0 left, 1 middle, 2 right, 3/4 side). */
 export const DEFAULT_BINDINGS: Bindings = {
@@ -38,6 +38,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   interact: ["KeyF"],
   pack: ["KeyI", "Tab"],
   character: ["KeyC"],
+  skills: ["KeyK"],
   quests: ["KeyJ"],
   map: ["KeyM"],
   party: ["KeyP"],

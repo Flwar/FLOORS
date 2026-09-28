@@ -95,6 +95,8 @@ export interface NpcDef {
   y: number;
   look: { skin: string; cloth: string; trim: string; hair: string; helm?: "none" | "hood" | "cap" | "helm" | "crown" };
   greeting: string;
+  /** Which shop this NPC sells from (defaults by role: "store", "smith"). */
+  shop?: string;
 }
 
 export type ObjectKind = "chest" | "lore" | "waystone" | "door" | "gate" | "campfire" | "lever";
@@ -110,6 +112,8 @@ export interface WorldObject {
   gold?: number;
   text?: string;
   requires?: string;
+  /** Gates and doors: where they lead ("world", "floor2", "floor3", "dungeon", "stormspire"). */
+  dest?: string;
 }
 
 export class WorldMap {

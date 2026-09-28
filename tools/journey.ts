@@ -6,7 +6,7 @@
  */
 import { Client, Predict, type Room } from "@colyseus/sdk";
 import {
-  Btn, buildFloor1, EAct, ENEMIES, impactMs, INTERP_DELAY, radToAim, SERVER_PORT, stepPlayer, type PlayerSim,
+  Btn, buildFloor1, EAct, ENEMIES, impactMs, INTERP_DELAY, radToAim, SERVER_PORT, SHOPS, stepPlayer, type PlayerSim,
 } from "@floors/shared";
 
 const endpoint = process.env.SERVER ?? `ws://localhost:${SERVER_PORT}`;
@@ -218,7 +218,7 @@ async function main() {
   await wait(200);
   const g1 = a.inv.gold;
   const tonics = a.count("tonic");
-  a.room.send("shop:buy", { shop: "store", idx: 0 });
+  a.room.send("shop:buy", { shop: "store", idx: SHOPS.store.findIndex((e) => e.key === "tonic") });
   await wait(400);
   check("buy a tonic", a.inv.gold === g1 - 18 && a.count("tonic") === tonics + 1, `gold ${g1}→${a.inv.gold}, tonics ${tonics}→${a.count("tonic")}`);
   const padded = a.inv.inventory.find((x: any) => x?.key === "armor_padded");

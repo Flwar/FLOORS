@@ -9,7 +9,7 @@ interface Particle {
   max: number;
   color: number;
   size: number;
-  kind: "spark" | "dot" | "ring" | "streak" | "star" | "dust";
+  kind: "spark" | "dot" | "ring" | "streak" | "star" | "dust" | "crack";
   r0?: number;
   r1?: number;
   a?: number;
@@ -61,6 +61,41 @@ export class Fx {
     this.over = scene.add.graphics().setDepth(1e6).setBlendMode(Phaser.BlendModes.ADD);
     this.trailG = scene.add.graphics().setDepth(1e6 - 3);
     this.dustG = scene.add.graphics().setDepth(-3);
+  }
+
+  /** Motes that float upward (healing light, embers, magic gathering). */
+  rise(x: number, y: number, color: number, count = 10, spread = 16, speed = 40, life = 900, size = 2) {
+    for (let i = 0; i < count; i++) {
+      this.parts.push({
+        x: x + (Math.random() - 0.5) * spread * 2, y: y + (Math.random() - 0.5) * spread * 0.6, vx: (Math.random() - 0.5) * 12, vy: -speed * (0.5 + Math.random()),
+        life: life * (0.6 + Math.random() * 0.5), max: life, color, size: size * (0.6 + Math.random() * 0.7), kind: "dot", drag: 0.985, gravity: -8,
+      });
+    }
+  }
+
+  /** A crack or scorch mark on the ground that fades (normal blend, under characters). */
+  crack(x0: number, y0: number, x1: number, y1: number, color = 0x3a2c1c, ms = 1600, width = 3) {
+    this.dusts.push({ x: x0, y: y0, vx: x1, vy: y1, life: ms, max: ms, color, size: width, kind: "crack" });
+  }
+
+  /** A jagged lightning bolt between two points. */
+  bolt(x0: number, y0: number, x1: number, y1: number, color: number, ms = 160, width = 5, jag = 12) {
+    const n = Math.max(3, Math.round(Math.hypot(x1 - x0, y1 - y0) / 22));
+    const nx = -(y1 - y0);
+    const ny = x1 - x0;
+    const len = Math.hypot(nx, ny) || 1;
+    let px = x0;
+    let py = y0;
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      const off = i === n ? 0 : (Math.random() - 0.5) * jag * 2;
+      const qx = x0 + (x1 - x0) * t + (nx / len) * off;
+      const qy = y0 + (y1 - y0) * t + (ny / len) * off;
+      this.streak(px, py, qx, qy, color, ms, width);
+      this.streak(px, py, qx, qy, 0xffffff, ms * 0.7, width * 0.4);
+      px = qx;
+      py = qy;
+    }
   }
 
   /** Soft dust kicked up at the feet (dodges, sprint steps, landings). `dir` pushes it one way. */
@@ -151,6 +186,11 @@ export class Fx {
         continue;
       }
       const k = p.life / p.max;
+      if (p.kind === "crack") {
+        dg.lineStyle(p.size, p.color, 0.7 * Math.min(1, k * 2));
+        dg.lineBetween(p.x, p.y, p.vx, p.vy);
+        continue;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.vx *= Math.pow(0.05, dt);

@@ -72,6 +72,8 @@ export interface EnemyDef {
   attacks: EnemyAttack[];
   xp: number;
   loot: string;
+  /** Summon special: which enemies answer the call. */
+  minions?: string[];
   look: EnemyLook;
   /** Bosses and minibosses. */
   boss?: { title: string; phases: number[]; posture: number; music: string };
@@ -402,6 +404,60 @@ export const ENEMIES: EnemyDef[] = [
   },
 ];
 
+/**
+ * Difficulty: how tough enemies are relative to their base stats. Normal enemies are
+ * meant to take a couple of full combos and to punish a player who trades hits.
+ */
+export const ENEMY_TUNING = {
+  hp: 2.2,
+  dmg: 1.7,
+  hpPerLevel: 0.16,
+  dmgPerLevel: 0.09,
+  /** Bosses keep their tested health curve (their fights are built on phases and posture) but hit harder. */
+  bossHp: 1,
+  bossHpPerLevel: 0.12,
+  bossDmg: 1.35,
+  eliteHp: 2,
+  eliteDmg: 1.35,
+  /** Longer fights are worth more. */
+  xp: 1.6,
+  /**
+   * Per-enemy corrections, from the time-to-kill / time-to-die table (tools/_curve.ts):
+   * a normal enemy should fall to roughly 7–14 light hits from an on-level character,
+   * and should take noticeably longer to kill you than you take to kill it.
+   */
+  per: {
+    goblin: { hp: 0.85 },
+    cutpurse: { dmg: 0.85 },
+    shieldbearer: { hp: 0.7 },
+    alpha: { hp: 0.65, dmg: 0.85 },
+    brute: { hp: 0.6, dmg: 0.9 },
+    // Floor 2
+    skyguard: { hp: 0.85 },
+    aegis: { hp: 0.62 },
+    sentinel: { hp: 0.55 },
+  } as Record<string, { hp?: number; dmg?: number }>,
+};
+
+const practice = (def: EnemyDef) => def.behavior === "dummy" || def.behavior === "sparring";
+
+export function enemyMaxHp(def: EnemyDef, level: number, elite = false, hpScale = 1) {
+  const t = ENEMY_TUNING;
+  if (practice(def)) return Math.round(def.hp * hpScale);
+  if (def.boss) return Math.round(def.hp * t.bossHp * (1 + (level - 1) * t.bossHpPerLevel) * hpScale);
+  const per = t.per[def.key]?.hp ?? 1;
+  return Math.round(def.hp * t.hp * per * (elite ? t.eliteHp : 1) * (1 + (level - 1) * t.hpPerLevel) * hpScale);
+}
+
+export function enemyDamageScale(def: EnemyDef, level: number, elite = false) {
+  const t = ENEMY_TUNING;
+  if (practice(def)) return 1;
+  const per = def.boss ? 1 : (t.per[def.key]?.dmg ?? 1);
+  return (def.boss ? t.bossDmg : t.dmg) * per * (elite ? t.eliteDmg : 1) * (1 + (level - 1) * t.dmgPerLevel);
+}
+
+export const enemyXp = (def: EnemyDef) => (def.boss ? def.xp : Math.round(def.xp * ENEMY_TUNING.xp));
+
 export const enemyIndex = (key: string) => ENEMIES.findIndex((e) => e.key === key);
 export const enemyDef = (i: number) => ENEMIES[i];
 
@@ -425,6 +481,8 @@ export const EFlag = {
   Aggro: 8,
   Enraged: 16,
   Hidden: 32,
+  /** Taking poison damage over time (Venom Edge). */
+  Poisoned: 64,
 } as const;
 
 /** Tick timeline of an enemy attack. */

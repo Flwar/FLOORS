@@ -36,7 +36,7 @@ async function main() {
   await world.leave(true);
   await wait(300);
 
-  const room: Room<any, any> = await client.joinOrCreate("dungeon", { token });
+  const room: Room<any, any> = await client.create("dungeon", { token });
   const msgs: { type: string; m: any; at: number }[] = [];
   room.onMessage("*", (type, m) => msgs.push({ type: String(type), m, at: performance.now() }));
   while (!room.state.players?.get(room.sessionId)) await wait(20);
@@ -162,7 +162,8 @@ async function main() {
   room.send("dev:bosshp", { frac: 0.69 });
   await wait(300);
   const p1 = seen("phase").length;
-  await fight(20000);
+  // Phase-2 attacks are picked at random: keep fighting until one of its signatures shows up.
+  for (let t = 0; t < 45000 && !(bladeProjectiles > 0 || hazardKinds.has(HazardKind.Sigil)); t += 5000) await fight(5000);
   check("phase 2 begins", p1 >= 1 || [...attacksSeen].some((a) => a === "Blade Storm" || a === "Sigils of Binding"), `phase events ${p1}, attacks: ${[...attacksSeen].join(", ")}`);
   check("Blade Storm / Sigils appear", bladeProjectiles > 0 || hazardKinds.has(HazardKind.Sigil), `blade projectiles seen ${bladeProjectiles}, sigils ${hazardKinds.has(HazardKind.Sigil)}`);
   room.send("dev:bosshp", { frac: 0.34 });

@@ -5,6 +5,9 @@ import { propTexture } from "../art/props.ts";
 
 const CHUNK = 16; // tiles
 const CHUNK_PX = CHUNK * TILE;
+/** Each Terrain paints its ground under its own texture keys: travelling rebuilds the scene
+ * with a different map, and a chunk cached from the last one must never be reused. */
+let terrainSeq = 0;
 
 function hash(x: number, y: number, s = 0): number {
   let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0;
@@ -19,6 +22,8 @@ interface Palette {
 }
 const MEADOW: Palette = { grass: "#6fae52", grassDark: "#5a9443", grassLight: "#86c264" };
 const FOREST: Palette = { grass: "#4f8c45", grassDark: "#3f7438", grassLight: "#62a055" };
+/** Floor 2: sun-gilded meadows. */
+const GILDED: Palette = { grass: "#9db85a", grassDark: "#86a04a", grassLight: "#b6cc6e" };
 const PATH = "#cfae72";
 const COBBLE = "#9b968b";
 const WATER = "#3f86c0";
@@ -51,6 +56,7 @@ export class Terrain {
   private buildingsByChunk = new Map<string, Building[]>();
   private propsByChunk = new Map<string, PropDef[]>();
   private forestRect?: { x0: number; y0: number; x1: number; y1: number };
+  private readonly tag = `t${++terrainSeq}`;
 
   constructor(private scene: Phaser.Scene, private map: WorldMap) {
     for (const b of map.buildings) {
@@ -64,8 +70,12 @@ export class Terrain {
       this.propsByChunk.get(k)!.push(pr);
     }
     this.forestRect = map.zones.find((z) => z.id === "whisperwood");
-    STONE = map.name.startsWith("Floor 2") ? "#e2cd92" : "#a89f8c";
+    STONE = map.name.startsWith("Floor 2") || map.name.includes("Stormspire") ? "#e2cd92" : "#a89f8c";
+    this.gilded = map.name.startsWith("Floor 2");
     paintSprites(scene, map);
+    scene.events.once("shutdown", () => {
+      for (const [k, c] of [...this.chunks]) this.unload(k, c);
+    });
   }
 
   /** Fade trees and roofs standing between the camera and a character behind them. */
@@ -120,7 +130,10 @@ export class Terrain {
     return this.chunks.size;
   }
 
+  private gilded = false;
+
   private palette(tx: number, ty: number): Palette {
+    if (this.gilded) return GILDED;
     const f = this.forestRect;
     if (f && tx >= f.x0 && tx < f.x1 && ty >= f.y0 && ty < f.y1) {
       const edge = Math.min(tx - f.x0, ty - f.y0, f.x1 - tx, f.y1 - ty);
@@ -130,7 +143,7 @@ export class Terrain {
   }
 
   private load(cx: number, cy: number) {
-    const key = `ground:${cx},${cy}`;
+    const key = `ground:${this.tag}:${cx},${cy}`;
     if (!this.scene.textures.exists(key)) this.paintChunk(cx, cy, key);
     // A hair of overlap hides seams between chunks at fractional camera positions.
     const ground = this.scene.add.image(cx * CHUNK_PX, cy * CHUNK_PX, key).setOrigin(0).setDisplaySize(CHUNK_PX + 0.75, CHUNK_PX + 0.75).setDepth(-10);
@@ -147,7 +160,7 @@ export class Terrain {
         switch (id) {
           case Tile.Tree: {
             const forest = this.palette(tx, ty) === FOREST;
-            const variant = Math.floor(hash(tx, ty, 3) * 3) + (forest ? 3 : 0);
+            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.gilded ? 6 : forest ? 3 : 0);
             add(tx * TILE + TILE / 2 + (hash(tx, ty, 4) - 0.5) * 8, bottom - 3, `tree${variant}`, 0.5, 0.94, 0.9 + hash(tx, ty, 5) * 0.35);
             tall.push(decor[decor.length - 1] as Phaser.GameObjects.Image);
             break;
@@ -531,8 +544,31 @@ export class Terrain {
       const x = px(tx);
       const y = py(ty);
       const southOpen = is(tx, ty + 1, Tile.Void);
-      g.fillStyle = MEADOW.grassDark;
-      g.fillRect(x, y, T, southOpen ? T * 0.35 : T);
+      // Inland, a cliff is a terrace step: grass on top, a low dry-stone face below.
+      const ledge = !southOpen && !is(tx, ty + 1, Tile.Cliff) && !is(tx, ty - 1, Tile.Void) && !is(tx - 1, ty, Tile.Void) && !is(tx + 1, ty, Tile.Void);
+      g.fillStyle = this.palette(tx, ty).grassDark;
+      g.fillRect(x, y, T, southOpen ? T * 0.35 : ledge ? T * 0.45 : T);
+      if (ledge) {
+        const [hi, lo] = this.gilded ? ["#dcc486", "#b3954f"] : ["#a29276", "#7c6d55"];
+        const fg = g.createLinearGradient(0, y + T * 0.45, 0, y + T);
+        fg.addColorStop(0, hi);
+        fg.addColorStop(1, lo);
+        g.fillStyle = fg;
+        g.fillRect(x, y + T * 0.45, T, T * 0.55);
+        g.strokeStyle = "rgba(40,30,20,0.3)";
+        g.lineWidth = 1.5;
+        g.beginPath();
+        g.moveTo(x, y + T * 0.72);
+        g.lineTo(x + T, y + T * 0.72);
+        const j = hash(tx, ty, 52) * T * 0.5;
+        g.moveTo(x + j + T * 0.2, y + T * 0.45);
+        g.lineTo(x + j + T * 0.2, y + T * 0.72);
+        g.moveTo(x + ((j + T * 0.55) % T), y + T * 0.72);
+        g.lineTo(x + ((j + T * 0.55) % T), y + T);
+        g.stroke();
+        g.fillStyle = "rgba(0,0,0,0.16)";
+        g.fillRect(x, y + T, T, 4);
+      }
       if (southOpen) {
         const fg = g.createLinearGradient(0, y + T * 0.35, 0, y + T);
         fg.addColorStop(0, "#9a7a5a");
@@ -648,6 +684,10 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
     ["#214f2c", "#2f6a3a", "#468a4a"],
     ["#1e4a2a", "#2b6236", "#3f8045"],
     ["#26552f", "#33703c", "#4c9150"],
+    // Floor 2: golden and amber canopies.
+    ["#8a6a1e", "#b8902e", "#e0b84a"],
+    ["#7a5a1a", "#a8802a", "#d8a83e"],
+    ["#6a7a22", "#8ea033", "#b8c450"],
   ];
   canopies.forEach(([dark, mid, light], v) => {
     make(`tree${v}`, 110, 150, (g) => {
@@ -842,6 +882,11 @@ function paintBuilding(scene: Phaser.Scene, bd: Building) {
     storage: ["#5d6a4a", "#76855e"],
     guild: ["#6b3f6f", "#8a5590"],
     scholar: ["#2e4a6a", "#44688e"],
+    skyhall: ["#b8903a", "#e0c060"],
+    quarter: ["#3f6a8a", "#5584a8"],
+    skyforge: ["#5a5f66", "#7d848c"],
+    skyvault: ["#4a6a5a", "#6a8a7a"],
+    windrest: ["#8a4a6a", "#b0638a"],
   };
   const [roofD, roofL] = palettes[bd.id] ?? ["#8a4a32", "#b0633f"];
   g.fillStyle = "#1d1a17";

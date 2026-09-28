@@ -1,4 +1,4 @@
-import { makeItem, QUESTS, questDef, type QuestDef } from "@floors/shared";
+import { makeItem, QUEST_SKILL_POINTS, QUESTS, questDef, type QuestDef } from "@floors/shared";
 import type { Character } from "./character.ts";
 
 export type QuestEvent =
@@ -6,7 +6,7 @@ export type QuestEvent =
   | { kind: "interact"; object: string }
   | { kind: "parry" }
   | { kind: "visit"; zone: string }
-  | { kind: "dungeon" }
+  | { kind: "dungeon"; dungeon: "dungeon" | "stormspire" }
   | { kind: "talk"; npc: string };
 
 export interface QuestUpdate {
@@ -56,6 +56,12 @@ function advance(ch: Character, q: QuestDef, out: QuestUpdate[]) {
       if (!ch.addItem(item)) ch.data.bank[ch.data.bank.indexOf(null)] = item; // never lose a reward: overflow goes to storage
     }
     if (r.unlockFloor) ch.data.floor = Math.max(ch.data.floor, r.unlockFloor);
+    // Main-story milestones also award a skill point.
+    const pts = QUEST_SKILL_POINTS[q.id] ?? 0;
+    if (pts) {
+      ch.data.bonusPoints = (ch.data.bonusPoints ?? 0) + pts;
+      ch.recompute();
+    }
     ch.addXp(r.xp);
     out.push({ id: q.id, name: q.name, text: "Quest complete", done: true, rewards: r });
   } else {
@@ -95,7 +101,7 @@ export function questEvent(ch: Character, ev: QuestEvent): QuestUpdate[] {
         if (ev.kind === "visit" && ev.zone === stage.zone) advance(ch, q, out);
         break;
       case "dungeon":
-        if (ev.kind === "dungeon") advance(ch, q, out);
+        if (ev.kind === "dungeon" && ev.dungeon === stage.dungeon) advance(ch, q, out);
         break;
       case "talk":
         if (ev.kind === "talk" && ev.npc === stage.npc) advance(ch, q, out);

@@ -1,14 +1,14 @@
 import { matchMaker, type Client } from "colyseus";
 import {
-  Act, buildFloor1, isEquipment, itemBase, makeItem, questDef, repairCost, sellPrice, SHOPS, TILE, upgradeCost, WEAPONS,
+  Act, buildFloor1, isEquipment, itemBase, makeItem, TREES, questDef, repairCost, sellPrice, SHOPS, TILE, upgradeCost, WEAPONS,
   type NpcDef, type WorldMap, type WorldObject,
 } from "@floors/shared";
 import { BANK_SIZE, type Character } from "../game/character.ts";
 import { accept, offers, questEvent, turnIns, type QuestEvent } from "../game/quests.ts";
 import { Spawners } from "../game/spawners.ts";
 import type { EnemyData } from "../game/sim.ts";
-import { DEV, GameRoom } from "./GameRoom.ts";
-import { WorldEvents } from "../game/events.ts";
+import { GameRoom } from "./GameRoom.ts";
+import { FLOOR1_EVENTS, WorldEvents, type EventDef } from "../game/events.ts";
 import { partyMembers } from "../game/parties.ts";
 import { online } from "../game/registry.ts";
 
@@ -23,9 +23,12 @@ const RUMOURS = [
   "Waystones remember you once you've touched them. Saves a lot of walking.",
 ];
 
-/** The persistent Floor 1 world everyone shares. */
+/**
+ * A persistent floor everyone shares (Floor 1 here; Floor 2 extends it): NPCs, quests,
+ * shops, the smith, storage, waystones, chests, gates, spawners and world events.
+ */
 export class WorldRoom extends GameRoom {
-  readonly kind = "world" as const;
+  readonly kind: "world" | "floor2" = "world";
   spawners!: Spawners;
   events!: WorldEvents;
   private zoneCheckAt = 0;
@@ -35,10 +38,31 @@ export class WorldRoom extends GameRoom {
     return buildFloor1();
   }
 
+  /** This floor's world events. */
+  protected eventDefs(): EventDef[] {
+    return FLOOR1_EVENTS;
+  }
+
+  /** What the innkeeper hears. */
+  protected rumours(): string[] {
+    return RUMOURS;
+  }
+
   protected spawnPoint(ch: Character, respawn: boolean) {
     const pos = ch.data.pos;
-    if (!respawn && pos?.room === "world" && !this.map.boxBlocked(pos.x, pos.y, 7, 5) && !this.map.isSolidTile(Math.floor(pos.x / TILE), Math.floor(pos.y / TILE))) {
-      return { x: pos.x, y: pos.y };
+    if (!respawn && pos?.room === this.kind) {
+      // Arriving through a gate: step out next to it.
+      const via = pos.via ? this.map.object(pos.via) : undefined;
+      if (via) {
+        for (const [dx, dy] of [[0, 44], [0, -48], [44, 0], [-44, 0], [0, 80], [0, -80]]) {
+          const x = via.x + dx;
+          const y = via.y + dy;
+          if (!this.map.boxBlocked(x, y, 7, 5)) return { x, y };
+        }
+      }
+      if (!pos.via && !this.map.boxBlocked(pos.x, pos.y, 7, 5) && !this.map.isSolidTile(Math.floor(pos.x / TILE), Math.floor(pos.y / TILE))) {
+        return { x: pos.x, y: pos.y };
+      }
     }
     const a = Math.random() * Math.PI * 2;
     return { x: this.map.spawn.x + Math.cos(a) * 36, y: this.map.spawn.y + Math.sin(a) * 20 };
@@ -51,14 +75,14 @@ export class WorldRoom extends GameRoom {
       this.spawners.onRemoved(ed);
       this.events.onRemoved(ed);
     };
-    this.events = new WorldEvents(this);
+    this.events = new WorldEvents(this, this.eventDefs());
     const baseParry = this.sim.onParry;
     this.sim.onParry = (pd, perfect) => {
       baseParry?.(pd, perfect);
       if (pd.ch) this.quest(pd.sid, pd.ch, { kind: "parry" });
     };
     this.registerWorldMessages();
-    if (DEV) this.registerDevMessages();
+    this.registerDevMessages();
   }
 
   protected tickRoom(now: number) {
@@ -68,6 +92,26 @@ export class WorldRoom extends GameRoom {
       this.zoneCheckAt = now + 400;
       this.checkZones();
     }
+  }
+
+  /** Back where you left off: a character last seen on Floor 2 goes straight up. */
+  protected onPlayerJoined(sid: string, ch: Character) {
+    const pos = ch.data.pos;
+    if (this.kind === "world" && pos?.room === "floor2" && ch.data.floor >= 2) this.travel(sid, ch, "floor2", undefined, pos);
+  }
+
+  /** Leaving through a gate: remember where to appear on the other side. */
+  protected onPlayerLeft(_sid: string, ch: Character) {
+    const t = ch.travelTo;
+    if (!t) return;
+    ch.travelTo = undefined;
+    ch.data.pos = t.pos ?? { room: t.room, x: 0, y: 0, hp: ch.data.pos?.hp, via: t.via };
+  }
+
+  /** Send a character to another floor, arriving by `via` (a gate) or at `pos`. */
+  protected travel(sid: string, ch: Character, room: "world" | "floor2", via?: string, pos?: Character["data"]["pos"]) {
+    ch.travelTo = { room, via: via ?? "", pos };
+    this.clients.getById(sid)?.send("travel", { room });
   }
 
   protected onKillRewards(ch: Character, ed: EnemyData) {
@@ -105,6 +149,17 @@ export class WorldRoom extends GameRoom {
 
   // ---------------------------------------------------------------------------
 
+  /** The shop an NPC sells from. */
+  protected shopOf(n: NpcDef): string | undefined {
+    if (n.role === "merchant") return "merchant";
+    return n.shop ?? (n.role === "store" ? "store" : n.role === "smith" ? "smith" : undefined);
+  }
+
+  private shopNear(client: Client, shop: string) {
+    const p = this.state.players.get(client.sessionId);
+    return !!p && this.map.npcs.some((n) => this.shopOf(n) === shop && Math.hypot(n.x - p.x, n.y - p.y) <= TALK_RANGE);
+  }
+
   private npcNear(client: Client, role?: NpcDef["role"], id?: string): NpcDef | undefined {
     const p = this.state.players.get(client.sessionId);
     if (!p) return undefined;
@@ -138,9 +193,18 @@ export class WorldRoom extends GameRoom {
       if (merchant && !this.events.merchantActive) return;
       const stock = merchant ? this.events.merchantStock : SHOPS[msg?.shop];
       const entry = stock?.[msg.idx];
-      const role = msg?.shop === "smith" ? "smith" : merchant ? "merchant" : "store";
-      if (!me || !entry || !this.npcNear(client, role)) return;
+      if (!me || !entry || !this.shopNear(client, String(msg.shop))) return;
       if (me.ch.data.gold < entry.price) return this.notify(client, "Not enough gold.", "error");
+      // Maps are learned, not carried: they can't be lost, traded or dropped.
+      if (entry.key.startsWith("map_")) {
+        const flag = `map:${entry.key.slice(4)}`;
+        if (me.ch.data.discovered.includes(flag)) return this.notify(client, "You already have this map.", "error");
+        me.ch.data.gold -= entry.price;
+        me.ch.data.discovered.push(flag);
+        me.ch.dirty = true;
+        client.send("mapBought", { key: entry.key });
+        return this.notify(client, `Bought ${itemBase(entry.key)?.name}. Press M to open it.`, "good");
+      }
       const item = makeItem(entry.key, entry.rarity ?? 0, 1);
       if (!me.ch.addItem(item)) return this.notify(client, "Your pack is full.", "error");
       me.ch.data.gold -= entry.price;
@@ -151,7 +215,8 @@ export class WorldRoom extends GameRoom {
 
     this.onMessage("shop:sell", (client, uid: string) => {
       const me = this.player(client);
-      if (!me || !(this.npcNear(client, "store") || this.npcNear(client, "smith") || this.npcNear(client, "merchant"))) return;
+      const p = this.state.players.get(client.sessionId);
+      if (!me || !p || !this.map.npcs.some((n) => this.shopOf(n) && Math.hypot(n.x - p.x, n.y - p.y) <= TALK_RANGE)) return;
       const i = me.ch.findSlot(String(uid));
       const it = i >= 0 ? me.ch.data.inventory[i] : null;
       if (!it) return;
@@ -261,21 +326,22 @@ export class WorldRoom extends GameRoom {
       if (updates.some((u) => u.done)) this.save(client.sessionId);
     }
     const services: string[] = [];
-    if (npc.role === "store") services.push("shop:store", "sell");
-    if (npc.role === "smith") services.push("shop:smith", "smith", "sell");
+    const shop = this.shopOf(npc);
+    if (shop) services.push(`shop:${shop}`);
+    if (npc.role === "smith") services.push("smith");
+    if (shop) services.push("sell");
     if (npc.role === "storage") services.push("bank");
     if (npc.role === "inn") services.push("rumour");
-    if (npc.role === "merchant") services.push("shop:merchant", "sell");
     const done = updates.filter((u) => u.done).map((u) => ({ id: u.id, name: u.name, thanks: questDef(u.id)!.thanks }));
     client.send("dialog", {
       npc: npc.id,
       name: npc.name,
       role: npc.role,
-      greeting: npc.role === "inn" ? `${npc.greeting} ${RUMOURS[Math.floor(Math.random() * RUMOURS.length)]}` : npc.role === "gate" && ch.data.floor >= 2 ? "The gate is open, climber. The Floor above is waiting." : npc.greeting,
+      greeting: npc.role === "inn" ? `${npc.greeting} ${this.rumours()[Math.floor(Math.random() * this.rumours().length)]}` : npc.role === "gate" && ch.data.floor >= 2 ? "The gate is open, climber. The Floor above is waiting." : npc.greeting,
       offers: offers(ch, npc.id).map((q) => ({ id: q.id, name: q.name, pitch: q.pitch, main: !!q.main })),
       done,
       services,
-      shop: npc.role === "store" ? SHOPS.store : npc.role === "smith" ? SHOPS.smith : npc.role === "merchant" ? this.events.merchantStock : undefined,
+      shop: shop === "merchant" ? this.events.merchantStock : shop ? SHOPS[shop] : undefined,
     });
   }
 
@@ -322,24 +388,28 @@ export class WorldRoom extends GameRoom {
       }
       case "door": {
         if (obj.requires && !ch.owns(obj.requires)) return this.notify(client, obj.text ?? "It's sealed.", "error");
-        void this.openDungeon(client, ch);
+        void this.openDungeon(client, ch, obj.dest === "stormspire" ? "stormspire" : "dungeon");
         return;
       }
       case "gate": {
-        if (ch.data.floor < 2) return client.send("lore", { name: obj.name, text: `${obj.text} It is sealed. Something below the ruins holds it shut.` });
-        client.send("travel", { room: "floor2" });
-        return;
+        const dest = obj.dest ?? (obj.id === "ascent-gate" ? "floor2" : undefined);
+        if (dest === "floor2") {
+          if (ch.data.floor < 2) return client.send("lore", { name: obj.name, text: `${obj.text} It is sealed. Something below the ruins holds it shut.` });
+          return this.travel(client.sessionId, ch, "floor2", "descent");
+        }
+        if (dest === "world") return this.travel(client.sessionId, ch, "world", "ascent-gate");
+        return client.send("lore", { name: obj.name, text: obj.text ?? "" });
       }
     }
   }
 
   /** Create a dungeon instance for this player (and their party, when grouped). */
-  protected async openDungeon(client: Client, ch: Character) {
+  protected async openDungeon(client: Client, ch: Character, kind: "dungeon" | "stormspire" = "dungeon") {
     const key = this.keys.get(client.sessionId)!;
     const members = this.partyKeys(key);
-    const room = await matchMaker.createRoom("dungeon", { allowed: members, leader: key });
-    for (const k of members) this.sendToKey(k, "travel", { room: "dungeon", roomId: room.roomId, leader: ch.data.name });
-    this.quest(client.sessionId, ch, { kind: "dungeon" });
+    const room = await matchMaker.createRoom(kind, { allowed: members, leader: key });
+    for (const k of members) this.sendToKey(k, "travel", { room: kind, roomId: room.roomId, leader: ch.data.name });
+    this.quest(client.sessionId, ch, { kind: "dungeon", dungeon: kind });
   }
 
   /** Party members in this world come along into the instance. */
@@ -348,19 +418,23 @@ export class WorldRoom extends GameRoom {
   }
 
   private registerDevMessages() {
-    this.onMessage("dev:weapon", (client, key: string) => {
+    this.onDev("dev:weapon", (client, key: string) => {
       const me = this.player(client);
       const w = WEAPONS.find((x) => x.key === key);
       if (!me || !w || me.p.act !== Act.None) return;
       const base = { sword: "sword_iron", greatsword: "greatsword_iron", daggers: "daggers_twin", spear: "spear_hunting", staff: "staff_oak" }[w.key];
       me.ch.data.equipment.weapon = makeItem(base, 1);
-      me.ch.data.mastery[w.key] = Math.max(me.ch.data.mastery[w.key] ?? 0, 2200);
+      me.ch.data.equipment.weapon.mxp = 2200;
+      // Tests and demos: the whole tree for this weapon, skills 1 and 2 equipped.
+      for (const n of TREES[w.key]) if (!me.ch.data.tree!.includes(n.id)) me.ch.data.tree!.push(n.id);
+      me.ch.data.bonusPoints = Math.max(me.ch.data.bonusPoints ?? 0, me.ch.data.tree!.length);
+      me.ch.data.loadout![w.key] = [0, 1];
       me.p.cd1 = 0;
       me.p.cd2 = 0;
       me.ch.recompute();
     });
     // Dev/test: wear a full outfit by item key (used by the appearance screenshots).
-    this.onMessage("dev:wear", (client, m: { weapon?: string; armor?: string; helm?: string; rarity?: number }) => {
+    this.onDev("dev:wear", (client, m: { weapon?: string; armor?: string; helm?: string; rarity?: number }) => {
       const me = this.player(client);
       if (!me || me.p.act !== Act.None) return;
       const eq = me.ch.data.equipment;
@@ -372,18 +446,18 @@ export class WorldRoom extends GameRoom {
       me.ch.recompute();
       me.ch.dirty = true;
     });
-    this.onMessage("dev:heal", (client) => {
+    this.onDev("dev:heal", (client) => {
       const me = this.player(client);
       if (me) me.p.hp = me.p.hpMax;
     });
-    this.onMessage("dev:teleport", (client, pos: { x: number; y: number }) => {
+    this.onDev("dev:teleport", (client, pos: { x: number; y: number }) => {
       const me = this.player(client);
       if (me && Number.isFinite(pos?.x) && Number.isFinite(pos?.y)) {
         me.p.x = Math.fround(pos.x);
         me.p.y = Math.fround(pos.y);
       }
     });
-    this.onMessage("dev:give", (client, msg: { key: string; rarity?: number; qty?: number; xp?: number; gold?: number }) => {
+    this.onDev("dev:give", (client, msg: { key: string; rarity?: number; qty?: number; xp?: number; gold?: number }) => {
       const me = this.player(client);
       if (!me) return;
       if (msg.key && itemBase(msg.key)) me.ch.addItem(makeItem(msg.key, msg.rarity, msg.qty ?? 1));
@@ -391,15 +465,15 @@ export class WorldRoom extends GameRoom {
       if (msg.gold) me.ch.data.gold += msg.gold;
       me.ch.dirty = true;
     });
-    this.onMessage("dev:spawn", (client, msg: { key: string; elite?: boolean; level?: number }) => {
+    this.onDev("dev:spawn", (client, msg: { key: string; elite?: boolean; level?: number }) => {
       const me = this.player(client);
       if (!me) return;
       const ed = this.sim.spawnEnemy(msg.key, me.p.x + 90, me.p.y, { elite: msg.elite, level: msg.level ?? 3 });
       ed.homeX = ed.e.x;
       ed.homeY = ed.e.y;
     });
-    this.onMessage("dev:event", (_client, id: string) => (id === "end" ? this.events.stop() : this.events.start(String(id))));
-    this.onMessage("dev:killnear", (client, radius: number) => {
+    this.onDev("dev:event", (_client, id: string) => (id === "end" ? this.events.stop() : this.events.start(String(id))));
+    this.onDev("dev:killnear", (client, radius: number) => {
       const me = this.player(client);
       if (!me) return;
       for (const ed of [...this.sim.enemies.values()]) {
@@ -408,7 +482,20 @@ export class WorldRoom extends GameRoom {
         this.sim.damageEnemy(ed, me.pd, 99999, 0, 0, 0);
       }
     });
-    this.onMessage("dev:kill", (client) => {
+    this.onDev("dev:floor", (client, n: number) => {
+      const me = this.player(client);
+      if (!me) return;
+      me.ch.data.floor = Math.max(1, Math.min(2, Math.round(Number(n) || 1)));
+      me.ch.dirty = true;
+    });
+    this.onDev("dev:questdone", (client, id: string) => {
+      const me = this.player(client);
+      const q = questDef(String(id));
+      if (!me || !q) return;
+      me.ch.data.quests[q.id] = { stage: q.stages.length - 1, progress: 0, done: true };
+      me.ch.dirty = true;
+    });
+    this.onDev("dev:kill", (client) => {
       const me = this.player(client);
       if (me && me.p.act !== Act.Dead) this.sim.killPlayer(me.pd);
     });

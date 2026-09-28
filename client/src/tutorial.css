@@ -1,0 +1,22 @@
+/* First-play tutorial card. */
+.tut-card { position: absolute; left: 16px; top: 84px; width: min(360px, 90vw); z-index: -1; pointer-events: auto; padding: 12px 14px 12px; border-radius: 14px;
+  background: linear-gradient(160deg, rgba(34, 28, 22, 0.94), rgba(16, 13, 10, 0.92)); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(232, 197, 90, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: tutin 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+@keyframes tutin { from { opacity: 0; transform: translateX(-18px) scale(0.97); } }
+.tut-card.tut-passed { animation: tutout 0.45s ease-in forwards; }
+@keyframes tutout { 0% { box-shadow: 0 0 0 2px #9fe0a6, 0 0 30px rgba(159, 224, 166, 0.7); } 100% { opacity: 0; transform: translateX(-24px); } }
+.tut-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tut-count { font: 600 11px/1 "Trebuchet MS", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #c9b58a; }
+.tut-skip { background: none; color: var(--ink-dim); font-size: 11px; padding: 2px 4px; text-decoration: underline; box-shadow: none; }
+.tut-skip:hover { color: var(--ink); }
+.tut-body { display: flex; gap: 12px; align-items: flex-start; }
+.tut-icon { flex: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
+.tut-title { font-family: Georgia, serif; font-size: 19px; color: #ffe1a0; margin-bottom: 4px; }
+.tut-text { font-size: 14px; line-height: 1.5; color: var(--ink); }
+.tut-text kbd { font-size: 12px; padding: 3px 7px; margin: 0 1px; }
+.tut-prog { display: flex; align-items: center; gap: 8px; margin: 10px 0 0 52px; font-size: 12px; color: #fff3d0; font-variant-numeric: tabular-nums; }
+.tut-bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.tut-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c9953a, #f2d27a); transition: width 0.3s; }
+.tut-next { margin: 12px 0 0 52px; }
+/* Step aside while a panel on the left (dialog, shop, storage) is open. */
+#ui:has(.panel.left) .tut-card { opacity: 0; pointer-events: none; transition: opacity 0.2s; }

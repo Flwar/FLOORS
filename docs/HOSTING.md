@@ -33,3 +33,14 @@ docker run -d -p 2567:2567 -v floors-data:/data --restart unless-stopped floors
 - Keep `/data` on a persistent volume, or characters are lost when the container is replaced.
 - Behind HTTPS (most platforms add it), the page connects with `wss://` automatically.
 - One server process holds the whole world; it comfortably handles a few dozen players.
+
+## Admin
+The account **Ofir** is the admin (change or add names with `FLOORS_ADMINS=Ofir,Someone`).
+Admins see an **ADMIN** button at the top of the screen (or press **F10** / the `` ` `` key):
+players online (go to, bring, heal, kick), teleport anywhere (also by clicking the map),
+world events, enemy spawning, any item at any rarity, level, gold, XP, skill points,
+weapon mastery, quests, map reveal, Floor 2, server stats and announcements.
+
+In production an admin name can only be **registered from the server machine itself**
+(`http://localhost:2567`), so nobody else can claim it first. On a remote host, start once with
+`FLOORS_ADMIN_SETUP=1`, create the account, then restart without it.

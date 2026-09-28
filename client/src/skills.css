@@ -1,0 +1,90 @@
+/* Skills panel (skill tree) and the HUD's skill slots. */
+
+.skills { display: flex; flex-direction: column; gap: 10px; }
+.sk-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sk-points { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); }
+.sk-points b { font-size: 22px; font-family: Georgia, serif; color: var(--ink-dim); margin-right: 3px; }
+.sk-points.has b { color: #f2d27a; text-shadow: 0 0 10px rgba(242, 210, 122, 0.6); }
+.sk-points span { display: block; font-size: 11px; color: var(--ink-dim); }
+.sk-reset { font-size: 12px; padding: 6px 10px; }
+
+.sk-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.sk-tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; font-size: 13px; color: var(--ink); background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(232, 197, 90, 0.18); border-radius: 8px; }
+.sk-tab img { width: 26px; height: 26px; }
+.sk-tab small { color: var(--ink-dim); font-size: 11px; }
+.sk-tab.on { background: linear-gradient(#3a2f20, #2a2218); color: #ffe1a0; box-shadow: inset 0 0 0 1px rgba(232, 197, 90, 0.7); }
+.sk-tab.hand span::after { content: " ✦"; color: #f2d27a; }
+
+.sk-main { display: flex; gap: 14px; align-items: flex-start; }
+.sk-tree { position: relative; flex: none; background: radial-gradient(ellipse at 50% 40%, rgba(232, 197, 90, 0.07), transparent 70%); border-radius: 12px; margin: 4px 0; }
+.sk-lines { position: absolute; inset: 0; pointer-events: none; }
+.sk-lines line { stroke: rgba(255, 255, 255, 0.12); stroke-width: 3; stroke-linecap: round; }
+.sk-lines line.open { stroke: rgba(232, 197, 90, 0.35); stroke-dasharray: 5 6; }
+.sk-lines line.lit { stroke: #e8c55a; stroke-width: 4; filter: drop-shadow(0 0 4px rgba(242, 210, 122, 0.7)); }
+.sk-rowlvl { position: absolute; left: -6px; font-size: 11px; color: var(--ink-dim); }
+
+.sk-node { position: absolute; width: 58px; height: 58px; padding: 0; border-radius: 14px; background: #1a1612;
+  box-shadow: 0 0 0 2px #3a332a, 0 4px 10px rgba(0, 0, 0, 0.5); transition: transform 0.12s, box-shadow 0.12s; }
+.sk-node img { width: 50px; height: 50px; display: block; margin: 4px; border-radius: 10px; }
+.sk-node.k-passive, .sk-node.k-move, .sk-node.k-perk { border-radius: 50%; }
+.sk-node.k-passive img, .sk-node.k-move img, .sk-node.k-perk img { border-radius: 50%; }
+.sk-node:hover { transform: translateY(-2px) scale(1.05); }
+.sk-node.locked img { filter: grayscale(0.85) brightness(0.55); }
+.sk-node.open { box-shadow: 0 0 0 2px #e8c55a, 0 0 16px rgba(242, 210, 122, 0.55); animation: sknode 1.4s ease-in-out infinite alternate; }
+.sk-node.learned { box-shadow: 0 0 0 3px #f2d27a, 0 0 12px rgba(242, 210, 122, 0.35); }
+.sk-node.sel { outline: 2px solid #fff; outline-offset: 4px; }
+@keyframes sknode { to { box-shadow: 0 0 0 2px #f2d27a, 0 0 26px rgba(242, 210, 122, 0.85); } }
+.sk-lock, .sk-tick { position: absolute; right: -6px; bottom: -6px; }
+.sk-label { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); width: 96px; font-size: 11px; line-height: 1.15; color: var(--ink);
+  text-shadow: 0 1px 2px #000; pointer-events: none; }
+.sk-node.locked .sk-label { color: var(--ink-dim); }
+
+.sk-side { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 220px; }
+.sk-card { background: linear-gradient(rgba(40, 32, 22, 0.9), rgba(24, 20, 16, 0.9)); border-radius: 12px; padding: 12px; box-shadow: inset 0 0 0 1px rgba(232, 197, 90, 0.3); }
+.sk-card-head { display: flex; gap: 10px; align-items: center; }
+.sk-card-head img { width: 64px; height: 64px; }
+.sk-card h3 { margin: 2px 0 0; font-family: Georgia, serif; font-weight: normal; font-size: 19px; color: #ffe1a0; }
+.sk-kind { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.sk-desc { margin: 10px 0; color: var(--ink); line-height: 1.45; font-size: 14px; }
+.sk-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12.5px; }
+.sk-stats > div { display: flex; align-items: center; gap: 6px; color: var(--ink-dim); }
+.sk-stats b { margin-left: auto; color: #fff3d0; }
+.sk-stats .sk-req { grid-column: 1 / -1; margin-top: 4px; }
+.sk-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+.sk-learn { display: flex; align-items: center; gap: 6px; }
+.sk-why { width: 100%; font-size: 12px; color: #f2a08a; }
+.sk-learned { display: flex; align-items: center; gap: 6px; color: #9fe0a6; width: 100%; }
+
+.sk-slots { background: rgba(0, 0, 0, 0.25); border-radius: 12px; padding: 10px 12px; }
+.sk-slots h4 { margin: 0 0 8px; font-weight: normal; font-size: 12px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.sk-slot-row { display: flex; gap: 14px; }
+.sk-slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; width: 76px; }
+.sk-slot img, .sk-slot > span { width: 52px; height: 52px; border-radius: 12px; box-shadow: 0 0 0 2px #e8c55a; }
+.sk-slot.empty > span { display: grid; place-items: center; font-size: 26px; color: var(--ink-dim); box-shadow: 0 0 0 2px #3a332a; background: #1a1612; }
+.sk-slot kbd { position: absolute; top: -6px; left: 6px; z-index: 1; }
+.sk-slot small { font-size: 11px; color: var(--ink); text-align: center; }
+.sk-mastery { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; color: #ffe1a0; }
+.sk-mastery.dim { color: var(--ink-dim); }
+
+/* HUD skill slots: the skill's icon, its key, and a clock-face cooldown. */
+.slot.skill { padding: 0; overflow: hidden; }
+.slot.skill .sicon { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); border-radius: 7px; }
+.slot.skill .key { z-index: 2; text-shadow: 0 1px 2px #000; font-weight: bold; }
+.slot.skill .cd { z-index: 1; transform: none !important; background: none; border-radius: 7px; }
+.slot.skill .cdnum { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; font: bold 17px Georgia, serif; color: #fff; text-shadow: 0 1px 3px #000; }
+.slot.skill.empty { cursor: pointer; }
+.slot.skill.empty .sicon { opacity: 0.8; }
+.slot.skill.learnable { animation: sklearn 1.1s ease-in-out infinite alternate; }
+@keyframes sklearn { to { box-shadow: 0 0 14px 3px rgba(242, 210, 122, 0.9); } }
+.slot.skill .name { display: none; }
+.slot.potion .picon { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); }
+.slot.potion .name { display: none; }
+
+/* Character panel: pointer to the skill tree and per-weapon mastery. */
+.char-skills .cs-row { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.char-skills .cs-row span { flex: 1; }
+.char-skills .cs-row b { color: #f2d27a; font-size: 16px; }
+.mastery .m-head img { width: 28px; height: 28px; }
+.mastery .m-head { align-items: center; gap: 8px; }
+.mastery .m-hand { font-size: 11px; color: #9fe0a6; }

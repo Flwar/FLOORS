@@ -97,19 +97,23 @@ for (const w of WEAPONS) {
   check(`${w.name}: ${w.comboHeavy.name}`, hitsSince(mark) >= 2, `${hitsSince(mark)} hit(s) incl. the opener`);
   await idle();
 
-  // Skills.
+  // Skills: every skill in the weapon's pool, equipped into slot 1 (cooldowns reset between).
   for (const [i, sk] of w.skills.entries()) {
-    await place(sk.special === "meteor" ? 170 : sk.lunge > 100 ? 150 : dist);
+    room.send("dev:weapon", w.key);
+    await wait(150);
+    room.send("skills:equip", { weapon: w.key, slot: 0, index: i });
+    const off = sk.shape?.kind === "circle" ? sk.shape.offset : 0;
+    await place(sk.special === "meteor" ? 170 : off > 60 ? off : sk.lunge > 100 ? 150 : sk.shape?.kind === "line" && sk.shape.length > 100 ? 90 : dist);
     await wait(200);
     mark = msgs.length;
     const seqBefore = me.state.actSeq;
     if (process.env.DEBUG) console.log(`  [skill${i}] before act=${me.state.act} st=${me.state.stamina.toFixed(0)} ex=${me.state.exhausted} cd=${me.state.cd1},${me.state.cd2} mods=${me.state.mods}`);
-    pending |= i === 0 ? Btn.Skill1 : Btn.Skill2;
+    pending |= Btn.Skill1;
     await wait(1600);
     const used = me.state.actSeq !== seqBefore;
     const hits = hitsSince(mark);
     const fx = msgs.slice(mark).filter((x) => x.type === "fx").map((x) => x.m.k);
-    const utility = sk.special === "counterStance" || sk.special === "shadowstep" || sk.special === "vault";
+    const utility = sk.special === "counterStance" || sk.special === "vault" || (sk.special === "shadowstep" && !sk.shape);
     const ok = used && (utility || hits > 0 || fx.length > 0);
     check(`${w.name}: ${sk.name}`, ok, `${used ? "used" : "NOT used"}, ${hits} hit(s)${fx.length ? `, fx ${fx.join(",")}` : ""}`);
     await idle();

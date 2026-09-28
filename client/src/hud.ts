@@ -2,6 +2,30 @@ import { type Zone } from "@floors/shared";
 
 const $ = (sel: string) => document.querySelector<HTMLElement>(sel)!;
 
+let emptyIcon = "";
+/** A dim "+" medallion for an empty skill slot. */
+function emptySlotIcon() {
+  if (emptyIcon) return emptyIcon;
+  const c = document.createElement("canvas");
+  c.width = c.height = 96;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(0,0,0,0.25)";
+  g.beginPath();
+  g.roundRect(4, 4, 88, 88, 16);
+  g.fill();
+  g.strokeStyle = "rgba(232,197,90,0.55)";
+  g.lineWidth = 6;
+  g.lineCap = "round";
+  g.beginPath();
+  g.moveTo(48, 30);
+  g.lineTo(48, 66);
+  g.moveTo(30, 48);
+  g.lineTo(66, 48);
+  g.stroke();
+  emptyIcon = c.toDataURL();
+  return emptyIcon;
+}
+
 /** DOM overlay HUD: stays crisp at any zoom and never covers the play space. */
 export class Hud {
   private bannerTimer = 0;
@@ -28,22 +52,51 @@ export class Hud {
     this.set("lv", level, () => ($("#level").textContent = String(level)));
   }
 
-  skills(names: [string, string], cds: [number, number], maxCds: [number, number], unlocked: [boolean, boolean]) {
+  /** Clicking an empty skill slot (to open the skill tree). */
+  onEmptySkillSlot?: () => void;
+
+  /**
+   * The two skill slots: the skill's icon, a clock-face cooldown with seconds left, and a
+   * pulsing "learn something" hint on empty slots while you have points to spend.
+   */
+  skills(slots: { icon?: string; name: string; cd: number; max: number }[], canLearn: boolean) {
     for (let i = 0; i < 2; i++) {
       const el = $(`#slot-skill${i + 1}`);
-      this.set(`sn${i}`, names[i], () => (el.querySelector(".name")!.textContent = names[i]));
-      this.set(`su${i}`, unlocked[i], () => el.classList.toggle("locked", !unlocked[i]));
-      const frac = maxCds[i] > 0 ? Math.min(1, cds[i] / maxCds[i]) : 0;
-      const q = Math.round(frac * 40);
-      this.set(`sc${i}`, q, () => {
-        (el.querySelector(".cd") as HTMLElement).style.transform = `scaleY(${frac})`;
-        if (q === 0) {
+      const sl = slots[i];
+      if (!el.classList.contains("skill")) {
+        el.classList.add("skill");
+        el.prepend(Object.assign(document.createElement("img"), { className: "sicon", alt: "" }));
+        el.append(Object.assign(document.createElement("span"), { className: "cdnum" }));
+        el.addEventListener("click", () => {
+          if (el.classList.contains("empty")) this.onEmptySkillSlot?.();
+        });
+      }
+      this.set(`si${i}`, sl.icon ?? "", () => {
+        const img = el.querySelector<HTMLImageElement>(".sicon")!;
+        img.src = sl.icon ?? emptySlotIcon();
+        el.classList.toggle("empty", !sl.icon);
+        el.title = sl.icon ? sl.name : "Empty slot: learn a skill in the skill tree";
+      });
+      this.set(`sl${i}`, !sl.icon && canLearn, () => el.classList.toggle("learnable", !sl.icon && canLearn));
+      const frac = sl.max > 0 ? Math.min(1, sl.cd / sl.max) : 0;
+      const secs = Math.ceil(sl.cd / 60);
+      this.set(`sc${i}`, Math.round(frac * 90), () => {
+        (el.querySelector(".cd") as HTMLElement).style.background = frac > 0 ? `conic-gradient(rgba(10,8,6,0.72) ${frac * 360}deg, transparent 0)` : "none";
+        if (frac === 0) {
           el.classList.remove("ready");
           void el.offsetWidth;
           el.classList.add("ready");
         }
       });
+      this.set(`sn${i}`, secs, () => (el.querySelector(".cdnum")!.textContent = secs > 0 ? String(secs) : ""));
     }
+  }
+
+  potionIcon(url: string) {
+    const el = $("#slot-potion");
+    if (el.querySelector(".picon")) return;
+    el.prepend(Object.assign(document.createElement("img"), { className: "picon", src: url, alt: "" }));
+    el.title = "Healing tonic";
   }
 
   potions(count: number) {

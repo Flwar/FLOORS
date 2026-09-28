@@ -26,6 +26,8 @@ const SECRETS = ["zone:forgotten-shrine", "zone:fox-hollow", "zone:collapsed-lib
 const CHESTS = ["chest:chest-shrine", "chest:chest-foxhollow", "chest:chest-library", "chest:chest-deep", "chest:chest-camp", "chest:chest-den"];
 const LORE = ["lore:lore-rim", "lore:lore-scout", "lore:lore-library", "lore:lore-shrine", "lore:lore-cave"];
 const WAYSTONES = ["ws:ws-town", "ws:ws-forest", "ws:ws-ruins", "ws:ws-caves"];
+const SKY_CHESTS = ["chest:aviary-chest", "chest:causeway-chest", "chest:heights-chest"];
+const SKY_WAYSTONES = ["ws:ws-landing", "ws:ws-terraces", "ws:ws-gardens", "ws:ws-causeway", "ws:ws-heights"];
 const has = (c: AchievementContext, list: string[]) => list.every((k) => c.discovered.includes(k));
 
 const DEFS: Def[] = [
@@ -41,6 +43,14 @@ const DEFS: Def[] = [
   { id: "bandit-bane", name: "Bandit Bane", desc: "Defeat Grakk, the Bandit King.", test: (c) => c.bossKills.includes("grakk") },
   { id: "wardens-end", name: "Warden's End", desc: "Defeat the Undercroft Warden.", test: (c) => c.bossKills.includes("warden") },
   { id: "first-gate", name: "The First Gate", desc: "Defeat Aurelion and open the way to Floor 2.", test: (c) => c.bossKills.includes("aurelion") },
+  // Floor 2
+  { id: "skyreach", name: "Above the Clouds", desc: "Set foot on Floor 2.", test: (c) => c.discovered.includes("zone:skyreach") || c.discovered.includes("zone:gilded-terraces") },
+  { id: "hidden-aviary", name: "Where the Birds Go", desc: "Find the Hidden Aviary on Floor 2.", test: (c) => c.discovered.includes("zone:hidden-aviary") },
+  { id: "sky-treasure", name: "Sky Plunder", desc: "Open every chest on Floor 2.", test: (c) => has(c, SKY_CHESTS) },
+  { id: "sky-roads", name: "Skyward Roads", desc: "Attune every waystone on Floor 2.", test: (c) => has(c, SKY_WAYSTONES) },
+  { id: "thunder-breaker", name: "Thunder Breaker", desc: "Topple the Storm Colossus.", test: (c) => c.bossKills.includes("colossus") },
+  { id: "last-watch", name: "The Last Watch", desc: "Defeat Kael, the Stormwarden.", test: (c) => c.bossKills.includes("stormwarden") },
+  { id: "storm-breaks", name: "The Storm Breaks", desc: "Defeat Vaelra, Keeper of the Storm.", test: (c) => c.bossKills.includes("vaelra") },
   { id: "master-of-arms", name: "Master of Arms", desc: "Reach mastery 10 with a weapon.", test: (c) => c.maxMastery >= 10 },
   { id: "seasoned", name: "Seasoned", desc: "Reach level 8.", test: (c) => c.level >= 8 },
   { id: "hoarder", name: "Deep Pockets", desc: "Carry 1,000 gold.", test: (c) => c.gold >= 1000 },

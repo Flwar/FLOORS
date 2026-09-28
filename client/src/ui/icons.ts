@@ -1,5 +1,6 @@
 import { armorStyle, DEFAULT_WEAPON_ART, helmStyle, itemBase, RARITY_COLORS } from "@floors/shared";
 import { drawGearIcon } from "../art/characters.ts";
+import { drawUiIcon } from "./uiIcons.ts";
 
 const cache = new Map<string, string>();
 const canvases = new Map<string, HTMLCanvasElement>();
@@ -178,6 +179,123 @@ export function itemIcon(key: string, rarity = 0): string {
       g.fillRect(27, 24, 3, 3);
       g.fillRect(34, 24, 3, 3);
       break;
+    case "map_floor1":
+    case "map_floor2":
+      drawUiIcon(g, "map");
+      break;
+    // --- Floor 2 ---------------------------------------------------------------
+    case "mat_feather": {
+      // A long white-gold flight feather.
+      g.save();
+      g.translate(32, 32);
+      g.rotate(-0.7);
+      g.fillStyle = outline;
+      g.beginPath();
+      g.ellipse(0, -4, 11, 24, 0, 0, Math.PI * 2);
+      g.fill();
+      const fg = g.createLinearGradient(-9, 0, 9, 0);
+      fg.addColorStop(0, "#fff6dc");
+      fg.addColorStop(1, "#e8c46a");
+      g.fillStyle = fg;
+      g.beginPath();
+      g.ellipse(0, -4, 8, 21, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "#b8902e";
+      g.lineWidth = 2;
+      for (let i = -3; i <= 3; i++) {
+        g.beginPath();
+        g.moveTo(0, -4 + i * 5);
+        g.lineTo(7, -9 + i * 5);
+        g.moveTo(0, -4 + i * 5);
+        g.lineTo(-7, -9 + i * 5);
+        g.stroke();
+      }
+      g.strokeStyle = outline;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(0, -22);
+      g.lineTo(0, 28);
+      g.stroke();
+      g.restore();
+      break;
+    }
+    case "mat_stormglass": {
+      // A shard of pale-blue glass with a lightning glint.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(34, 6); g.lineTo(50, 26); g.lineTo(42, 58); g.lineTo(20, 54); g.lineTo(14, 28);
+      g.closePath();
+      g.fill();
+      const sg = g.createLinearGradient(14, 8, 48, 56);
+      sg.addColorStop(0, "#eaf6ff");
+      sg.addColorStop(0.5, "#9fcaf2");
+      sg.addColorStop(1, "#4f78b8");
+      g.fillStyle = sg;
+      g.beginPath();
+      g.moveTo(34, 11); g.lineTo(46, 27); g.lineTo(39, 54); g.lineTo(23, 51); g.lineTo(18, 29);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(33, 16); g.lineTo(28, 30); g.lineTo(35, 33); g.lineTo(29, 47);
+      g.stroke();
+      break;
+    }
+    case "mat_gilded": {
+      // A riveted plate of gilded armour.
+      g.fillStyle = outline;
+      rr(g, 12, 16, 40, 34, 8);
+      g.fill();
+      const pg = g.createLinearGradient(0, 18, 0, 48);
+      pg.addColorStop(0, "#f4d67a");
+      pg.addColorStop(1, "#b8862a");
+      g.fillStyle = pg;
+      rr(g, 15, 19, 34, 28, 6);
+      g.fill();
+      g.fillStyle = "rgba(255,255,255,0.45)";
+      rr(g, 18, 22, 28, 6, 3);
+      g.fill();
+      g.fillStyle = outline;
+      for (const [x, y] of [[20, 25], [44, 25], [20, 41], [44, 41]]) {
+        g.beginPath();
+        g.arc(x, y, 2.5, 0, Math.PI * 2);
+        g.fill();
+      }
+      break;
+    }
+    case "key_stormspire":
+    case "art_stormheart": {
+      // The Seal is a gold disc bearing the storm's bolt; the Heart is the same storm, loose.
+      const heart = key === "art_stormheart";
+      if (heart) {
+        const halo = g.createRadialGradient(32, 32, 4, 32, 32, 30);
+        halo.addColorStop(0, "rgba(200,235,255,0.9)");
+        halo.addColorStop(1, "rgba(160,210,255,0)");
+        g.fillStyle = halo;
+        g.fillRect(0, 0, S, S);
+      }
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 32, 21, 0, Math.PI * 2);
+      g.fill();
+      const dg = g.createRadialGradient(28, 26, 2, 32, 32, 19);
+      dg.addColorStop(0, heart ? "#ffffff" : "#ffe9a8");
+      dg.addColorStop(1, heart ? "#6fa8e8" : "#c9a24a");
+      g.fillStyle = dg;
+      g.beginPath();
+      g.arc(32, 32, 18, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = heart ? "#ffffff" : "#2c3a58";
+      g.strokeStyle = outline;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(35, 14); g.lineTo(23, 35); g.lineTo(31, 35); g.lineTo(27, 50); g.lineTo(42, 28); g.lineTo(34, 28);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      break;
+    }
     case "key_ruins":
       g.strokeStyle = outline;
       g.lineWidth = 9;

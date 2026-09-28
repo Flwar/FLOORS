@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { itemBase, QUESTS, RARITY_COLORS, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { itemBase, QUESTS, RARITY_COLORS, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Drop } from "../../../server/src/state.ts";
 import { RES } from "../art/characters.ts";
 import { itemIconCanvas } from "../ui/icons.ts";
@@ -41,6 +41,8 @@ export class WorldObjects {
   private objs: ObjView[] = [];
   private drops = new Map<string, DropView>();
   merchantActive = false;
+  /** Instance gate mask; the Stormspire also keeps its woken conduits in bits 16+. */
+  gates = 0;
 
   constructor(private scene: Phaser.Scene, private map: WorldMap) {
     paintObjects(scene);
@@ -78,13 +80,13 @@ export class WorldObjects {
       n.marker.setPosition(n.def.x, n.def.y - 50 + Math.sin(n.phase / 300) * 2).setDepth(n.def.y + 2);
     }
     for (const o of this.objs) {
-      const st = objState(o.def, inv, stage);
+      const st = objState(o.def, inv, stage, this.gates);
       if (st !== o.state) {
         o.state = st;
         o.img.setTexture(texFor(o.def, st));
         o.img.setVisible(!(o.def.id === "ascent" && st !== "open"));
       }
-      if (o.def.kind === "campfire" || (o.def.kind === "gate" && st === "open")) o.img.setAlpha(0.9 + Math.sin(performance.now() / 120 + o.def.x) * 0.1);
+      if (o.def.kind === "campfire" || st === "lit" || (o.def.kind === "gate" && st === "open")) o.img.setAlpha(0.9 + Math.sin(performance.now() / 120 + o.def.x) * 0.1);
     }
     const t = performance.now();
     for (const d of this.drops.values()) {
@@ -111,7 +113,7 @@ export class WorldObjects {
         beam.setTint(Phaser.Display.Color.HexStringToColor(RARITY_COLORS[d.rarity]).color);
       }
       const mine = !d.owner || d.owner === myKey;
-      const name = d.kind === 1 ? `${d.qty} gold` : d.kind === 2 ? "Your belongings" : `${d.qty > 1 ? `${d.qty}× ` : ""}${itemName(d.key)}`;
+      const name = d.kind === 1 ? `${d.qty} gold` : d.kind === 2 ? (d.owner === myKey ? "Your belongings" : "Someone's belongings") : `${d.qty > 1 ? `${d.qty}× ` : ""}${itemName(d.key)}`;
       const label = this.scene.add
         .text(d.x, d.y - 22, name, { fontFamily: "Trebuchet MS", fontSize: "16px", color: d.kind === 0 ? RARITY_COLORS[d.rarity] : "#f2c94c", stroke: "#1d1a17", strokeThickness: 4 })
         .setOrigin(0.5, 1)
@@ -192,13 +194,18 @@ function markerFor(npc: string, inv?: InvView): string {
   return "";
 }
 
-function objState(o: WorldObject, inv: InvView | undefined, stage: string): string {
+const isConduit = (o: WorldObject) => o.kind === "lever" && o.name.endsWith("Conduit");
+
+function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates: number): string {
   switch (o.kind) {
+    case "lever":
+      return isConduit(o) && (gates >> (SS_CONDUIT_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
     case "chest":
       return inv?.discovered.includes(`chest:${o.id}`) ? "open" : "";
     case "waystone":
       return inv?.discovered.includes(`ws:${o.id}`) ? "on" : "";
     case "gate":
+      if (o.dest === "floor3") return ""; // the stair above is not built yet
       if (o.id === "ascent") return stage === "cleared" ? "open" : "";
       if (o.id === "descent") return "open";
       return (inv?.floor ?? 1) >= 2 ? "open" : "";
@@ -218,13 +225,13 @@ function objLabel(o: WorldObject, state: string): string {
     case "waystone":
       return state === "on" ? `Travel — ${o.name}` : `Attune ${o.name}`;
     case "door":
-      return o.id === "exit" ? "Return to the surface" : `Unseal ${o.name}`;
+      return o.id === "exit" ? o.name : `Unseal ${o.name}`;
     case "gate":
-      return o.id === "ascent" ? "Ascend to Floor 2" : o.id === "descent" ? "Descend to Emberwatch" : state === "open" ? "Ascend to Floor 2" : `Examine ${o.name}`;
+      return o.dest === "floor3" ? `Examine ${o.name}` : o.id === "ascent" ? "Ascend to Floor 2" : o.id === "descent" ? "Descend to Emberwatch" : state === "open" ? "Ascend to Floor 2" : `Examine ${o.name}`;
     case "campfire":
       return `Rest at ${o.name}`;
     case "lever":
-      return `Pull the ${o.name}`;
+      return isConduit(o) ? (state === "lit" ? `${o.name} (awake)` : `Wake the ${o.name}`) : `Pull the ${o.name}`;
   }
 }
 
@@ -237,13 +244,13 @@ function texFor(o: WorldObject, state: string): string {
     case "waystone":
       return state === "on" ? "objWaystoneOn" : "objWaystone";
     case "door":
-      return o.id === "exit" ? "objStairs" : "objDoor";
+      return o.id === "exit" ? "objStairs" : o.dest === "stormspire" ? "objSpireDoor" : "objDoor";
     case "gate":
       return o.id === "ascent" ? "objBeam" : state === "open" ? "objArchOpen" : "objArch";
     case "campfire":
       return "objBrazier";
     case "lever":
-      return "objLever";
+      return isConduit(o) ? (state === "lit" ? "objConduitLit" : "objConduit") : "objLever";
   }
 }
 
@@ -368,6 +375,72 @@ function paintObjects(scene: Phaser.Scene) {
     g.fillStyle = O;
     g.fillRect(87, 92, 6, 12);
   });
+  // The Stormspire Gate: a stormglass door in a slate arch, the seal-shaped hollow at its heart.
+  make("objSpireDoor", 180, 170, (g) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(90, 164, 80, 7, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.beginPath();
+    g.roundRect(12, 8, 156, 160, [78, 78, 0, 0]);
+    g.fill();
+    g.fillStyle = "#5a6478";
+    g.beginPath();
+    g.roundRect(18, 14, 144, 154, [72, 72, 0, 0]);
+    g.fill();
+    g.fillStyle = "#7a869c";
+    for (let i = 0; i < 7; i++) {
+      const a = Math.PI + (i + 0.5) * (Math.PI / 7);
+      g.beginPath();
+      g.arc(90 + Math.cos(a) * 64, 86 + Math.sin(a) * 64, 7, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = O;
+    g.beginPath();
+    g.roundRect(34, 34, 112, 134, [56, 56, 0, 0]);
+    g.fill();
+    const glass = g.createLinearGradient(0, 40, 0, 168);
+    glass.addColorStop(0, "#cfe8ff");
+    glass.addColorStop(0.5, "#8fb8e8");
+    glass.addColorStop(1, "#4d6fa6");
+    g.fillStyle = glass;
+    g.beginPath();
+    g.roundRect(40, 40, 100, 128, [50, 50, 0, 0]);
+    g.fill();
+    g.strokeStyle = "rgba(255,255,255,0.85)";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(70, 50);
+    g.lineTo(62, 84);
+    g.lineTo(74, 92);
+    g.lineTo(64, 132);
+    g.stroke();
+    g.strokeStyle = "#2c3a58";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(90, 42);
+    g.lineTo(90, 168);
+    g.stroke();
+    g.fillStyle = O;
+    g.beginPath();
+    g.arc(90, 106, 17, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#c9a24a";
+    g.beginPath();
+    g.arc(90, 106, 13, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#2c3a58";
+    g.beginPath();
+    g.moveTo(92, 96);
+    g.lineTo(84, 108);
+    g.lineTo(91, 108);
+    g.lineTo(87, 117);
+    g.lineTo(97, 103);
+    g.lineTo(90, 103);
+    g.closePath();
+    g.fill();
+  });
   make("objStairs", 120, 70, (g) => {
     for (let i = 0; i < 5; i++) {
       g.fillStyle = i % 2 ? "#6f6a60" : "#827c70";
@@ -476,6 +549,57 @@ function paintObjects(scene: Phaser.Scene) {
     g.arc(37, 12, 7, 0, Math.PI * 2);
     g.fill();
   });
+  // A Stormspire conduit: a stormglass pylon on a gilded plinth. Dormant it is dull slate;
+  // woken it blazes white-blue.
+  const conduit = (lit: boolean) => (g: CanvasRenderingContext2D) => {
+    if (lit) {
+      const halo = g.createRadialGradient(45, 60, 6, 45, 60, 44);
+      halo.addColorStop(0, "rgba(200,235,255,0.75)");
+      halo.addColorStop(1, "rgba(160,210,255,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 10, 90, 100);
+    }
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(45, 124, 32, 6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.fillRect(17, 100, 56, 26);
+    g.fillStyle = "#c9a24a";
+    g.fillRect(20, 103, 50, 10);
+    g.fillStyle = "#a8842e";
+    g.fillRect(20, 113, 50, 10);
+    const shard = (x: number, top: number, w: number, fill: string, edge: string) => {
+      g.fillStyle = O;
+      g.beginPath();
+      g.moveTo(x, top - 4); g.lineTo(x + w / 2 + 3, top + 18); g.lineTo(x + w / 2, 104); g.lineTo(x - w / 2, 104); g.lineTo(x - w / 2 - 3, top + 18);
+      g.closePath();
+      g.fill();
+      g.fillStyle = fill;
+      g.beginPath();
+      g.moveTo(x, top); g.lineTo(x + w / 2, top + 18); g.lineTo(x + w / 2 - 2, 102); g.lineTo(x - w / 2 + 2, 102); g.lineTo(x - w / 2, top + 18);
+      g.closePath();
+      g.fill();
+      g.fillStyle = edge;
+      g.beginPath();
+      g.moveTo(x, top); g.lineTo(x - w / 2, top + 18); g.lineTo(x - w / 2 + 2, 102); g.lineTo(x - 2, 102);
+      g.closePath();
+      g.fill();
+    };
+    const [fill, edge] = lit ? ["#bfe6ff", "#f4fbff"] : ["#56627a", "#77839b"];
+    shard(28, 62, 14, fill, edge);
+    shard(62, 58, 14, fill, edge);
+    shard(45, 18, 24, fill, edge);
+    if (lit) {
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(47, 30); g.lineTo(41, 52); g.lineTo(50, 58); g.lineTo(43, 84);
+      g.stroke();
+    }
+  };
+  make("objConduit", 90, 130, conduit(false));
+  make("objConduitLit", 90, 130, conduit(true));
   make("lootBeam", 40, 220, (g) => {
     const lg = g.createLinearGradient(0, 0, 0, 220);
     lg.addColorStop(0, "rgba(255,255,255,0)");
