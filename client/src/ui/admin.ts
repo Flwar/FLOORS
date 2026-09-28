@@ -6,6 +6,8 @@ import { iconImg } from "./uiIcons.ts";
 export interface AdminOverview {
   players: { key: string; name: string; level: number; room: string; here: boolean; hp: number; hpMax: number; dead: boolean; x: number; y: number; gold: number; guest: boolean }[];
   server: { uptimeMs: number; online: number; room: string; roomId: string; clients: number; enemies: number; drops: number; memMb: number; dev: boolean };
+  /** How far the tower is open for everyone. */
+  world?: { floor: number; by: string[]; at: number; sealed?: boolean; top: number };
 }
 
 export interface AdminContext {
@@ -83,6 +85,27 @@ export function renderAdmin(ctx: AdminContext): HTMLElement {
       break;
     }
     case "world": {
+      // The tower: open or seal each floor above the first for the whole server.
+      const w = ctx.data?.world;
+      const top = w?.top ?? 3;
+      const at = w?.floor ?? 1;
+      const when = w?.at ? ` · ${new Date(w.at).toLocaleString()}` : "";
+      pane.append(el(`<h4>The tower</h4>`));
+      pane.append(el(`<div class="adm-note">${w?.by.length ? `Last ${w.sealed ? "sealed" : "opened"} by ${esc(w.by.join(", "))}${when}` : "Floors open for everyone when a party defeats the Floor Boss below."}</div>`));
+      const BOSS: Record<number, string> = { 2: "Aurelion", 3: "Vaelra" };
+      for (let f = 2; f <= top; f++) {
+        const open = at >= f;
+        pane.append(el(`<div class="adm-tower ${open ? "open" : "sealed"}"><b>Floor ${f} is ${open ? "open to everyone" : "sealed"}</b><span>${open ? "" : `Opens when ${BOSS[f] ?? "the Floor Boss"} falls`}</span></div>`));
+        const act = (openIt: boolean) => {
+          s("admin:tower", { floor: f, open: openIt });
+          if (ctx.data) ctx.data.world = { ...(w ?? { by: [], at: 0, top }), floor: openIt ? f : f - 1, sealed: !openIt, by: ["you"], at: Date.now() };
+          ctx.rerender();
+        };
+        // Floors open in order: only the next floor can be opened, only the top open one sealed.
+        if (open && at === f) pane.append(row("", btn(`Seal Floor ${f}`, () => confirm(`Seal Floor ${f} for everyone? Players on it are sent down to Floor ${f - 1}.`) && act(false), "danger")));
+        else if (!open && at === f - 1) pane.append(row("", btn(`Open Floor ${f} for everyone`, () => act(true))));
+      }
+      pane.append(el(`<div class="adm-note">Opening plays the celebration for every player online. Admins can always go up.</div>`));
       const m = ctx.map;
       if (m) {
         const places = el(`<div class="adm-grid"></div>`);
@@ -133,7 +156,7 @@ export function renderAdmin(ctx: AdminContext): HTMLElement {
       const wpn = el(`<div class="adm-grid tight"></div>`);
       for (const w of WEAPONS) wpn.append(btn(w.name, () => s("dev:weapon", w.key)));
       pane.append(row("Quick weapon", wpn));
-      pane.append(row("World", btn("Reveal map + waystones", () => s("admin:reveal")), btn("Unlock Floor 2", () => s("admin:floor", 2))));
+      pane.append(row("World", btn("Reveal map + waystones", () => s("admin:reveal")), btn("Unlock Floor 2 (just me)", () => s("admin:floor", 2)), btn("Unlock Floor 3 (just me)", () => s("admin:floor", 3))));
       break;
     }
     case "items": {

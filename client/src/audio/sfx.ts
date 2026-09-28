@@ -399,6 +399,21 @@ export class Sfx {
     for (let i = 0; i <= Math.min(4, rarity + 1); i++) this.tone(out, "sine", notes[i], notes[i], 0.2, 0.005, 0.5 + rarity * 0.1, i * 0.07);
   }
 
+  /** A floor opens for everyone: a rising brassy run, then a long bright chord. */
+  fanfare() {
+    const out = this.bus(undefined, undefined, 0.8);
+    if (!out) return;
+    [262, 330, 392, 523, 392, 523, 659, 784].forEach((f, i) => this.tone(out, "sawtooth", f, f, 0.07, 0.01, 0.32, i * 0.11));
+    for (const f of [523, 659, 784, 1047]) this.tone(out, "triangle", f, f, 0.15, 0.06, 2.4, 0.95);
+  }
+
+  /** A floor is sealed: a low falling toll. */
+  seal() {
+    const out = this.bus(undefined, undefined, 0.8);
+    if (!out) return;
+    [196, 147, 98].forEach((f, i) => this.tone(out, "triangle", f, f * 0.8, 0.22, 0.01, 1.4, i * 0.38));
+  }
+
   levelUp() {
     const out = this.bus(undefined, undefined, 0.6);
     if (!out) return;

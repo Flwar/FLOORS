@@ -1,10 +1,10 @@
 /**
  * Moveset verification (npm run moves): every weapon's light chain, heavy, combo heavy
- * and both skills are used on a training dummy; checks each connects (or fires its
- * projectile / special) with the server.
+ * and every skill — its own and the universal ones every weapon can use — are used on a
+ * training dummy; checks each connects (or fires its projectile / special) with the server.
  */
 import { Client, Predict } from "@colyseus/sdk";
-import { Btn, buildFloor1, ENEMIES, radToAim, SERVER_PORT, stepPlayer, WEAPONS, type PlayerSim } from "@floors/shared";
+import { Btn, buildFloor1, EFlag, ENEMIES, radToAim, SERVER_PORT, stepPlayer, UNIVERSAL_BASE, UNIVERSAL_SKILLS, WEAPONS, type MoveDef, type PlayerSim, type WeaponDef } from "@floors/shared";
 
 const endpoint = process.env.SERVER ?? `ws://localhost:${SERVER_PORT}`;
 const map = buildFloor1();
@@ -98,13 +98,28 @@ for (const w of WEAPONS) {
   await idle();
 
   // Skills: every skill in the weapon's pool, equipped into slot 1 (cooldowns reset between).
-  for (const [i, sk] of w.skills.entries()) {
+  for (const [i, sk] of w.skills.entries()) await trySkill(w, i, sk, dist);
+}
+
+// Universal skills (including every floor's own abilities), with a sword in hand.
+room.send("dev:learn", "all");
+await wait(200);
+for (const [i, sk] of UNIVERSAL_SKILLS.entries()) await trySkill(WEAPONS[0], UNIVERSAL_BASE + i, sk, 26);
+
+async function trySkill(w: WeaponDef, i: number, sk: MoveDef, dist: number) {
+  let mark = 0;
+  {
     room.send("dev:weapon", w.key);
     await wait(150);
     room.send("skills:equip", { weapon: w.key, slot: 0, index: i });
     const off = sk.shape?.kind === "circle" ? sk.shape.offset : 0;
     await place(sk.special === "meteor" ? 170 : off > 60 ? off : sk.lunge > 100 ? 150 : sk.shape?.kind === "line" && sk.shape.length > 100 ? 90 : dist);
     await wait(200);
+    // Healing skills need a wound to show their healing.
+    if (sk.special === "drain" || sk.special === "bloodlust") {
+      room.send("dev:hurt", 50);
+      await wait(150);
+    }
     mark = msgs.length;
     const seqBefore = me.state.actSeq;
     if (process.env.DEBUG) console.log(`  [skill${i}] before act=${me.state.act} st=${me.state.stamina.toFixed(0)} ex=${me.state.exhausted} cd=${me.state.cd1},${me.state.cd2} mods=${me.state.mods}`);
@@ -116,6 +131,23 @@ for (const w of WEAPONS) {
     const utility = sk.special === "counterStance" || sk.special === "vault" || (sk.special === "shadowstep" && !sk.shape);
     const ok = used && (utility || hits > 0 || fx.length > 0);
     check(`${w.name}: ${sk.name}`, ok, `${used ? "used" : "NOT used"}, ${hits} hit(s)${fx.length ? `, fx ${fx.join(",")}` : ""}`);
+    const heals = () => msgs.slice(mark).filter((x) => x.type === "heal" && x.m.p === room.sessionId);
+    if (sk.special === "drain") check(`${w.name}: ${sk.name} heals you`, heals().length > 0, `${heals().map((x) => "+" + x.m.d).join(" ")}`);
+    if (sk.special === "mark") {
+      const d = room.state.enemies?.get(dummyId);
+      check(`${w.name}: ${sk.name} marks the target`, !!d && (d.flags & 128) !== 0, `flags ${d?.flags}`);
+    }
+    if (sk.special === "burn" || sk.special === "meteors") {
+      const burned = msgs.slice(mark).some((x) => x.type === "hit" && x.m.t === dummyId && x.m.dot) || ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Burning) !== 0;
+      check(`${w.name}: ${sk.name} sets the target burning`, burned, burned ? "burning" : "no burn");
+    }
+    if (sk.special === "empower") check(`${w.name}: ${sk.name} empowers`, fx.includes("empower"), fx.join(",") || "no fx");
+    if (sk.special === "bloodlust") {
+      await idle();
+      pending |= Btn.Light;
+      await wait(900);
+      check(`${w.name}: ${sk.name} makes hits heal`, heals().length > 0, `${heals().map((x) => "+" + x.m.d).join(" ") || "no heals"}`);
+    }
     await idle();
   }
 }

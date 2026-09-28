@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ENEMIES, LOOT, QUESTS, TILE, type QuestDef, type QuestStage, type WorldMap, type Zone } from "@floors/shared";
+import { ENEMIES, LOOT, QUESTS, questOpen, TILE, type QuestDef, type QuestStage, type WorldMap, type Zone, routeVia } from "@floors/shared";
 import type { InvView } from "../ui/ui.ts";
 
 /** A quest shown in the tracker: the one you are on, or (for the main story) the next to pick up. */
@@ -12,17 +12,24 @@ export interface Tracked {
 }
 
 /** The main quest the player is on, or the next one they can pick up. */
-export function mainObjective(inv: InvView): { quest: QuestDef; offered: boolean } | undefined {
-  const active = QUESTS.find((q) => q.main && inv.quests[q.id] && !inv.quests[q.id].done);
-  if (active) return { quest: active, offered: false };
-  const next = QUESTS.find((q) => q.main && !inv.quests[q.id] && (!q.requires || inv.quests[q.requires]?.done));
-  return next ? { quest: next, offered: true } : undefined;
+export function mainObjective(inv: InvView, here?: number): { quest: QuestDef; offered: boolean } | undefined {
+  const active = QUESTS.filter((q) => q.main && inv.quests[q.id] && !inv.quests[q.id].done);
+  const next = QUESTS.filter((q) => q.main && !inv.quests[q.id] && questOpen(q, (id) => !!inv.quests[id]?.done, inv.floor));
+  // The story of the floor you're standing on comes first: floors open for everyone, so a
+  // climber can be on Floor 2 with Floor 1's story still unfinished.
+  const on = (q: QuestDef) => !here || (q.floor ?? 1) === here;
+  const a = active.find(on) ?? (here ? undefined : active[0]);
+  if (a) return { quest: a, offered: false };
+  const n = next.find(on);
+  if (n) return { quest: n, offered: true };
+  if (active[0]) return { quest: active[0], offered: false };
+  return next[0] ? { quest: next[0], offered: true } : undefined;
 }
 
 /** Main story first, then side quests in progress. */
-export function trackedQuests(inv: InvView): Tracked[] {
+export function trackedQuests(inv: InvView, here?: number): Tracked[] {
   const out: Tracked[] = [];
-  const main = mainObjective(inv);
+  const main = mainObjective(inv, here);
   if (main) {
     const st = inv.quests[main.quest.id];
     out.push({ quest: main.quest, offered: main.offered, stage: st ? main.quest.stages[st.stage] : undefined, progress: st?.progress ?? 0 });
@@ -55,13 +62,25 @@ export interface QuestTarget {
   person: boolean;
   /** Where it is, for the tracker ("Whisperwood"). */
   area?: string;
+  /** The way there is through a door first (into or out of a building). */
+  door?: boolean;
 }
 
 /**
  * Where a tracked quest wants you to go. People, bosses and the dungeon door are exact.
  * Hidden places point to the area around them, never the exact spot.
  */
-export function questTarget(map: WorldMap, inv: InvView, t: Tracked, px: number, py: number): QuestTarget | undefined {
+export function questTarget(map: WorldMap, inv: InvView, t: Tracked, px: number, py: number, route = true): QuestTarget | undefined {
+  const raw = rawTarget(map, inv, t, px, py);
+  if (!raw || !route) return raw;
+  // Through the right door: out of the building you're in, or into the one it's in.
+  const r = routeVia(map, px, py, raw.x, raw.y);
+  if (r.x === raw.x && r.y === raw.y) return raw;
+  const inside = map.indoors(py);
+  return { x: r.x, y: r.y, person: false, door: true, area: inside ? "out the door" : `inside the ${map.zoneAt(raw.x, raw.y)?.name ?? "building"}` };
+}
+
+function rawTarget(map: WorldMap, inv: InvView, t: Tracked, px: number, py: number): QuestTarget | undefined {
   const zonesAt = (x: number, y: number) => {
     const tx = Math.floor(x / TILE);
     const ty = Math.floor(y / TILE);
@@ -103,8 +122,10 @@ export function questTarget(map: WorldMap, inv: InvView, t: Tracked, px: number,
   const here = mapFloor(map);
   const want = t.quest.floor ?? 1;
   if (here && want !== here) {
-    const gate = map.objects.find((o) => o.kind === "gate" && (want > here ? o.dest === "floor2" || o.id === "ascent-gate" : o.dest === "world"));
-    return gate ? { ...at(gate.x, gate.y), area: want > here ? "the Ascent Gate" : "the Descent" } : undefined;
+    const up = map.objects.find((o) => o.kind === "gate" && (o.id === "ascent-gate" || o.dest === `floor${here + 1}`));
+    const down = map.objects.find((o) => o.kind === "gate" && o.dest === (here === 2 ? "world" : `floor${here - 1}`));
+    const gate = want > here ? up : down;
+    return gate ? { ...at(gate.x, gate.y), area: want > here ? `the way up (${gate.name})` : `the way down (${gate.name})` } : undefined;
   }
 
   if (t.offered) return npc(t.quest.giver);
@@ -129,7 +150,7 @@ export function questTarget(map: WorldMap, inv: InvView, t: Tracked, px: number,
       return z ? { x: ((z.x0 + z.x1) / 2) * TILE, y: ((z.y0 + z.y1) / 2) * TILE, person: false, area: z.secret ? undefined : z.name } : undefined;
     }
     case "dungeon": {
-      const d = map.objects.find((ob) => ob.kind === "door" && ob.id !== "exit" && (ob.dest === "stormspire") === (stage.dungeon === "stormspire"));
+      const d = map.objects.find((ob) => ob.kind === "door" && ob.id !== "exit" && (stage.dungeon === "dungeon" ? ob.dest !== "stormspire" && ob.dest !== "roost" : ob.dest === stage.dungeon));
       return d ? at(d.x, d.y) : doorTarget;
     }
     default:
@@ -139,7 +160,7 @@ export function questTarget(map: WorldMap, inv: InvView, t: Tracked, px: number,
 
 /** Which floor a map is (0 for dungeons). */
 export function mapFloor(map: WorldMap) {
-  return map.name.startsWith("Floor 2") ? 2 : map.name.startsWith("Floor 1") ? 1 : 0;
+  return map.name.startsWith("Floor 3") ? 3 : map.name.startsWith("Floor 2") ? 2 : map.name.startsWith("Floor 1") ? 1 : 0;
 }
 
 export const MAIN_COLOR = 0xf2d27a;

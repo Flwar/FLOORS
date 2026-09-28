@@ -58,7 +58,6 @@ function cellInner(it: Item, isNew: boolean) {
   return `<img class="pk-icon" src="${itemIcon(it.key, it.rarity)}" alt="" draggable="false">
     ${it.qty > 1 ? `<span class="pk-qty">${it.qty}</span>` : ""}
     ${it.plus ? `<span class="pk-plus">+${it.plus}</span>` : ""}
-    ${it.dur <= 0 ? `<span class="pk-broken" title="Broken">!</span>` : ""}
     ${lvl >= 2 ? `<span class="pk-mastery" title="Weapon mastery">★${lvl}</span>` : ""}
     ${isNew ? `<span class="pk-new"></span>` : ""}`;
 }

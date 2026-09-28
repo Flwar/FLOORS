@@ -1,4 +1,4 @@
-import { makeItem, rollRarity, TILE } from "@floors/shared";
+import { makeItem, rollRarity, TILE, randomScroll, itemBase } from "@floors/shared";
 import type { WorldRoom } from "../rooms/WorldRoom.ts";
 import type { EnemyData } from "./sim.ts";
 
@@ -94,6 +94,44 @@ export const FLOOR2_EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 3: dragons on the wing, the caldera stirring, and the wandering merchant. */
+export const FLOOR3_EVENTS: EventDef[] = [
+  {
+    id: "dragonraid",
+    name: "Dragon Raid",
+    announce: "Drakes are diving on the Ashen Slopes — a raiding flight, and something bigger leads it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 80, y: 96 }, { x: 104, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "drake", level: 13 }, { key: "drake", level: 13 }, { key: "ashling", level: 13 }, { key: "ashling", level: 13 },
+      { key: "drake", level: 14, elite: true, hpScale: 1.7 },
+    ],
+    reward: { xp: 900, gold: 260, loot: true },
+    lootPool: ["mat_dragonscale", "mat_emberheart", "helm_dragon", "armor_drakehide", "daggers_dragon", "spear_dragon"],
+  },
+  {
+    id: "eruption",
+    name: "The Caldera Wakes",
+    announce: "The ground splits on the Caldera Heights — obsidian golems climb out of the magma!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 80, y: 42 }),
+    enemies: [
+      { key: "obsidian", level: 14 }, { key: "obsidian", level: 14 }, { key: "flamecaller", level: 14 }, { key: "flamecaller", level: 14 },
+      { key: "emberguard", level: 15, elite: true },
+    ],
+    reward: { xp: 1000, gold: 300, loot: true },
+    lootPool: ["mat_cinder", "mat_emberheart", "armor_emberweave", "staff_dragon", "sword_dragon", "greatsword_dragon"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has braved the heat to set up in Emberhold — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 92, y: 138 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {
   private active?: { def: EventDef; until: number; enemies: Set<string>; contributors: Set<string> };
@@ -134,10 +172,13 @@ export class WorldEvents {
       this.merchantStock = [
         { key: "charm_duelist", rarity: 2, price: 320 },
         { key: "charm_feather", rarity: 2, price: 300 },
-        { key: "charm_gale", rarity: rollRarity(1, 2), price: 360 },
-        { key: ["sword_iron", "daggers_stalker", "spear_iron", "staff_ember", "greatsword_bandit"][Math.floor(Math.random() * 5)], rarity: rollRarity(1.5, 2), price: 420 },
-        { key: ["armor_ranger", "armor_robes", "helm_horned"][Math.floor(Math.random() * 3)], rarity: rollRarity(1.5, 2), price: 380 },
+        { key: "charm_gale", rarity: rollRarity(0.5, 2), price: 360 },
+        { key: ["sword_iron", "daggers_stalker", "spear_iron", "staff_ember", "greatsword_bandit"][Math.floor(Math.random() * 5)], rarity: rollRarity(0.7, 2), price: 420 },
+        { key: ["armor_ranger", "armor_robes", "helm_horned"][Math.floor(Math.random() * 3)], rarity: rollRarity(0.7, 2), price: 380 },
       ];
+      // The caravan sometimes carries a skill scroll, for gold alone (no Marks) — at a price.
+      const scroll = Math.random() < 0.6 ? randomScroll(Math.random() < 0.25 ? 2 : 1, Math.random, this.room.kind === "floor3" ? 3 : this.room.kind === "floor2" ? 2 : 1) : undefined;
+      if (scroll) this.merchantStock.push({ key: scroll, rarity: itemBase(scroll)?.rarity ?? 1, price: itemBase(scroll)?.rarity === 2 ? 1500 : 600 });
     }
     this.active = { def, until: now + def.durationMs, enemies, contributors: new Set() };
     const st = this.room.state;
@@ -185,7 +226,7 @@ export class WorldEvents {
       ch.data.gold += a.def.reward.gold;
       if (a.def.reward.loot) {
         const pool = a.def.lootPool ?? ["charm_amber", "charm_wolf", "armor_chain", "armor_ranger", "helm_iron", "helm_horned", "sword_iron"];
-        const it = makeItem(pool[Math.floor(Math.random() * pool.length)], rollRarity(1.4, 1));
+        const it = makeItem(pool[Math.floor(Math.random() * pool.length)], rollRarity(0.6, 1));
         if (!ch.addItem(it)) ch.data.bank[ch.data.bank.indexOf(null)] = it;
         this.room.clients.getById(sid)?.send("looted", { key: it.key, rarity: it.rarity, qty: 1 });
       }

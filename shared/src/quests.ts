@@ -6,7 +6,7 @@ export type QuestStage =
   | { kind: "parry"; count: number; text: string }
   | { kind: "visit"; zone: string; text: string }
   /** Enter a boss dungeon; `dungeon` is its room kind ("dungeon" is the Undercroft). */
-  | { kind: "dungeon"; text: string; dungeon: "dungeon" | "stormspire" };
+  | { kind: "dungeon"; text: string; dungeon: "dungeon" | "stormspire" | "roost" };
 
 export interface QuestDef {
   id: string;
@@ -18,10 +18,36 @@ export interface QuestDef {
   thanks: string;
   requires?: string;
   stages: QuestStage[];
-  rewards: { xp: number; gold: number; items?: { key: string; rarity?: number; qty?: number }[]; unlockFloor?: number };
+  /** Marks default to 4 for main-story quests and 2 for the rest. */
+  rewards: { xp: number; gold: number; marks?: number; items?: { key: string; rarity?: number; qty?: number }[]; unlockFloor?: number };
   main?: boolean;
+  /** A repeatable mission from a town's Mission Board: it can be taken again after MISSION_COOLDOWN_MS. */
+  mission?: boolean;
   /** The floor the quest's giver is on (default 1). */
   floor?: number;
+}
+
+/**
+ * Can this quest be taken? It needs its prerequisite, unless it belongs to a higher floor
+ * that is already open to you: floors open for everyone, so a floor's story starts there
+ * whatever you left unfinished below.
+ */
+export function questOpen(q: QuestDef, done: (id: string) => boolean, floor: number) {
+  if (!q.requires || done(q.requires)) return true;
+  const qf = q.floor ?? 1;
+  const rf = QUESTS.find((x) => x.id === q.requires)?.floor ?? 1;
+  return qf > rf && floor >= qf;
+}
+
+/** A finished mission goes back on the board after this long. */
+export const MISSION_COOLDOWN_MS = 15 * 60 * 1000;
+
+/** Marks a quest pays: the currency the Archivists take for skill scrolls. */
+export const questMarks = (q: QuestDef) => q.rewards.marks ?? (q.main ? 4 : 2);
+
+/** Is a mission on the board for this character (never taken, or finished and cooled down)? */
+export function missionReady(st: { done?: boolean; at?: number } | undefined, now: number) {
+  return !st || (!!st.done && now - (st.at ?? 0) >= MISSION_COOLDOWN_MS);
 }
 
 export const QUESTS: QuestDef[] = [
@@ -36,7 +62,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "parry", count: 3, text: "Parry the Sparring Knight 3 times" },
       { kind: "talk", npc: "guildmaster", text: "Report to Guildmaster Rhea" },
     ],
-    rewards: { xp: 40, gold: 20, items: [{ key: "tonic", qty: 2 }] },
+    rewards: { xp: 40, gold: 20, items: [{ key: "tonic", qty: 2 }, { key: "scroll_any_kick" }] },
   },
   {
     id: "q_wolves",
@@ -94,7 +120,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", enemy: ["warden"], count: 1, text: "Defeat the Undercroft Warden" },
       { kind: "talk", npc: "guildmaster", text: "Return to Guildmaster Rhea" },
     ],
-    rewards: { xp: 500, gold: 150, items: [{ key: "tonic", qty: 3 }] },
+    rewards: { xp: 500, gold: 150, items: [{ key: "tonic", qty: 3 }, { key: "scroll_any_blink" }] },
   },
   {
     id: "q_keeper",
@@ -108,7 +134,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", enemy: ["aurelion"], count: 1, text: "Defeat Aurelion, Keeper of the First Gate" },
       { kind: "talk", npc: "warden", text: "Tell Gate Warden Eld the Keeper has fallen" },
     ],
-    rewards: { xp: 1000, gold: 400, unlockFloor: 2 },
+    rewards: { xp: 1000, gold: 400, unlockFloor: 2, marks: 6, items: [{ key: "scroll_any_ironwill" }] },
   },
   {
     id: "q_pelts",
@@ -204,7 +230,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", enemy: ["colossus"], count: 1, text: "Defeat the Storm Colossus in the Thunder Ring" },
       { kind: "talk", npc: "herald", text: "Bring the Stormspire Seal to Lumen" },
     ],
-    rewards: { xp: 1100, gold: 320 },
+    rewards: { xp: 1100, gold: 320, marks: 5, items: [{ key: "scroll_any_thunder" }] },
   },
   {
     id: "f2_spire",
@@ -220,7 +246,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", enemy: ["vaelra"], count: 1, text: "Defeat Vaelra, Keeper of the Storm" },
       { kind: "talk", npc: "herald", text: "Return to Lumen" },
     ],
-    rewards: { xp: 2400, gold: 700 },
+    rewards: { xp: 2400, gold: 700, marks: 8, items: [{ key: "scroll_any_storm" }] },
   },
   {
     id: "f2_feathers",
@@ -272,6 +298,165 @@ export const QUESTS: QuestDef[] = [
     ],
     rewards: { xp: 450, gold: 180, items: [{ key: "mat_stormglass", qty: 3 }] },
   },
+  // --- Floor 3: the Ember Reaches --------------------------------------------------------
+  {
+    id: "f3_arrival",
+    name: "Where Dragons Nest",
+    giver: "captain",
+    main: true,
+    floor: 3,
+    requires: "f2_spire",
+    pitch: "You climbed through the storm to get here. Good — now forget everything the storm taught you. Up here the ground burns and the sky has teeth. Walk the Ashen Slopes and cull the ashlings and magma hounds before they reach our walls.",
+    thanks: "Still standing, and not even singed. Maybe you'll last. The canyon is next.",
+    stages: [
+      { kind: "visit", zone: "ashen-slopes", text: "Walk out onto the Ashen Slopes" },
+      { kind: "kill", enemy: ["ashling", "magmahound"], count: 8, text: "Cull ashlings and magma hounds" },
+      { kind: "talk", npc: "captain", text: "Report to Captain Brask in Emberhold" },
+    ],
+    rewards: { xp: 1400, gold: 380, items: [{ key: "tonic", qty: 3 }] },
+  },
+  {
+    id: "f3_canyon",
+    name: "Dragonbone Canyon",
+    giver: "captain",
+    main: true,
+    floor: 3,
+    requires: "f3_arrival",
+    pitch: "West lies a canyon full of bones — the first dragon's, they say. Drakes nest in it now. Find the shrine at its heart, and bring down three of those drakes. Mind their breath: step out of the fire, not back into it.",
+    thanks: "Three drakes. You're the first climber in years to come back from that canyon with both eyebrows.",
+    stages: [
+      { kind: "visit", zone: "dragonbone-canyon", text: "Enter Dragonbone Canyon" },
+      { kind: "interact", objects: ["bone-shrine"], text: "Find the Shrine of the First Dragon" },
+      { kind: "kill", enemy: ["drake"], count: 3, text: "Slay 3 drakes" },
+      { kind: "talk", npc: "captain", text: "Return to Captain Brask" },
+    ],
+    rewards: { xp: 1800, gold: 450, marks: 5, items: [{ key: "scroll_any_fireball" }] },
+  },
+  {
+    id: "f3_wastes",
+    name: "Hearts of Glass",
+    giver: "captain",
+    main: true,
+    floor: 3,
+    requires: "f3_canyon",
+    pitch: "East, in the Obsidian Wastes, golems of black glass guard an altar nobody can read. Ysolde thinks it will tell us who holds the Roost. Read it, and break two of the golems while you're there.",
+    thanks: "Ysolde will want to hear this. Go — she's in the Keep's library, and she's been impossible all week.",
+    stages: [
+      { kind: "visit", zone: "obsidian-wastes", text: "Cross into the Obsidian Wastes" },
+      { kind: "interact", objects: ["obsidian-altar"], text: "Read the Obsidian Altar" },
+      { kind: "kill", enemy: ["obsidian"], count: 2, text: "Shatter 2 obsidian golems" },
+      { kind: "talk", npc: "scholar", text: "Tell Ysolde what the altar said" },
+    ],
+    rewards: { xp: 2000, gold: 500 },
+  },
+  {
+    id: "f3_wyrm",
+    name: "Cindermaw",
+    giver: "scholar",
+    main: true,
+    floor: 3,
+    requires: "f3_wastes",
+    pitch: "A crown of flame… that's Ignivar's mark. He rules the Roost, and his doors answer only to the sigil Cindermaw wears in its crest. Cindermaw sleeps in the Wyrmrest Caldera, north on the Heights. Wake it. Take the sigil.",
+    thanks: "The Emberwyrm Sigil. You actually did it. The Roost is open to you now — and Ignivar will know it.",
+    stages: [
+      { kind: "visit", zone: "caldera-heights", text: "Climb the Caldera Heights" },
+      { kind: "interact", objects: ["caldera-scar"], text: "Find the Scorched Stone" },
+      { kind: "kill", enemy: ["cindermaw"], count: 1, text: "Defeat Cindermaw in the Wyrmrest Caldera" },
+      { kind: "talk", npc: "scholar", text: "Bring the Emberwyrm Sigil to Ysolde" },
+    ],
+    rewards: { xp: 2800, gold: 700, marks: 6 },
+  },
+  {
+    id: "f3_roost",
+    name: "The Dragon's Roost",
+    giver: "captain",
+    main: true,
+    floor: 3,
+    requires: "f3_wyrm",
+    pitch: "This is it. The Roost's gate is at the top of the Heights. Past it: the hatchery, the flame seals, Vyrmak the Dragonsworn — and Ignivar, the Ember Tyrant. Kill him, and the stair above is ours.",
+    thanks: "The Tyrant is dead. Listen — the whole mountain is quiet. Emberhold will sing about this for a hundred years. So will I, and I can't sing.",
+    stages: [
+      { kind: "dungeon", dungeon: "roost", text: "Enter the Dragon's Roost" },
+      { kind: "kill", enemy: ["ignivar"], count: 1, text: "Defeat Ignivar, the Ember Tyrant" },
+      { kind: "talk", npc: "captain", text: "Return to Captain Brask" },
+    ],
+    rewards: { xp: 5000, gold: 1400, marks: 10 },
+  },
+  {
+    id: "f3_scales",
+    name: "Scales for the Forge",
+    giver: "forgemistress",
+    floor: 3,
+    requires: "f2_spire",
+    pitch: "Dragonscale. Six of them. The drakes in the canyon shed them when they die — they don't shed them gladly.",
+    thanks: "Beautiful. Here — the first circlet I made from the last batch. It'll keep the heat off your head.",
+    stages: [{ kind: "collect", item: "mat_dragonscale", count: 6, consume: true, text: "Bring Kaela 6 Dragonscales" }],
+    rewards: { xp: 900, gold: 200, items: [{ key: "helm_embercirclet", rarity: 1 }] },
+  },
+  {
+    id: "f3_embers",
+    name: "Embers in the Dark",
+    giver: "innkeep3",
+    floor: 3,
+    requires: "f2_spire",
+    pitch: "The flamecallers come down the slopes at night and set the thatch alight. Five of them. Make it five fewer.",
+    thanks: "Quiet nights again. Drinks are on the house — well, some of them.",
+    stages: [
+      { kind: "kill", enemy: ["flamecaller"], count: 5, text: "Put out 5 flamecallers" },
+      { kind: "talk", npc: "innkeep3", text: "Tell Mira at the Cinder Cup" },
+    ],
+    rewards: { xp: 1000, gold: 300, items: [{ key: "tonic", qty: 4 }] },
+  },
+  {
+    id: "f3_hoard",
+    name: "The Dragon's Hoard",
+    giver: "scholar",
+    floor: 3,
+    requires: "f3_canyon",
+    pitch: "The shrine's carvings show an egg on a bed of gold, somewhere past the canyon's northern bones. If there's a hoard, there's history in it. Find the egg.",
+    thanks: "An egg. Hatched. Recently. …I'm going to pretend I didn't hear that. Take this — you earned it.",
+    stages: [
+      { kind: "interact", objects: ["hoard-egg"], text: "Find the dragon egg beyond Dragonbone Canyon" },
+      { kind: "talk", npc: "scholar", text: "Tell Ysolde what you found" },
+    ],
+    rewards: { xp: 1200, gold: 400, marks: 4, items: [{ key: "mat_emberheart", qty: 1 }] },
+  },
+  {
+    id: "f3_golems",
+    name: "Glass and Fire",
+    giver: "quarter3",
+    floor: 3,
+    requires: "f2_spire",
+    pitch: "The obsidian golems' cores burn for weeks. The keep needs fuel. Break four golems in the Wastes and I'll pay you in coin and cinderstone.",
+    thanks: "That'll keep the forges hot for a month.",
+    stages: [
+      { kind: "kill", enemy: ["obsidian"], count: 4, text: "Break 4 obsidian golems" },
+      { kind: "talk", npc: "quarter3", text: "Report to Quartermaster Sable" },
+    ],
+    rewards: { xp: 1100, gold: 320, items: [{ key: "mat_cinder", qty: 4 }] },
+  },
+
+  // --- Missions: repeatable work from each town's Mission Board ------------------------------
+  // Floor 1 (Emberwatch)
+  mission("m1_wolves", "board1", 1, "Bounty: Wolves at the Fence", "The farms want the wolf packs thinned again. Ten pelts' worth.", { kind: "kill", enemy: ["wolf", "alpha"], count: 10, text: "Hunt 10 wolves" }, 120, 60, 2),
+  mission("m1_bandits", "board1", 1, "Bounty: Bandit Trouble", "Grakk's gang is back on the roads. Break up the raiding parties.", { kind: "kill", enemy: ["goblin", "archer", "cutpurse", "shieldbearer", "brute"], count: 10, text: "Defeat 10 bandits" }, 160, 80, 2),
+  mission("m1_ruins", "board1", 1, "Bounty: Things in the Ruins", "The cult and the stalkers are spilling out of the ruins. Push them back.", { kind: "kill", enemy: ["cultist", "stalker"], count: 8, text: "Defeat 8 cultists or ruin stalkers" }, 220, 110, 3),
+  mission("m1_scrap", "board1", 1, "Contract: Salvage", "The forge is short of scrap iron. Bandits carry plenty.", { kind: "collect", item: "mat_scrap", count: 8, consume: true, text: "Hand in 8 Scrap Iron at the board" }, 140, 90, 2),
+  // Floor 2 (Skyreach)
+  mission("m2_lynx", "board2", 2, "Bounty: Sky Lynx Prides", "The prides are hunting too close to the Landing. Ten will do.", { kind: "kill", enemy: ["skylynx"], count: 10, text: "Hunt 10 sky lynxes" }, 420, 150, 3),
+  mission("m2_knights", "board2", 2, "Bounty: Gilded Knights", "The Skyguard and the Aegis are marching on the Causeway again.", { kind: "kill", enemy: ["skyguard", "aegis"], count: 8, text: "Defeat 8 Skyguard or Aegis knights" }, 520, 180, 3),
+  mission("m2_storm", "board2", 2, "Bounty: Storm Callers", "Windcallers and storm adepts are calling lightning down on the terraces.", { kind: "kill", enemy: ["windcaller", "stormadept"], count: 8, text: "Defeat 8 windcallers or storm adepts" }, 560, 200, 4),
+  mission("m2_plate", "board2", 2, "Contract: Gilded Plate", "Brannoc needs plate for the Landing's guard.", { kind: "collect", item: "mat_gilded", count: 6, consume: true, text: "Hand in 6 Gilded Plate at the board" }, 480, 220, 3),
+  // Floor 3 (Emberhold)
+  mission("m3_ash", "board3", 3, "Bounty: Ash and Embers", "Ashlings and magma hounds are gathering on the slopes. Scatter them.", { kind: "kill", enemy: ["ashling", "magmahound"], count: 12, text: "Defeat 12 ashlings or magma hounds" }, 900, 260, 4),
+  mission("m3_drakes", "board3", 3, "Bounty: Drake Hunt", "The canyon drakes are raiding Emberhold's herds. Five of them.", { kind: "kill", enemy: ["drake"], count: 5, text: "Slay 5 drakes" }, 1200, 340, 5),
+  mission("m3_golems", "board3", 3, "Bounty: Black Glass", "The obsidian golems are walking toward the road. Stop them.", { kind: "kill", enemy: ["obsidian"], count: 4, text: "Shatter 4 obsidian golems" }, 1100, 320, 5),
+  mission("m3_scales", "board3", 3, "Contract: Dragonscale", "The Dragonforge always needs scales.", { kind: "collect", item: "mat_dragonscale", count: 6, consume: true, text: "Hand in 6 Dragonscales at the board" }, 1000, 380, 4),
 ];
 
 export const questDef = (id: string) => QUESTS.find((q) => q.id === id);
+
+/** A repeatable mission posted on a town's Mission Board. */
+function mission(id: string, board: string, floor: number, name: string, pitch: string, stage: QuestStage, xp: number, gold: number, marks: number): QuestDef {
+  return { id, name, giver: board, floor, mission: true, pitch, thanks: "Mission complete. The board pays on the spot.", stages: [stage], rewards: { xp, gold, marks } };
+}

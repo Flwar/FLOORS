@@ -5,6 +5,8 @@ import express from "express";
 import { SERVER_PORT } from "@floors/shared";
 import { DungeonRoom } from "./rooms/DungeonRoom.ts";
 import { Floor2Room } from "./rooms/Floor2Room.ts";
+import { Floor3Room } from "./rooms/Floor3Room.ts";
+import { RoostRoom } from "./rooms/RoostRoom.ts";
 import { StormspireRoom } from "./rooms/StormspireRoom.ts";
 import { WorldRoom } from "./rooms/WorldRoom.ts";
 
@@ -18,6 +20,8 @@ const server = defineServer({
     dungeon: defineRoom(DungeonRoom),
     floor2: defineRoom(Floor2Room),
     stormspire: defineRoom(StormspireRoom),
+    floor3: defineRoom(Floor3Room),
+    roost: defineRoom(RoostRoom),
   },
   express: serveClient
     ? (app) => {

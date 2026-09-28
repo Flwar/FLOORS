@@ -24,7 +24,9 @@ const MEADOW: Palette = { grass: "#6fae52", grassDark: "#5a9443", grassLight: "#
 const FOREST: Palette = { grass: "#4f8c45", grassDark: "#3f7438", grassLight: "#62a055" };
 /** Floor 2: sun-gilded meadows. */
 const GILDED: Palette = { grass: "#9db85a", grassDark: "#86a04a", grassLight: "#b6cc6e" };
-const PATH = "#cfae72";
+/** Floor 3: ash over black rock. */
+const EMBER: Palette = { grass: "#5c534b", grassDark: "#463e38", grassLight: "#746a61" };
+let PATH = "#cfae72";
 const COBBLE = "#9b968b";
 const WATER = "#3f86c0";
 const SAND = "#d8c08a";
@@ -34,7 +36,9 @@ const CAVE = "#4a4e57";
 const ROCK = "#5b5f69";
 const SKY_TOP = "#9ccbe8";
 
-const RAISED = new Set<number>([Tile.Tree, Tile.Wall, Tile.RuinWall, Tile.Palisade, Tile.Fence, Tile.Crystal, Tile.Gate]);
+const RAISED = new Set<number>([Tile.Tree, Tile.Wall, Tile.RuinWall, Tile.Palisade, Tile.Fence, Tile.Crystal, Tile.Gate, Tile.IndoorWall]);
+const FLOORBOARD = "#9a6a3e";
+const INDOOR_DARK = "#17120e";
 
 interface ChunkView {
   cx: number;
@@ -72,6 +76,9 @@ export class Terrain {
     this.forestRect = map.zones.find((z) => z.id === "whisperwood");
     STONE = map.name.startsWith("Floor 2") || map.name.includes("Stormspire") ? "#e2cd92" : "#a89f8c";
     this.gilded = map.name.startsWith("Floor 2");
+    this.ember = map.name.startsWith("Floor 3") || map.name === "The Dragon's Roost";
+    if (this.ember) STONE = "#6a625c";
+    PATH = this.ember ? "#8a7866" : "#cfae72";
     paintSprites(scene, map);
     scene.events.once("shutdown", () => {
       for (const [k, c] of [...this.chunks]) this.unload(k, c);
@@ -131,9 +138,12 @@ export class Terrain {
   }
 
   private gilded = false;
+  /** Floor 3: ash for grass, lava for water, charred trees. */
+  private ember = false;
 
   private palette(tx: number, ty: number): Palette {
     if (this.gilded) return GILDED;
+    if (this.ember) return EMBER;
     const f = this.forestRect;
     if (f && tx >= f.x0 && tx < f.x1 && ty >= f.y0 && ty < f.y1) {
       const edge = Math.min(tx - f.x0, ty - f.y0, f.x1 - tx, f.y1 - ty);
@@ -160,7 +170,7 @@ export class Terrain {
         switch (id) {
           case Tile.Tree: {
             const forest = this.palette(tx, ty) === FOREST;
-            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.gilded ? 6 : forest ? 3 : 0);
+            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.ember ? 9 : this.gilded ? 6 : forest ? 3 : 0);
             add(tx * TILE + TILE / 2 + (hash(tx, ty, 4) - 0.5) * 8, bottom - 3, `tree${variant}`, 0.5, 0.94, 0.9 + hash(tx, ty, 5) * 0.35);
             tall.push(decor[decor.length - 1] as Phaser.GameObjects.Image);
             break;
@@ -183,6 +193,12 @@ export class Terrain {
           case Tile.Gate:
             add(tx * TILE, bottom, "portcullis", 0, 1);
             break;
+          case Tile.IndoorWall: {
+            // The face of a wall shows only where it looks into a room.
+            const below = m.get(tx, ty + 1);
+            if (below === Tile.Floorboards || below === Tile.StoneFloor || below === Tile.Prop) add(tx * TILE, bottom, `inWall${Math.floor(hash(tx, ty, 8) * 3)}`, 0, 1);
+            break;
+          }
         }
       }
     }
@@ -240,10 +256,16 @@ export class Terrain {
     };
     const isLand = (tx: number, ty: number) => !is(tx, ty, Tile.Void);
 
+    // Below the world, around the building interiors, there is only darkness.
+    range((tx, ty) => {
+      if (ty < m.outdoorHeight || !is(tx, ty, Tile.Void, Tile.IndoorWall)) return;
+      g.fillStyle = INDOOR_DARK;
+      g.fillRect(px(tx) - 1, py(ty) - 1, T + 2, T + 2);
+    });
     // Void tiles stay transparent: the parallax sky shows through beneath the island.
     // The island's rocky underside hangs into the sky beneath southern edges.
     range((tx, ty) => {
-      if (!is(tx, ty, Tile.Void)) return;
+      if (!is(tx, ty, Tile.Void) || ty >= m.outdoorHeight) return;
       let depth = 0;
       for (let k = 1; k <= 4; k++) if (isLand(tx, ty - k)) {
         depth = k;
@@ -279,13 +301,19 @@ export class Terrain {
         case Tile.CaveFloor:
         case Tile.Rock:
         case Tile.Crystal:
-          color = ROCK;
+          color = this.ember ? "#3a3230" : ROCK;
           break;
         case Tile.Cliff:
           color = "#8a6e52";
           break;
         case Tile.Crop:
           color = "#8a6a45";
+          break;
+        case Tile.Floorboards:
+          color = FLOORBOARD;
+          break;
+        case Tile.IndoorWall:
+          color = "#3a2c22";
           break;
         default:
           color = this.palette(tx, ty).grass;
@@ -361,7 +389,8 @@ export class Terrain {
           g.stroke();
         }
         if (hash(tx, ty, 27) < 0.3) {
-          g.fillStyle = "rgba(90,140,70,0.55)";
+          // Moss on old flagstones; soot and a live cinder in the Ember Reaches.
+          g.fillStyle = this.ember ? (hash(tx, ty, 31) < 0.25 ? "rgba(255,120,40,0.45)" : "rgba(30,22,18,0.45)") : "rgba(90,140,70,0.55)";
           g.beginPath();
           g.arc(x + hash(tx, ty, 28) * T, y + hash(tx, ty, 29) * T, 5 + hash(tx, ty, 30) * 6, 0, Math.PI * 2);
           g.fill();
@@ -373,6 +402,49 @@ export class Terrain {
           g.arc(x + hash(tx, ty, 35 + i) * T, y + hash(tx, ty, 39 + i) * T, 2 + hash(tx, ty, 43 + i) * 3, 0, Math.PI * 2);
           g.fill();
         }
+      }
+    });
+
+    // Floorboards: long planks, staggered joints, knots, and a warm sheen.
+    range((tx, ty) => {
+      if (!is(tx, ty, Tile.Floorboards)) return;
+      const x = px(tx);
+      const y = py(ty);
+      const plank = T / 4;
+      for (let r = 0; r < 4; r++) {
+        const tone = Math.round((hash(tx, ty * 4 + r, 60) - 0.5) * 22);
+        g.fillStyle = shade(FLOORBOARD, tone);
+        g.fillRect(x, y + r * plank + 1, T, plank - 2);
+        g.fillStyle = "rgba(40,24,12,0.55)";
+        g.fillRect(x, y + r * plank + plank - 1, T, 2);
+        if (hash(tx, ty * 4 + r, 61) < 0.35) g.fillRect(x + Math.floor(hash(tx, ty * 4 + r, 62) * (T - 4)), y + r * plank, 2, plank);
+        if (hash(tx, ty * 4 + r, 63) < 0.08) {
+          g.fillStyle = "rgba(60,36,18,0.6)";
+          g.beginPath();
+          g.ellipse(x + hash(tx, ty, 64 + r) * T, y + r * plank + plank / 2, 4, 2, 0, 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+      // Walls cast a soft shadow onto the floor below them.
+      if (is(tx, ty - 1, Tile.IndoorWall)) {
+        const sh = g.createLinearGradient(0, y, 0, y + T * 0.6);
+        sh.addColorStop(0, "rgba(20,12,6,0.45)");
+        sh.addColorStop(1, "rgba(20,12,6,0)");
+        g.fillStyle = sh;
+        g.fillRect(x, y, T, T * 0.6);
+      }
+    });
+    // Tops of indoor walls: dark timber, with a lighter edge where they meet a floor.
+    range((tx, ty) => {
+      if (!is(tx, ty, Tile.IndoorWall)) return;
+      const x = px(tx);
+      const y = py(ty);
+      g.fillStyle = "#2e231b";
+      g.fillRect(x, y, T, T);
+      g.fillStyle = "#4a382a";
+      for (const [dx, dy, w, h] of [[0, 0, T, 4], [0, T - 4, T, 4], [0, 0, 4, T], [T - 4, 0, 4, T]] as const) {
+        const [nx, ny] = dy === 0 && h === 4 ? [0, -1] : dy > 0 ? [0, 1] : dx === 0 ? [-1, 0] : [1, 0];
+        if (!is(tx + nx, ty + ny, Tile.IndoorWall, Tile.Void)) g.fillRect(x + dx, y + dy, w, h);
       }
     });
 
@@ -515,18 +587,31 @@ export class Terrain {
       if (paved) {
         disc(tx, ty, 0.95, "#1d1a17");
         disc(tx, ty, 0.88, "#c9c0ad");
-      } else disc(tx, ty, 0.82, "#d9ecf0");
+      } else disc(tx, ty, 0.82, this.ember ? "#2a1410" : "#d9ecf0");
     });
+    const water = this.ember ? "#e0501a" : WATER;
     range((tx, ty) => {
-      if (is(tx, ty, Tile.Water)) disc(tx, ty, 0.72, shade(WATER, 28));
+      if (is(tx, ty, Tile.Water)) disc(tx, ty, 0.72, this.ember ? "#ffb347" : shade(WATER, 28));
     });
     range((tx, ty) => {
       if (!is(tx, ty, Tile.Water)) return;
-      disc(tx, ty, 0.6, WATER);
-      g.fillStyle = WATER;
+      disc(tx, ty, 0.6, water);
+      g.fillStyle = water;
       if (is(tx + 1, ty, Tile.Water)) g.fillRect(px(tx) + T / 2, py(ty) + T * 0.2, T, T * 0.6);
       if (is(tx, ty + 1, Tile.Water)) g.fillRect(px(tx) + T * 0.2, py(ty) + T / 2, T * 0.6, T);
-      if (hash(tx, ty, 9) < 0.5) {
+      if (this.ember) {
+        // Molten crust: dark plates floating on the fire, and bright seams between.
+        if (hash(tx, ty, 12) < 0.45) {
+          g.fillStyle = "rgba(60,20,10,0.55)";
+          g.beginPath();
+          g.ellipse(px(tx) + hash(tx, ty, 13) * T, py(ty) + hash(tx, ty, 14) * T, 6 + hash(tx, ty, 15) * 8, 4 + hash(tx, ty, 16) * 5, hash(tx, ty, 17) * 3, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.fillStyle = "rgba(255,230,120,0.7)";
+        g.beginPath();
+        g.arc(px(tx) + hash(tx, ty, 18) * T, py(ty) + hash(tx, ty, 19) * T, 2 + hash(tx, ty, 20) * 3, 0, Math.PI * 2);
+        g.fill();
+      } else if (hash(tx, ty, 9) < 0.5) {
         g.strokeStyle = "rgba(255,255,255,0.35)";
         g.lineWidth = 2;
         g.beginPath();
@@ -571,8 +656,8 @@ export class Terrain {
       }
       if (southOpen) {
         const fg = g.createLinearGradient(0, y + T * 0.35, 0, y + T);
-        fg.addColorStop(0, "#9a7a5a");
-        fg.addColorStop(1, "#6b5440");
+        fg.addColorStop(0, this.ember ? "#4a3a32" : "#9a7a5a");
+        fg.addColorStop(1, this.ember ? "#2a1e18" : "#6b5440");
         g.fillStyle = fg;
         g.fillRect(x, y + T * 0.35, T, T * 0.65);
         g.fillStyle = "rgba(0,0,0,0.18)";
@@ -587,7 +672,7 @@ export class Terrain {
     range((tx, ty) => {
       if (!is(tx, ty, Tile.Rock, Tile.Crystal)) return;
       for (let i = 0; i < 3; i++) {
-        g.fillStyle = hash(tx, ty, 60 + i) < 0.5 ? "#50545d" : "#666a74";
+        g.fillStyle = this.ember ? (hash(tx, ty, 60 + i) < 0.5 ? "#2e2826" : "#4a403c") : hash(tx, ty, 60 + i) < 0.5 ? "#50545d" : "#666a74";
         g.beginPath();
         g.arc(px(tx) + hash(tx, ty, 63 + i) * T, py(ty) + hash(tx, ty, 66 + i) * T, 6 + hash(tx, ty, 69 + i) * 10, 0, Math.PI * 2);
         g.fill();
@@ -636,7 +721,7 @@ export class Terrain {
           g.stroke();
         }
         if (t === Tile.Flowers) {
-          const colors = ["#f6d860", "#f59bb7", "#ffffff", "#b99af5", "#ff9a6b"];
+          const colors = this.ember ? ["#ff7a2a", "#ffb347", "#ff5a1a"] : ["#f6d860", "#f59bb7", "#ffffff", "#b99af5", "#ff9a6b"];
           for (let i = 0; i < 7; i++) {
             const fx = x + 6 + hash(tx, ty, 60 + i) * (T - 12);
             const fy = y + 6 + hash(tx, ty, 70 + i) * (T - 12);
@@ -688,6 +773,10 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
     ["#8a6a1e", "#b8902e", "#e0b84a"],
     ["#7a5a1a", "#a8802a", "#d8a83e"],
     ["#6a7a22", "#8ea033", "#b8c450"],
+    // Floor 3: charred, ash-grey, with embers still in the crowns.
+    ["#231d1a", "#352c27", "#4e423a"],
+    ["#2a201b", "#3e3029", "#5a4034"],
+    ["#1e1a18", "#2f2925", "#4a3e36"],
   ];
   canopies.forEach(([dark, mid, light], v) => {
     make(`tree${v}`, 110, 150, (g) => {
@@ -756,6 +845,64 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
         }
       }
     });
+  for (let v = 0; v < 3; v++) {
+    make(`inWall${v}`, T, T * 2, (g) => {
+      const W = T;
+      const H = T * 2;
+      const pl = g.createLinearGradient(0, 0, 0, H);
+      pl.addColorStop(0, "#d9c9a8");
+      pl.addColorStop(1, "#bfa982");
+      g.fillStyle = pl;
+      g.fillRect(0, 0, W, H);
+      // Timber frame.
+      g.fillStyle = "#5b3b24";
+      g.fillRect(0, 0, W, 8);
+      g.fillRect(0, 0, 5, H);
+      // Wainscot.
+      const wg = g.createLinearGradient(0, H * 0.58, 0, H);
+      wg.addColorStop(0, "#8a5a34");
+      wg.addColorStop(1, "#5b3b24");
+      g.fillStyle = wg;
+      g.fillRect(0, H * 0.58, W, H * 0.42);
+      g.fillStyle = "#3a2716";
+      g.fillRect(0, H * 0.58, W, 5);
+      g.fillStyle = "rgba(255,230,180,0.15)";
+      g.fillRect(8, H * 0.66, W - 16, 3);
+      if (v === 1) {
+        // A small window, lit from outside.
+        g.fillStyle = "#1d1a17";
+        g.fillRect(W / 2 - 16, 18, 32, 36);
+        const lg = g.createLinearGradient(0, 22, 0, 50);
+        lg.addColorStop(0, "#fff4c8");
+        lg.addColorStop(1, "#e8b860");
+        g.fillStyle = lg;
+        g.fillRect(W / 2 - 12, 22, 24, 28);
+        g.fillStyle = "#1d1a17";
+        g.fillRect(W / 2 - 1, 22, 2, 28);
+        g.fillRect(W / 2 - 12, 35, 24, 2);
+      } else if (v === 2) {
+        // A shield on the wall.
+        g.fillStyle = "#1d1a17";
+        g.beginPath();
+        g.moveTo(W / 2, 16);
+        g.lineTo(W / 2 + 16, 22);
+        g.quadraticCurveTo(W / 2 + 16, 46, W / 2, 56);
+        g.quadraticCurveTo(W / 2 - 16, 46, W / 2 - 16, 22);
+        g.closePath();
+        g.fill();
+        g.fillStyle = "#8a3a2a";
+        g.beginPath();
+        g.moveTo(W / 2, 20);
+        g.lineTo(W / 2 + 12, 25);
+        g.quadraticCurveTo(W / 2 + 12, 44, W / 2, 52);
+        g.quadraticCurveTo(W / 2 - 12, 44, W / 2 - 12, 25);
+        g.closePath();
+        g.fill();
+        g.fillStyle = "#e8c86a";
+        g.fillRect(W / 2 - 2, 24, 4, 24);
+      }
+    });
+  }
   block("wallTop", ["#c9c0ad", "#a79d88"], ["#857b69", "#5d5548"], false, 0);
   block("wallFront", ["#c9c0ad", "#a79d88"], ["#857b69", "#5d5548"], false, 0);
   block("ruin0", ["#cbbd9b", "#a8977a"], ["#8f7f64", "#62564a"], true, 1);

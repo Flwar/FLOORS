@@ -2,6 +2,7 @@ import type { Client } from "colyseus";
 import { buildUndercroft, GATE, TILE, UNDERCROFT_ROOMS as R, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Character } from "../game/character.ts";
 import type { EnemyData } from "../game/sim.ts";
+import { openFloor } from "../game/floors.ts";
 import { InstanceRoom, inRect, type BossArena, type MinibossHall } from "./InstanceRoom.ts";
 
 const LEVER_NAMES = ["Sun", "Moon", "Star"];
@@ -62,6 +63,12 @@ export class DungeonRoom extends InstanceRoom {
     if (ed.def.key === "aurelion") ch.data.floor = Math.max(ch.data.floor, 2);
   }
 
+  /** Aurelion falls: Floor 2 opens for the whole server, not just this party. */
+  protected onCleared(boss: EnemyData) {
+    const by = this.climbers();
+    if (by.length) openFloor(2, by, boss.def.name);
+  }
+
   protected tickInstance() {
     this.hallEncounter();
   }
@@ -71,6 +78,7 @@ export class DungeonRoom extends InstanceRoom {
     const inside = this.living().filter((pd) => inRect(pd.p.x, pd.p.y, R.hall));
     if (this.hallState === "idle") {
       if (!inside.length) return;
+      this.gatherParty((x, y) => inRect(x, y, R.hall), this.insideGate(GATE.hallSouth), "the Sealed Hall");
       this.gate(GATE.hallSouth, false);
       this.state.stage = "The Sealed Hall";
       this.emitAll("banner", { title: "The Sealed Hall", sub: "The gates slam shut behind you" });

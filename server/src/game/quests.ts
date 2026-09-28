@@ -1,4 +1,4 @@
-import { makeItem, QUEST_SKILL_POINTS, QUESTS, questDef, type QuestDef } from "@floors/shared";
+import { makeItem, missionReady, questMarks, QUESTS, questDef, questOpen, type QuestDef } from "@floors/shared";
 import type { Character } from "./character.ts";
 
 export type QuestEvent =
@@ -6,7 +6,7 @@ export type QuestEvent =
   | { kind: "interact"; object: string }
   | { kind: "parry" }
   | { kind: "visit"; zone: string }
-  | { kind: "dungeon"; dungeon: "dungeon" | "stormspire" }
+  | { kind: "dungeon"; dungeon: "dungeon" | "stormspire" | "roost" }
   | { kind: "talk"; npc: string };
 
 export interface QuestUpdate {
@@ -17,9 +17,16 @@ export interface QuestUpdate {
   rewards?: QuestDef["rewards"];
 }
 
-/** Quests an NPC can offer right now. */
+/** Can this character take the quest now? Missions come back to the board once they cool down. */
+function available(ch: Character, q: QuestDef) {
+  const st = ch.data.quests[q.id];
+  if (q.mission ? !missionReady(st, Date.now()) : st) return false;
+  return questOpen(q, (id) => !!ch.data.quests[id]?.done, ch.data.floor);
+}
+
+/** Quests an NPC (or a Mission Board) can offer right now. */
 export function offers(ch: Character, npc: string): QuestDef[] {
-  return QUESTS.filter((q) => q.giver === npc && !ch.data.quests[q.id] && (!q.requires || ch.data.quests[q.requires]?.done));
+  return QUESTS.filter((q) => q.giver === npc && available(ch, q));
 }
 
 /** Active quests whose current stage wants to talk to this NPC (or hand in collections to the giver). */
@@ -36,8 +43,9 @@ export function turnIns(ch: Character, npc: string): QuestDef[] {
 
 export function accept(ch: Character, id: string): string | undefined {
   const q = questDef(id);
-  if (!q || ch.data.quests[id]) return "You can't take that quest.";
-  if (q.requires && !ch.data.quests[q.requires]?.done) return "You're not ready for that yet.";
+  if (!q || (ch.data.quests[id] && !q.mission)) return "You can't take that quest.";
+  if (q.mission && !missionReady(ch.data.quests[id], Date.now())) return "That mission isn't on the board right now.";
+  if (!available(ch, q)) return "You're not ready for that yet.";
   ch.data.quests[id] = { stage: 0, progress: 0 };
   ch.dirty = true;
   return undefined;
@@ -49,21 +57,18 @@ function advance(ch: Character, q: QuestDef, out: QuestUpdate[]) {
   st.progress = 0;
   if (st.stage >= q.stages.length) {
     st.done = true;
+    st.at = Date.now();
     const r = q.rewards;
     ch.data.gold += r.gold;
+    // Marks buy skill scrolls from the Archivists.
+    ch.data.marks = (ch.data.marks ?? 0) + questMarks(q);
     for (const it of r.items ?? []) {
       const item = makeItem(it.key, it.rarity, it.qty ?? 1);
       if (!ch.addItem(item)) ch.data.bank[ch.data.bank.indexOf(null)] = item; // never lose a reward: overflow goes to storage
     }
     if (r.unlockFloor) ch.data.floor = Math.max(ch.data.floor, r.unlockFloor);
-    // Main-story milestones also award a skill point.
-    const pts = QUEST_SKILL_POINTS[q.id] ?? 0;
-    if (pts) {
-      ch.data.bonusPoints = (ch.data.bonusPoints ?? 0) + pts;
-      ch.recompute();
-    }
     ch.addXp(r.xp);
-    out.push({ id: q.id, name: q.name, text: "Quest complete", done: true, rewards: r });
+    out.push({ id: q.id, name: q.name, text: q.mission ? "Mission complete" : "Quest complete", done: true, rewards: { ...r, marks: questMarks(q) } });
   } else {
     out.push({ id: q.id, name: q.name, text: q.stages[st.stage].text });
   }

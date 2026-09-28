@@ -44,3 +44,10 @@
 #admin-btn { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); padding: 4px 12px; font: bold 12px "Trebuchet MS", sans-serif; letter-spacing: 0.08em;
   background: linear-gradient(#b8433a, #7a2a22); color: #fff; border-radius: 6px; pointer-events: auto; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
 .map canvas.teleport { cursor: crosshair; }
+
+/* The tower: whether Floor 2 is open for everyone. */
+.adm-tower { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid; }
+.adm-tower b { font-size: 14px; }
+.adm-tower span { font-size: 12px; opacity: 0.8; }
+.adm-tower.open { border-color: rgba(232, 200, 103, 0.6); background: rgba(232, 200, 103, 0.12); color: #ffe9a8; }
+.adm-tower.sealed { border-color: rgba(196, 64, 44, 0.6); background: rgba(196, 64, 44, 0.12); color: #f4c4b8; }

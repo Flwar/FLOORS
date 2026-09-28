@@ -1,5 +1,6 @@
 import { TILE } from "../constants.ts";
 import { Tile, WorldMap } from "./map.ts";
+import { addInteriors } from "./interiors.ts";
 
 /** Deterministic PRNG so the server and every client build the identical map. */
 function mulberry32(seed: number) {
@@ -394,7 +395,7 @@ export function buildFloor1(): WorldMap {
   obj({ id: "chest-shrine", kind: "chest", tx: 18, ty: 12, name: "Shrine Offering", loot: [{ key: "charm_duelist", rarity: 2 }], gold: 40 });
   obj({ id: "chest-foxhollow", kind: "chest", tx: 115, ty: 105, name: "Fox's Hoard", loot: [{ key: "charm_feather", rarity: 2 }, { key: "tonic", qty: 2 }], gold: 25 });
   obj({ id: "chest-library", kind: "chest", tx: 189, ty: 92, name: "Scholar's Strongbox", loot: [{ key: "art_lens" }, { key: "staff_ember", rarity: 2 }], gold: 60 });
-  obj({ id: "chest-deep", kind: "chest", tx: 180, ty: 134, name: "Crawler's Cache", loot: [{ key: "charm_gale", rarity: 3 }, { key: "mat_ember" }], gold: 90 });
+  obj({ id: "chest-deep", kind: "chest", tx: 180, ty: 134, name: "Crawler's Cache", loot: [{ key: "charm_gale", rarity: 2 }, { key: "mat_ember" }], gold: 90 });
   obj({ id: "chest-camp", kind: "chest", tx: 116, ty: 18, name: "Bandit Loot Chest", loot: [{ key: "armor_leather", rarity: 1 }, { key: "tonic", qty: 2 }], gold: 45 });
   obj({ id: "chest-den", kind: "chest", tx: 23, ty: 20, name: "Gnawed Satchel", loot: [{ key: "charm_wolf", rarity: 1 }], gold: 15 });
   obj({ id: "lore-rim", kind: "lore", tx: 104, ty: 108, name: "Weathered Marker", text: "\"The Floor floats. Below is sky. Above is the next Floor. Between is everything we have.\"" });
@@ -448,6 +449,20 @@ export function buildFloor1(): WorldMap {
 
   m.spawn = { x: px(38), y: px(84) };
   connectEverything(m);
+  m.npcs.push({ id: "board1", name: "Mission Board", role: "board", x: px(41), y: px(67), look: { skin: "#000", cloth: "#000", trim: "#000", hair: "#000" }, greeting: "Missions posted by the town. Each pays gold, experience and Marks — and goes back up on the board a while after it's done." });
+  addInteriors(m, [
+    { building: "smith", style: "smithy", npcs: [{ id: "smith" }] },
+    { building: "guild", style: "hall" },
+    { building: "store", style: "shop", npcs: [{ id: "merchant" }] },
+    { building: "inn", style: "inn", npcs: [{ id: "innkeep" }] },
+    { building: "storage", style: "vault", npcs: [{ id: "banker" }] },
+    {
+      building: "scholar",
+      style: "library",
+      add: [{ id: "archivist1", name: "Archivist Pell", role: "archivist", shop: "scrolls1", look: { skin: "#e0b890", cloth: "#4a3a6a", trim: "#d8b35a", hair: "#9aa3ad", helm: "hood" },
+        greeting: "Every skill ever written down passes through these shelves. Scrolls cost coin — and Marks, which prove you've done honest work for the town. The Mission Board pays in Marks." }],
+    },
+  ]);
   return m;
 }
 

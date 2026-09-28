@@ -2,10 +2,10 @@
  * Visible equipment styles. Each armour, helm and weapon names one of these, and the
  * index is synced on the player so everyone sees what you wear.
  */
-export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave"] as const;
+export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave", "hide", "ringmail", "templar", "windrunner", "sunforged", "mystic", "dragonscale", "drakehide", "emberweave"] as const;
 export type ArmorStyle = (typeof ARMOR_STYLES)[number];
 
-export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown"] as const;
+export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown", "coif", "templar", "suncrown", "dragonhelm", "embercirclet"] as const;
 export type HelmStyle = (typeof HELM_STYLES)[number];
 
 export const WEAPON_ARTS = [
@@ -22,6 +22,14 @@ export const WEAPON_ARTS = [
   "st_frost", "st_moon",
   // Floor 2: the Stormglass set.
   "sword_storm", "gs_storm", "dg_storm", "sp_storm", "st_storm",
+  // The third wave.
+  "sword_bronze", "sword_falchion", "sword_royal",
+  "gs_bone", "gs_moon", "gs_gilded",
+  "dg_bone", "dg_duel", "dg_gilded",
+  "sp_partisan", "sp_halberd", "sp_sun",
+  "st_bone", "st_crystal", "st_sun",
+  // Floor 3: the Dragonscale set.
+  "sword_dragon", "gs_dragon", "dg_dragon", "sp_dragon", "st_dragon",
 ] as const;
 export type WeaponArtKey = (typeof WEAPON_ARTS)[number];
 

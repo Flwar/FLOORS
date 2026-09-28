@@ -39,7 +39,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   const W = c.width;
   const margin = 26;
   const s = (W - margin * 2) / m.width;
-  c.height = Math.round(m.height * s + margin * 2 + 34);
+  c.height = Math.round(m.outdoorHeight * s + margin * 2 + 34);
   const H = c.height;
   const g = c.getContext("2d")!;
   const ox = margin;
@@ -65,13 +65,13 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   }
 
   // Land colours (1 px per tile), smoothed when scaled up for a painted look.
-  const land = offscreen(m.width, m.height);
-  const mask = offscreen(m.width, m.height);
+  const land = offscreen(m.width, m.outdoorHeight);
+  const mask = offscreen(m.width, m.outdoorHeight);
   const lg = land.getContext("2d")!;
   const mg = mask.getContext("2d")!;
-  const img = lg.createImageData(m.width, m.height);
-  const mimg = mg.createImageData(m.width, m.height);
-  for (let y = 0; y < m.height; y++) {
+  const img = lg.createImageData(m.width, m.outdoorHeight);
+  const mimg = mg.createImageData(m.width, m.outdoorHeight);
+  for (let y = 0; y < m.outdoorHeight; y++) {
     for (let x = 0; x < m.width; x++) {
       const t = m.get(x, y);
       if (t === Tile.Void) continue;
@@ -94,14 +94,14 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   g.imageSmoothingQuality = "high";
   // Drop shadow, inked coast, then the paint.
   g.globalAlpha = 0.25;
-  g.drawImage(mask, ox + 4, oy + 6, m.width * s, m.height * s);
+  g.drawImage(mask, ox + 4, oy + 6, m.width * s, m.outdoorHeight * s);
   g.globalAlpha = 0.9;
-  for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) g.drawImage(mask, ox + dx, oy + dy, m.width * s, m.height * s);
+  for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) g.drawImage(mask, ox + dx, oy + dy, m.width * s, m.outdoorHeight * s);
   g.globalAlpha = 1;
-  g.drawImage(land, ox, oy, m.width * s, m.height * s);
+  g.drawImage(land, ox, oy, m.width * s, m.outdoorHeight * s);
 
   // Glyphs: trees in woods, ripples on water, little houses.
-  for (let y = 0; y < m.height; y += 2) {
+  for (let y = 0; y < m.outdoorHeight; y += 2) {
     for (let x = 0; x < m.width; x += 2) {
       if (!seenZone(x, y)) continue;
       const t = m.get(x, y);
@@ -149,7 +149,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   }
 
   // Fog: unexplored land hides under soft parchment clouds.
-  for (let y = 0; y < m.height; y += 3) {
+  for (let y = 0; y < m.outdoorHeight; y += 3) {
     for (let x = 0; x < m.width; x += 3) {
       if (m.get(x + 1, y + 1) === Tile.Void || seenZone(x + 1, y + 1)) continue;
       const cx = X(x + 1.5 + (hash(x, y, 21) - 0.5) * 1.5);
@@ -165,7 +165,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   // Faint swirls in the fog, like an unfinished survey.
   g.strokeStyle = "rgba(120,90,50,0.22)";
   g.lineWidth = 1.2;
-  for (let y = 4; y < m.height; y += 12) {
+  for (let y = 4; y < m.outdoorHeight; y += 12) {
     for (let x = 4; x < m.width; x += 14) {
       if (m.get(x, y) === Tile.Void || seenZone(x, y) || hash(x, y, 24) < 0.4) continue;
       const cx = X(x);
@@ -219,7 +219,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   let sy = 0;
   let n = 0;
   if (open) {
-    for (let y = 0; y < m.height; y += 3) {
+    for (let y = 0; y < m.outdoorHeight; y += 3) {
       for (let x = 0; x < m.width; x += 3) {
         if (m.get(x, y) !== Tile.Grass || m.zoneAt(x * TILE + 16, y * TILE + 16) !== open) continue;
         sx += x;

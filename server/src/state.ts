@@ -13,6 +13,8 @@ export const Player = schema(
     weaponRarity: t.uint8(),
     weaponLook: t.uint8(),
     party: t.string(),
+    /** Sitting: 0 standing, 1 on the ground, 2 on a bench or logs. */
+    sit: t.uint8(),
     // --- PlayerSim (predicted by the owning client; keep in sync with shared/sim/player.ts) ---
     x: t.float32(),
     y: t.float32(),
@@ -75,7 +77,7 @@ export const Enemy = schema(
     ay: t.float32(),
     hp: t.uint16(),
     hpMax: t.uint16(),
-    flags: t.uint8(),
+    flags: t.uint16(),
     /** Boss posture 0–255. */
     posture: t.uint8(),
     level: t.uint8(),

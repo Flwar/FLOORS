@@ -24,7 +24,13 @@
     "trade": "tsx tools/trade.ts",
     "settings": "tsx tools/settings.ts",
     "reach": "tsx tools/reach.ts",
-    "floor2": "tsx tools/floor2.ts"
+    "floor2": "tsx tools/floor2.ts",
+    "floor3": "tsx tools/floor3.ts",
+    "party": "tsx tools/party.ts",
+    "worldfloor": "tsx tools/worldfloor.ts",
+    "social": "tsx tools/social.ts",
+    "loot": "tsx tools/loot.ts",
+    "curve": "tsx tools/curve.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

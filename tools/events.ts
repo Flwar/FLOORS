@@ -21,9 +21,11 @@ while (!room.state.players?.get(room.sessionId) || !inv) await wait(20);
 // Make sure no other event is running, then start the raid.
 room.send("dev:event", "end");
 for (let i = 0; i < 40 && room.state.event; i++) await wait(250);
+// (Messages before this are from whatever event was running: another test may have left a raid going.)
+const startMark = msgs.length;
 room.send("dev:event", "raid");
 await wait(600);
-const started = msgs.find((x) => x.type === "event" && x.m.id === "raid" && !x.m.ended);
+const started = msgs.slice(startMark).find((x) => x.type === "event" && x.m.id === "raid" && !x.m.ended);
 check("raid announced to the world", !!started && room.state.event === "raid", started?.m.text ?? `state.event=${room.state.event}`);
 room.send("dev:teleport", { x: room.state.eventX, y: room.state.eventY });
 await wait(1200);
@@ -34,7 +36,7 @@ const xp0 = inv.xp + inv.level * 1e6;
 const gold0 = inv.gold;
 room.send("dev:killnear", 400);
 await wait(2600);
-const ended = msgs.find((x) => x.type === "event" && x.m.id === "raid" && x.m.ended);
+const ended = msgs.slice(startMark).find((x) => x.type === "event" && x.m.id === "raid" && x.m.ended);
 check("raid defeated", !!ended?.m.success && !room.state.event, ended?.m.text ?? "no end message");
 await wait(300);
 check("participants rewarded", inv.gold > gold0 && inv.xp + inv.level * 1e6 > xp0, `gold ${gold0}→${inv.gold}, xp ${inv.xp} (level ${inv.level})`);

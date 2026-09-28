@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import type { Room } from "@colyseus/sdk";
-import { Act, keyLabel, treeNode, type BindAction, type PlayerSim, type WorldMap } from "@floors/shared";
+import { Act, keyLabel, type BindAction, type PlayerSim, type WorldMap } from "@floors/shared";
 import { sfx } from "../audio/sfx.ts";
 import { settings } from "../settings.ts";
 import { iconImg, type UiIconName } from "./uiIcons.ts";
@@ -20,7 +20,7 @@ interface Me {
 interface Watch {
   me: Me;
   quests: Record<string, { stage: number; progress: number; done?: boolean }>;
-  tree: string[];
+  skills: string[];
 }
 
 interface Step {
@@ -51,8 +51,8 @@ const STEPS: Step[] = [
   { id: "heavy", icon: "kill", title: "Heavy attack", text: "{heavy} swings harder and breaks guards — but it's slow. Try it on the dummy.", count: 2, target: spawnAt("yard-dummy-a") },
   { id: "dodge", icon: "boot", title: "Dodge", text: "Press {dodge} to roll. For a moment you can't be hit. Roll in any direction you're moving.", count: 2 },
   { id: "parry", icon: "parry", title: "Parry", text: "Follow the gold marker to the Sparring Knight. When his weapon glints gold, press {parry} just before it lands. A perfect parry stuns him. (Red glint: dodge instead!)", count: 1 },
-  { id: "learn", icon: "skills", title: "Learn a skill", text: "You have a skill point. Open the skill tree with {skills} and learn a skill for your weapon.", count: 1 },
-  { id: "useskill", icon: "skills", title: "Use your skill", text: "Skills sit in the slots at the bottom of the screen. Press {skill1} to use it.", count: 1 },
+  { id: "learn", icon: "skills", title: "Your Skill Book", text: "Open the Skill Book with {skills}. You already know Whirlwind — every other skill is learned by reading a skill scroll. Missions and quests pay Marks, and the Archivist sells scrolls.", count: 1 },
+  { id: "useskill", icon: "skills", title: "Use your skill", text: "Skills sit in the slots at the bottom of the screen. Press {skill1} to use Whirlwind.", count: 1 },
   { id: "pack", icon: "pack", title: "Your pack", text: "Open your pack with {pack}. Drag gear onto your character to wear it — better gear shows green arrows.", count: 1 },
   { id: "tonic", icon: "heart", title: "Stay alive", text: "Drink a tonic with {use} when you're hurt — it takes a moment, so step back first. Out of a fight, wounds heal on their own.", manual: true },
   { id: "done", icon: "main", title: "You're ready", text: "Follow the gold arrow for your main quest; blue arrows are side quests. Quest details are on the right, and {quests} opens your quest log. Tilde at the General Store sells a map of the floor — then {map} shows it. Good luck, climber.", manual: true },
@@ -205,7 +205,7 @@ export class Tutorial {
         if (newAct && s.act === Act.Dodge) this.bump();
         break;
       case "learn":
-        if (w.tree.some((id) => treeNode(id)?.kind === "skill")) this.bump();
+        if (document.querySelector('.panel[data-id="skills"]')) this.bump();
         break;
       case "useskill":
         if (newAct && s.act === Act.Skill) this.bump();

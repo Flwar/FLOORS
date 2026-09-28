@@ -26,12 +26,15 @@ export const Tile = {
   Crop: 20,
   /** A placed prop (stall, barrel, bench…): solid; see WorldMap.props for what it is. */
   Prop: 21,
+  /** Inside a building: plastered walls (solid) and wooden floorboards. */
+  IndoorWall: 22,
+  Floorboards: 23,
 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 
-const SOLID = new Set<number>([Tile.Wall, Tile.Tree, Tile.Water, Tile.House, Tile.Void, Tile.Rock, Tile.RuinWall, Tile.Palisade, Tile.Fence, Tile.Cliff, Tile.Crystal, Tile.Gate, Tile.Prop]);
+const SOLID = new Set<number>([Tile.Wall, Tile.Tree, Tile.Water, Tile.House, Tile.Void, Tile.Rock, Tile.RuinWall, Tile.Palisade, Tile.Fence, Tile.Cliff, Tile.Crystal, Tile.Gate, Tile.Prop, Tile.IndoorWall]);
 
-export type PropKind = "stall" | "barrel" | "crates" | "bench" | "lamp" | "planter" | "board" | "hay" | "cart" | "rack" | "anvil" | "well" | "logs" | "sacks";
+export type PropKind = "stall" | "barrel" | "crates" | "bench" | "lamp" | "planter" | "board" | "hay" | "cart" | "rack" | "anvil" | "well" | "logs" | "sacks" | "ribs" | "skull" | "counter" | "shelf" | "hearth" | "table";
 
 /** Town furniture and clutter. The footprint is solid; `under` is the ground it stands on. */
 export interface PropDef {
@@ -58,6 +61,8 @@ export interface Zone {
   /** Hidden areas are announced as discoveries. */
   secret?: boolean;
   dark?: boolean;
+  /** Inside a building (no sky, no weather). */
+  indoor?: boolean;
   music?: string;
 }
 
@@ -84,7 +89,7 @@ export interface SpawnDef {
   level: number;
 }
 
-export type NpcRole = "store" | "smith" | "storage" | "guild" | "inn" | "gate" | "lore" | "merchant" | "tanner" | "scholar";
+export type NpcRole = "store" | "smith" | "storage" | "guild" | "inn" | "gate" | "lore" | "merchant" | "tanner" | "scholar" | "archivist" | "board";
 
 export interface NpcDef {
   id: string;
@@ -99,7 +104,7 @@ export interface NpcDef {
   shop?: string;
 }
 
-export type ObjectKind = "chest" | "lore" | "waystone" | "door" | "gate" | "campfire" | "lever";
+export type ObjectKind = "chest" | "lore" | "waystone" | "door" | "gate" | "campfire" | "lever" | "entry";
 
 export interface WorldObject {
   id: string;
@@ -114,10 +119,12 @@ export interface WorldObject {
   requires?: string;
   /** Gates and doors: where they lead ("world", "floor2", "floor3", "dungeon", "stormspire"). */
   dest?: string;
+  /** Building entrances and exits: where you step to (world pixels, same map). */
+  to?: { x: number; y: number };
 }
 
 export class WorldMap {
-  readonly tiles: Uint8Array;
+  tiles: Uint8Array;
   readonly zones: Zone[] = [];
   readonly buildings: Building[] = [];
   readonly spawns: SpawnDef[] = [];
@@ -126,9 +133,26 @@ export class WorldMap {
   readonly props: PropDef[] = [];
   spawn = { x: 0, y: 0 };
   name = "";
+  /** Rows below this hold building interiors, out of sight of the world (see interiors.ts). */
+  outdoorHeight: number;
 
-  constructor(readonly width: number, readonly height: number) {
+  constructor(readonly width: number, public height: number) {
     this.tiles = new Uint8Array(width * height);
+    this.outdoorHeight = height;
+  }
+
+  /** Add empty (void) rows at the bottom of the map. */
+  growRows(rows: number) {
+    const next = new Uint8Array(this.width * (this.height + rows));
+    next.fill(Tile.Void);
+    next.set(this.tiles);
+    this.tiles = next;
+    this.height += rows;
+  }
+
+  /** Is this point inside a building interior? */
+  indoors(py: number) {
+    return py >= this.outdoorHeight * TILE;
   }
 
   get(tx: number, ty: number): number {

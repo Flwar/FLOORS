@@ -1,4 +1,4 @@
-import { skillById } from "@floors/shared";
+import { skillById, skillEntry } from "@floors/shared";
 
 /**
  * Skill icons: a medallion in the skill's colour with a glyph for what it does, drawn in
@@ -118,7 +118,550 @@ function flame(g: G, cx: number, cy: number, s: number, outer: string, inner: st
   g.translate(0, -4 * s);
 }
 
+/** Small tongues of fire along the bottom of an icon. */
+function embers(g: G) {
+  flame(g, 16, 50, 0.45, "#ff7a2a", "#ffe08a");
+  flame(g, 48, 50, 0.4, "#ff7a2a", "#ffe08a");
+}
+
+function ball(g: G, x: number, y: number, r: number, inner: string, mid: string, outer: string) {
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  const gr = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r);
+  gr.addColorStop(0, inner);
+  gr.addColorStop(0.5, mid);
+  gr.addColorStop(1, outer);
+  fillInk(g, gr);
+}
+
+/** A dragon's head in profile, jaws open (Dragon's Breath, Wrath of the Wyrm). */
+function dragonHead(g: G, x: number, y: number, s: number, color: string) {
+  g.beginPath();
+  g.moveTo(x, y);
+  g.lineTo(x + 18 * s, y - 12 * s);
+  g.lineTo(x + 30 * s, y - 10 * s);
+  g.lineTo(x + 26 * s, y - 2 * s);
+  g.lineTo(x + 14 * s, y + 2 * s);
+  g.lineTo(x + 28 * s, y + 8 * s);
+  g.lineTo(x + 14 * s, y + 12 * s);
+  g.lineTo(x - 2 * s, y + 10 * s);
+  g.closePath();
+  fillInk(g, color, 3);
+  g.beginPath();
+  g.moveTo(x + 4 * s, y - 2 * s);
+  g.lineTo(x - 8 * s, y - 16 * s);
+  g.lineTo(x + 10 * s, y - 6 * s);
+  fillInk(g, "#e8dcc0", 2.5);
+  g.fillStyle = "#ffe08a";
+  g.beginPath();
+  g.arc(x + 16 * s, y - 6 * s, 2 * s, 0, Math.PI * 2);
+  g.fill();
+}
+
 const GLYPH: Record<string, (g: G, c: string) => void> = {
+  // --- Dragon arts and universal skills ----------------------------------------------
+  dragonfang: (g, c) => {
+    GLYPH.dash(g, c);
+    embers(g);
+  },
+  wyrmslayer: (g, c) => {
+    GLYPH.sunder(g, c);
+    flame(g, 32, 44, 0.6, "#ff7a2a", "#ffe08a");
+  },
+  magma: (g, c) => {
+    GLYPH.fissure(g, c);
+    embers(g);
+  },
+  cataclysm: (g, c) => {
+    GLYPH.titan(g, c);
+    embers(g);
+  },
+  emberdance: (g, c) => {
+    GLYPH.dance(g, c);
+    flame(g, 32, 34, 0.5, "#ff7a2a", "#ffe08a");
+  },
+  wyvern: (g, c) => GLYPH.assassin(g, c),
+  dragoon: (g, c) => {
+    GLYPH.skyfall(g, c);
+  },
+  wyrmfang: (g, c) => {
+    GLYPH.skewer(g, c);
+    embers(g);
+  },
+  breath: (g) => {
+    g.beginPath();
+    g.moveTo(24, 30);
+    g.lineTo(58, 12);
+    g.lineTo(58, 50);
+    g.closePath();
+    const gr = g.createLinearGradient(24, 0, 58, 0);
+    gr.addColorStop(0, "#fff0b0");
+    gr.addColorStop(0.5, "#ff9a3a");
+    gr.addColorStop(1, "rgba(200,60,30,0.6)");
+    g.fillStyle = gr;
+    g.fill();
+    dragonHead(g, 8, 32, 0.62, "#6b3a2a");
+  },
+  meteors: (g) => {
+    for (const [x, y, r] of [[20, 22, 7], [44, 18, 6], [34, 42, 11]] as const) {
+      g.beginPath();
+      g.moveTo(x + r * 1.6, y - r * 1.6);
+      g.lineTo(x, y);
+      ink(g, "#ffb347", 2.5);
+      ball(g, x, y, r, "#fff6d8", "#ff9a3a", "#b8342c");
+    }
+  },
+  kick: (g, c) => {
+    g.beginPath();
+    g.moveTo(16, 14);
+    g.lineTo(26, 14);
+    g.lineTo(28, 36);
+    g.lineTo(48, 38);
+    g.quadraticCurveTo(54, 40, 52, 48);
+    g.lineTo(20, 48);
+    g.closePath();
+    fillInk(g, "#7a5433");
+    g.beginPath();
+    g.moveTo(20, 48);
+    g.lineTo(52, 48);
+    ink(g, "#3a2a1a", 4);
+    for (const [x0, y0] of [[56, 22], [58, 32], [56, 42]]) {
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x0 - 4, y0);
+      ink(g, c, 3);
+    }
+  },
+  knife: (g, c) => {
+    blade(g, 12, 50, 48, 14, 6, "#eef3f6");
+    for (const d of [0, 7]) {
+      g.beginPath();
+      g.moveTo(8 + d, 38 + d);
+      g.lineTo(2 + d, 44 + d);
+      ink(g, c, 2);
+    }
+  },
+  fireball: (g) => {
+    for (const d of [0, 7, 14]) {
+      g.beginPath();
+      g.moveTo(12 + d * 0.3, 50 - d);
+      g.lineTo(28, 36);
+      ink(g, "#ff9a3a", 3);
+    }
+    ball(g, 38, 26, 15, "#fff6d8", "#ffb347", "#d8402c");
+  },
+  storm: (g) => {
+    g.beginPath();
+    g.ellipse(32, 18, 22, 10, 0, 0, Math.PI * 2);
+    fillInk(g, "#5a6478");
+    bolt(g, [[22, 24], [16, 38], [24, 38], [18, 54]], "#eaf6ff", 4);
+    bolt(g, [[42, 24], [36, 38], [44, 38], [38, 54]], "#9fd3ff", 4);
+  },
+  sunburst: (g) => {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo(32 + Math.cos(a) * 14, 32 + Math.sin(a) * 14);
+      g.lineTo(32 + Math.cos(a) * (i % 2 ? 22 : 27), 32 + Math.sin(a) * (i % 2 ? 22 : 27));
+      ink(g, "#ffe08a", 3);
+    }
+    ball(g, 32, 32, 12, "#ffffff", "#fff0b0", "#e8b840");
+  },
+  wyrmwrath: (g) => {
+    flame(g, 36, 34, 1.15, "#ff5a1a", "#ffd07a");
+    dragonHead(g, 10, 36, 0.7, "#3a1e14");
+  },
+  phoenix: (g) => {
+    flame(g, 32, 40, 0.7, "#ff7a2a", "#ffe08a");
+    for (const sgn of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(32, 30);
+      g.quadraticCurveTo(32 + 16 * sgn, 8, 32 + 28 * sgn, 14);
+      g.quadraticCurveTo(32 + 18 * sgn, 20, 32 + 22 * sgn, 28);
+      g.quadraticCurveTo(32 + 12 * sgn, 26, 32, 34);
+      g.closePath();
+      const gr = g.createLinearGradient(32, 30, 32 + 28 * sgn, 10);
+      gr.addColorStop(0, "#ffe08a");
+      gr.addColorStop(1, "#ff5a2a");
+      fillInk(g, gr, 3);
+    }
+    g.beginPath();
+    g.arc(32, 22, 5, 0, Math.PI * 2);
+    fillInk(g, "#ffd07a", 2.5);
+  },
+  hatchets: (g) => {
+    for (const [x, y, a] of [[18, 40, -0.6], [32, 30, -0.2], [46, 40, 0.3]] as const) {
+      g.save();
+      g.translate(x, y);
+      g.rotate(a);
+      g.beginPath();
+      g.moveTo(0, 12);
+      g.lineTo(0, -10);
+      ink(g, "#8a5a34", 3.5);
+      g.beginPath();
+      g.moveTo(-1, -12);
+      g.quadraticCurveTo(10, -14, 9, -4);
+      g.lineTo(-1, -5);
+      g.closePath();
+      fillInk(g, "#dfe5ea", 2.5);
+      g.restore();
+    }
+  },
+  snare: (g, c) => {
+    g.beginPath();
+    g.arc(32, 34, 20, 0, Math.PI * 2);
+    ink(g, c, 3);
+    for (let i = -2; i <= 2; i++) {
+      g.beginPath();
+      g.moveTo(32 + i * 8, 15);
+      g.lineTo(32 + i * 8, 53);
+      g.moveTo(13, 34 + i * 8);
+      g.lineTo(51, 34 + i * 8);
+      ink(g, "#a88a5a", 2);
+    }
+    for (const [x, y] of [[14, 22], [50, 22], [14, 46], [50, 46]] as const) {
+      g.beginPath();
+      g.arc(x, y, 3.5, 0, Math.PI * 2);
+      fillInk(g, "#6f6a60", 2);
+    }
+  },
+  howl: (g, c) => {
+    // A wolf's head raised to the moon.
+    g.beginPath();
+    g.arc(46, 16, 8, 0, Math.PI * 2);
+    fillInk(g, "#fff6d8", 2.5);
+    g.beginPath();
+    g.moveTo(14, 54);
+    g.lineTo(18, 34);
+    g.lineTo(28, 18);
+    g.lineTo(34, 26);
+    g.lineTo(38, 20);
+    g.lineTo(36, 34);
+    g.lineTo(30, 42);
+    g.lineTo(34, 54);
+    g.closePath();
+    fillInk(g, c);
+    for (const r of [8, 13]) {
+      g.beginPath();
+      g.arc(30, 20, r, -2.2, -1.2);
+      ink(g, "#ffe08a", 2);
+    }
+  },
+  gale: (g, c) => {
+    for (const [y, l] of [[22, 34], [32, 44], [42, 30]] as const) {
+      g.beginPath();
+      g.moveTo(10, y);
+      g.quadraticCurveTo(10 + l * 0.6, y - 8, 10 + l, y);
+      g.quadraticCurveTo(10 + l + 6, y + 6, 10 + l - 4, y + 7);
+      ink(g, c, 3.5);
+    }
+    arrowHead(g, 56, 32, 0, 8, "#ffffff");
+  },
+  windwall: (g, c) => {
+    for (const r of [10, 17, 24]) {
+      g.beginPath();
+      g.arc(32, 32, r, -0.9, 0.9);
+      ink(g, c, 3);
+      g.beginPath();
+      g.arc(32, 32, r, Math.PI - 0.9, Math.PI + 0.9);
+      ink(g, c, 3);
+    }
+    g.beginPath();
+    g.arc(32, 32, 5, 0, Math.PI * 2);
+    fillInk(g, "#ffffff", 2.5);
+  },
+  drakeblood: (g) => {
+    g.beginPath();
+    g.moveTo(24, 14);
+    g.lineTo(40, 14);
+    g.lineTo(40, 22);
+    g.quadraticCurveTo(52, 30, 48, 44);
+    g.quadraticCurveTo(44, 56, 32, 56);
+    g.quadraticCurveTo(20, 56, 16, 44);
+    g.quadraticCurveTo(12, 30, 24, 22);
+    g.closePath();
+    const gr = g.createLinearGradient(0, 22, 0, 56);
+    gr.addColorStop(0, "#ffb347");
+    gr.addColorStop(1, "#8a1a14");
+    fillInk(g, gr);
+    flame(g, 32, 40, 0.45, "#ffe08a", "#ffffff");
+    g.beginPath();
+    g.roundRect(22, 8, 20, 7, 2);
+    fillInk(g, "#8a5a34", 2.5);
+  },
+  eruption: (g) => {
+    g.beginPath();
+    g.moveTo(6, 54);
+    g.lineTo(24, 30);
+    g.lineTo(40, 30);
+    g.lineTo(58, 54);
+    g.closePath();
+    fillInk(g, "#4a3a32");
+    flame(g, 32, 24, 0.8, "#ff5a1a", "#ffe08a");
+    for (const [x, y] of [[16, 14], [48, 12], [22, 6]] as const) {
+      g.beginPath();
+      g.arc(x, y, 3.5, 0, Math.PI * 2);
+      fillInk(g, "#ffb347", 2);
+    }
+  },
+  passive: (g, c) => {
+    g.beginPath();
+    g.moveTo(32, 8);
+    g.lineTo(52, 16);
+    g.quadraticCurveTo(52, 44, 32, 56);
+    g.quadraticCurveTo(12, 44, 12, 16);
+    g.closePath();
+    const gr = g.createLinearGradient(0, 8, 0, 56);
+    gr.addColorStop(0, "#ffffff");
+    gr.addColorStop(1, c);
+    fillInk(g, gr);
+    star(g, 32, 30, 11, 5, 0.45);
+    fillInk(g, "#fff3d0", 2.5);
+  },
+  // --- Deeper skills (levels 10 and 12) -------------------------------------------------
+  pierce: (g, c) => {
+    blade(g, 10, 50, 50, 14, 5);
+    for (const [x, y] of [[38, 26], [26, 38]]) {
+      g.beginPath();
+      g.arc(x, y, 6, 0, Math.PI * 2);
+      ink(g, c, 2.5);
+    }
+  },
+  sunder: (g, c) => {
+    g.beginPath();
+    g.arc(32, 44, 26, Math.PI * 1.05, Math.PI * 1.95);
+    ink(g, c, 7);
+    g.beginPath();
+    g.arc(32, 44, 26, Math.PI * 1.15, Math.PI * 1.85);
+    ink(g, "#ffffff", 2.5);
+    bolt(g, [[20, 50], [26, 44], [30, 50], [36, 42], [42, 50]], "#b08050", 3);
+  },
+  aegis: (g, c) => {
+    g.beginPath();
+    g.moveTo(32, 9);
+    g.lineTo(50, 16);
+    g.lineTo(48, 36);
+    g.lineTo(32, 55);
+    g.lineTo(16, 36);
+    g.lineTo(14, 16);
+    g.closePath();
+    const gr = g.createLinearGradient(0, 9, 0, 55);
+    gr.addColorStop(0, "#ffffff");
+    gr.addColorStop(1, c);
+    fillInk(g, gr);
+    star(g, 32, 30, 9, 4, 0.35);
+    fillInk(g, "#ffffff", 2.5);
+  },
+  skyfall: (g, c) => {
+    for (const x of [22, 42]) {
+      g.beginPath();
+      g.moveTo(x, 8);
+      g.lineTo(x, 26);
+      ink(g, "#fff6d8", 2.5);
+    }
+    blade(g, 32, 8, 32, 46, 6);
+    g.beginPath();
+    g.ellipse(32, 50, 18, 5, 0, 0, Math.PI * 2);
+    ink(g, c, 3);
+  },
+  rush: (g, c) => {
+    for (const [x, w] of [[14, 4], [24, 5], [36, 6]]) {
+      g.beginPath();
+      g.moveTo(x, 18);
+      g.lineTo(x + 10, 32);
+      g.lineTo(x, 46);
+      ink(g, c, w);
+    }
+    for (const y of [22, 32, 42]) {
+      g.beginPath();
+      g.moveTo(6, y);
+      g.lineTo(12, y);
+      ink(g, "#ffffff", 2);
+    }
+  },
+  guillotine: (g, c) => {
+    g.beginPath();
+    g.moveTo(18, 8);
+    g.lineTo(18, 54);
+    g.moveTo(46, 8);
+    g.lineTo(46, 54);
+    g.moveTo(14, 10);
+    g.lineTo(50, 10);
+    ink(g, "#8a5a34", 4);
+    g.beginPath();
+    g.moveTo(21, 20);
+    g.lineTo(43, 26);
+    g.lineTo(43, 34);
+    g.lineTo(21, 34);
+    g.closePath();
+    const gr = g.createLinearGradient(0, 20, 0, 34);
+    gr.addColorStop(0, "#ffffff");
+    gr.addColorStop(1, c);
+    fillInk(g, gr, 3);
+  },
+  bloodlust: (g, c) => {
+    g.beginPath();
+    g.moveTo(32, 10);
+    g.bezierCurveTo(46, 28, 48, 36, 44, 44);
+    g.arc(32, 42, 12.6, 0.15, Math.PI - 0.15);
+    g.bezierCurveTo(16, 36, 18, 28, 32, 10);
+    g.closePath();
+    const gr = g.createLinearGradient(0, 10, 0, 56);
+    gr.addColorStop(0, "#ff9a8a");
+    gr.addColorStop(1, c);
+    fillInk(g, gr);
+    g.beginPath();
+    g.ellipse(27, 38, 3, 5, -0.4, 0, Math.PI * 2);
+    g.fillStyle = "rgba(255,255,255,0.7)";
+    g.fill();
+  },
+  quake: (g, c) => {
+    for (const r of [10, 18, 26]) {
+      g.beginPath();
+      g.ellipse(32, 42, r, r * 0.35, 0, 0, Math.PI * 2);
+      ink(g, c, 3);
+    }
+    bolt(g, [[32, 42], [26, 30], [34, 24], [28, 12]], "#3a2c1c", 3.5);
+  },
+  smoke: (g, c) => {
+    for (const [x, y, r] of [[22, 38, 11], [40, 38, 12], [31, 26, 13], [32, 44, 10]] as const) {
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      fillInk(g, shade(c, -20), 3);
+    }
+    g.beginPath();
+    g.arc(31, 26, 7, 0, Math.PI * 2);
+    g.fillStyle = "rgba(255,255,255,0.35)";
+    g.fill();
+  },
+  cuts: (g, c) => {
+    for (const [x0, y0, x1, y1] of [[12, 16, 34, 46], [22, 12, 46, 40], [30, 14, 52, 42], [14, 30, 30, 52]]) {
+      g.beginPath();
+      g.moveTo(x0, y0);
+      g.lineTo(x1, y1);
+      ink(g, x0 === 22 ? "#ffffff" : c, 3);
+    }
+  },
+  mark: (g, c) => {
+    g.beginPath();
+    g.arc(32, 32, 16, 0, Math.PI * 2);
+    ink(g, c, 4);
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2 + Math.PI / 4;
+      g.beginPath();
+      g.moveTo(32 + Math.cos(a) * 10, 32 + Math.sin(a) * 10);
+      g.lineTo(32 + Math.cos(a) * 24, 32 + Math.sin(a) * 24);
+      ink(g, c, 3);
+    }
+    g.beginPath();
+    g.arc(32, 32, 4, 0, Math.PI * 2);
+    fillInk(g, "#ffffff", 2.5);
+  },
+  phantom: (g, c) => {
+    for (const [x, al] of [[14, 0.35], [24, 0.6], [34, 1]] as const) {
+      g.globalAlpha = al;
+      g.beginPath();
+      g.arc(x + 6, 24, 7, 0, Math.PI * 2);
+      g.moveTo(x, 32);
+      g.lineTo(x + 12, 32);
+      g.lineTo(x + 14, 50);
+      g.lineTo(x - 2, 50);
+      g.closePath();
+      fillInk(g, shade(c, -30), 3);
+    }
+    g.globalAlpha = 1;
+    blade(g, 42, 44, 56, 18, 4);
+  },
+  phalanx: (g, c) => {
+    g.beginPath();
+    g.roundRect(14, 14, 26, 36, 6);
+    const gr = g.createLinearGradient(0, 14, 0, 50);
+    gr.addColorStop(0, "#f2f6f9");
+    gr.addColorStop(1, c);
+    fillInk(g, gr);
+    g.beginPath();
+    g.moveTo(46, 56);
+    g.lineTo(46, 12);
+    ink(g, "#8a5a34", 4);
+    arrowHead(g, 46, 8, -Math.PI / 2, 8, "#eef3f6");
+  },
+  pin: (g, c) => {
+    g.beginPath();
+    g.moveTo(10, 16);
+    g.lineTo(40, 44);
+    ink(g, "#8a5a34", 4);
+    arrowHead(g, 44, 48, Math.PI / 4, 9, "#eef3f6");
+    flake(g, 48, 18, 9, c);
+  },
+  whirlspear: (g, c) => {
+    g.beginPath();
+    g.arc(32, 32, 22, 0.3, Math.PI * 1.7);
+    ink(g, c, 4);
+    g.beginPath();
+    g.moveTo(14, 46);
+    g.lineTo(46, 18);
+    ink(g, "#8a5a34", 4);
+    arrowHead(g, 49, 15, -Math.PI / 4, 8, "#eef3f6");
+  },
+  heaven: (g, c) => {
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI / 2 + (i - 2.5) * 0.35;
+      g.beginPath();
+      g.moveTo(50 + Math.cos(a) * 6, 16 + Math.sin(a) * 6);
+      g.lineTo(50 + Math.cos(a) * 12, 16 + Math.sin(a) * 12);
+      ink(g, "#fff6d8", 2);
+    }
+    g.beginPath();
+    g.moveTo(8, 56);
+    g.lineTo(44, 20);
+    ink(g, c, 5);
+    arrowHead(g, 48, 16, -Math.PI / 4, 10, "#ffffff");
+  },
+  drain: (g, c) => {
+    bolt(g, [[8, 20], [20, 28], [28, 22], [40, 32]], c, 4);
+    g.beginPath();
+    g.moveTo(44, 26);
+    g.bezierCurveTo(54, 38, 54, 44, 50, 48);
+    g.arc(44, 46, 7, 0.2, Math.PI - 0.2);
+    g.bezierCurveTo(34, 44, 36, 38, 44, 26);
+    g.closePath();
+    fillInk(g, "#d84a4a", 3);
+  },
+  ward: (g, c) => {
+    g.beginPath();
+    g.arc(32, 32, 20, 0, Math.PI * 2);
+    ink(g, c, 4);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      g.beginPath();
+      g.arc(32 + Math.cos(a) * 20, 32 + Math.sin(a) * 20, 3, 0, Math.PI * 2);
+      fillInk(g, "#ffffff", 2);
+    }
+    star(g, 32, 32, 10, 6, 0.45);
+    fillInk(g, "#ffffff", 2.5);
+  },
+  pulse: (g, c) => {
+    for (const r of [8, 16, 24]) {
+      g.beginPath();
+      g.arc(32, 32, r, 0, Math.PI * 2);
+      ink(g, r === 16 ? "#ffffff" : c, 3);
+    }
+    for (let i = 0; i < 4; i++) arrowHead(g, 32 + Math.cos((i * Math.PI) / 2) * 27, 32 + Math.sin((i * Math.PI) / 2) * 27, (i * Math.PI) / 2, 5, c);
+  },
+  comet: (g, c) => {
+    for (const [w, col] of [[12, c], [6, "#fff1d8"]] as const) {
+      g.beginPath();
+      g.moveTo(10, 12);
+      g.lineTo(36, 38);
+      ink(g, col, w);
+    }
+    g.beginPath();
+    g.arc(40, 42, 11, 0, Math.PI * 2);
+    const gr = g.createRadialGradient(37, 39, 2, 40, 42, 11);
+    gr.addColorStop(0, "#ffffff");
+    gr.addColorStop(1, c);
+    fillInk(g, gr);
+  },
   whirl: (g, c) => {
     g.beginPath();
     g.arc(32, 32, 17, -0.6, Math.PI * 1.35);
@@ -463,6 +1006,36 @@ export function drawSkillIcon(g: G, vfx: string, color: number) {
   g.fillStyle = glow;
   g.fillRect(4, 4, 56, 56);
   (GLYPH[vfx] ?? GLYPH.whirl)(g, c);
+}
+
+/** Colours for passive skills, so each reads differently at a glance. */
+const PASSIVE_COLOR: Record<string, number> = {
+  fleetfoot: 0x8fe0c0, deepLungs: 0x9fd3ff, secondWind: 0x9fe08a, ironSkin: 0xc9d3dd, wardensGrace: 0xffe08a, riposteMaster: 0xffc27a, keenEye: 0xdfe8ff,
+  executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b,
+};
+
+/** A passive skill's icon (shield and star in its colour). */
+export function passiveIcon(id: string, px = 48): string {
+  const key = `passive:${id}:${px}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const c = document.createElement("canvas");
+  const scale = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
+  c.width = c.height = Math.round(px * scale);
+  const g = c.getContext("2d")!;
+  g.scale(c.width / 64, c.height / 64);
+  drawSkillIcon(g, "passive", PASSIVE_COLOR[id] ?? 0xe8c55a);
+  const url = c.toDataURL();
+  cache.set(key, url);
+  return url;
+}
+
+/** Draw any skill book entry's icon into a 64×64 design space (for scrolls). */
+export function drawEntryIcon(g: G, id: string) {
+  const e = skillEntry(id);
+  if (!e) return;
+  if (e.kind === "passive") drawSkillIcon(g, "passive", PASSIVE_COLOR[id] ?? 0xe8c55a);
+  else drawSkillIcon(g, e.move?.vfx ?? "whirl", e.move?.color ?? 0xdfe8ff);
 }
 
 /** A skill's icon as a data URL (by skill id). */

@@ -31,6 +31,7 @@ import {
   type EnemyDef,
   type MoveDef,
   type PlayerCommand,
+  REST_REGEN,
   type PlayerSim,
   type Shape,
   type WorldMap,
@@ -70,6 +71,11 @@ export interface PlayerData {
   regen: number;
   /** Iron Skin: damage taken is halved until this time. */
   guardUntil: number;
+  /** Bloodlust: hits heal until this time. */
+  lifestealUntil: number;
+  /** Empower (Wolf's Howl, Drakeblood): extra damage until this time. */
+  empowerUntil: number;
+  empower: number;
   invulnUntil: number;
   deadAt: number;
   atkMul: number;
@@ -127,6 +133,17 @@ export interface EnemyData {
   poisonNext?: number;
   poisonDmg?: number;
   poisonBy?: string;
+  /** Death Mark: takes extra damage from everyone until this time. */
+  markUntil?: number;
+  /** Burning: fire ticking until this time. */
+  burnUntil?: number;
+  burnNext?: number;
+  burnDmg?: number;
+  burnBy?: string;
+  /** The level it spawned at; engaging a stronger player can raise it (see levelToTarget). */
+  baseLevel: number;
+  hpScale?: number;
+  raised?: boolean;
 }
 
 interface ProjData {
@@ -141,6 +158,8 @@ interface ProjData {
   weapon?: number;
   pierce: boolean;
   hits: Set<string>;
+  /** Sets what it hits burning (Fireball). */
+  burn?: boolean;
 }
 
 interface HazardData {
@@ -154,6 +173,8 @@ interface HazardData {
   enemyId?: string;
   resolved: Set<string>;
   frost?: boolean;
+  /** Sets what it hits burning (Meteor Storm). */
+  burn?: boolean;
   /** Glyphs are safe spots, not damage. */
   safe?: boolean;
   lifeUntil: number;
@@ -163,6 +184,14 @@ export type Emit = (type: string, data: Record<string, unknown>, x: number, y: n
 
 const SAFE_RESPAWN_MS = 2500;
 export const RESPAWN_DELAY_MS = 9000;
+
+/**
+ * Level gaps, as in most MMOs: from three levels up your blows start to glance (12% less per
+ * level beyond two, never below half), and enemies above you hit harder (6% per level, up to
+ * 50%). Enemies below you hit a little softer (3% per level, down to 80%).
+ */
+export const levelGapDealt = (gap: number) => (gap >= 3 ? Math.max(0.5, 1 - 0.12 * (gap - 2)) : 1);
+export const levelGapTaken = (gap: number) => (gap > 0 ? Math.min(1.5, 1 + 0.06 * gap) : Math.max(0.8, 1 + 0.03 * gap));
 
 export class Sim {
   readonly players = new Map<string, PlayerData>();
@@ -225,6 +254,9 @@ export class Sim {
       combatUntil: 0,
       regen: 0,
       guardUntil: 0,
+      lifestealUntil: 0,
+      empowerUntil: 0,
+      empower: 0,
       invulnUntil: this.now + SAFE_RESPAWN_MS,
       deadAt: 0,
       atkMul: 1,
@@ -312,7 +344,7 @@ export class Sim {
       pd.hitSeq = p.actSeq;
       pd.hitSet.clear();
     }
-    if (m.special === "meteor") return; // detonates as a hazard
+    if (m.special === "meteor" || m.special === "meteors") return; // detonates as hazards
     const shape = m.shape!;
     const rad = aimToRad(p.actAim);
     const reach = shapeReach(shape) + 40;
@@ -339,7 +371,7 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
         pierce: pj.look === "wave",
         team: 0,
         owner: pd.sid,
@@ -354,6 +386,7 @@ export class Sim {
         knockback: m.knockback,
         sid: pd.sid,
         weapon: p.weapon,
+        burn: m.special === "burn",
       });
     }
   }
@@ -371,6 +404,22 @@ export class Sim {
           ty = p.y + Math.sin(rad) * off * 0.4;
         }
         this.spawnHazard({ kind: HazardKind.Meteor, team: 0, x: tx, y: ty, radius: 60, delay: 700, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: true, sid: pd.sid });
+        break;
+      }
+      case "meteors": {
+        // Meteor Storm: six burning meteors scattered around the aim point, one after another.
+        const shape = m.shape as Extract<Shape, { kind: "circle" }>;
+        let cx = p.x + Math.cos(rad) * shape.offset;
+        let cy = p.y + Math.sin(rad) * shape.offset;
+        if (!this.wallClear(p.x, p.y, cx, cy)) {
+          cx = p.x + Math.cos(rad) * shape.offset * 0.4;
+          cy = p.y + Math.sin(rad) * shape.offset * 0.4;
+        }
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + Math.random() * 0.8;
+          const d = i === 0 ? 0 : shape.radius * (0.35 + Math.random() * 0.5);
+          this.spawnHazard({ kind: HazardKind.Meteor, team: 0, x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d * 0.8, radius: 46, delay: 600 + i * 170, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: true, sid: pd.sid, burn: true });
+        }
         break;
       }
       case "frost":
@@ -409,9 +458,49 @@ export class Sim {
         this.emit("fx", { k: m.vfx ?? "rally", x: p.x, y: p.y, r, p: pd.sid }, p.x, p.y);
         break;
       }
+      case "storm": {
+        // Storm Call: lightning falls on up to five enemies around you, one after another.
+        const near = [...this.enemies.values()]
+          .filter((ed) => ed.e.act !== EAct.Dead && ed.e.act !== EAct.Spawn && ed.def.behavior !== "dummy" && Math.hypot(ed.e.x - p.x, ed.e.y - p.y) < 240)
+          .sort((a, b) => Math.hypot(a.e.x - p.x, a.e.y - p.y) - Math.hypot(b.e.x - p.x, b.e.y - p.y))
+          .slice(0, 5);
+        near.forEach((ed, i) => {
+          this.spawnHazard({ kind: HazardKind.Lightning, team: 0, x: ed.e.x, y: ed.e.y, radius: 30, delay: 350 + i * 130, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, life: 300 });
+        });
+        this.emit("fx", { k: "storm", x: p.x, y: p.y, r: 240 }, p.x, p.y);
+        break;
+      }
+      case "phoenix": {
+        // Phoenix Rite: rise in fire — heal yourself half, allies a quarter, and harden.
+        for (const other of this.players.values()) {
+          const q = other.p;
+          if (q.act === Act.Dead || q.hp <= 0) continue;
+          const self = other === pd;
+          if (!self && Math.hypot(q.x - p.x, q.y - p.y) > 130) continue;
+          const heal = Math.max(0, Math.min(q.hpMax - q.hp, Math.round(q.hpMax * (self ? 0.5 : 0.25))));
+          if (heal) {
+            q.hp += heal;
+            this.emit("heal", { p: other.sid, d: heal, x: q.x, y: q.y }, q.x, q.y);
+          }
+        }
+        pd.guardUntil = this.now + 4000;
+        this.emit("fx", { k: "phoenix", x: p.x, y: p.y, p: pd.sid, ms: 4000 }, p.x, p.y);
+        break;
+      }
       case "ironskin": {
         pd.guardUntil = this.now + 5000;
         this.emit("fx", { k: "ironskin", x: p.x, y: p.y, p: pd.sid, ms: 5000 }, p.x, p.y);
+        break;
+      }
+      case "empower": {
+        pd.empowerUntil = this.now + 6000;
+        pd.empower = m.power ?? 0.15;
+        this.emit("fx", { k: "empower", x: p.x, y: p.y, p: pd.sid, ms: 6000, r: Math.round(pd.empower * 100) }, p.x, p.y);
+        break;
+      }
+      case "bloodlust": {
+        pd.lifestealUntil = this.now + 6000;
+        this.emit("fx", { k: "bloodlust", x: p.x, y: p.y, p: pd.sid, ms: 6000 }, p.x, p.y);
         break;
       }
     }
@@ -473,11 +562,30 @@ export class Sim {
       e.flags |= EFlag.Poisoned;
     }
     if (attacker && attacker.act === Act.Light && pd?.ch?.hasPerk("momentum")) dmg *= 1 + Math.min(0.25, attacker.combo * 0.05);
+    if (ed.markUntil && this.now < ed.markUntil) dmg *= 1.3;
+    if (pd && this.now < pd.empowerUntil) dmg *= 1 + pd.empower;
+    if (pd?.ch) {
+      if (def.boss && pd.ch.hasPerk("wyrmsbane")) dmg *= 1.15;
+      if (pd.p.hp < pd.p.hpMax * 0.35 && pd.ch.hasPerk("lastStand")) dmg *= 1.2;
+    }
+    if (pd && (m?.special === "burn" || (pd.ch?.hasPerk("emberblood") && Math.random() < 0.15))) this.ignite(ed, pd, base);
+    if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
+    if (m?.special === "mark" && pd) {
+      ed.markUntil = this.now + 6000;
+      e.flags |= EFlag.Marked;
+    }
     dmg *= 1 - def.armor;
     const amount = Math.max(1, Math.round(dmg));
     // Credit (kill share, weapon mastery) counts only health actually removed, never overkill.
     const dealt = Math.min(amount, e.hp);
     e.hp = Math.max(0, e.hp - amount);
+    // Life Drain heals 40% of what it deals; Bloodlust makes every hit heal 20%.
+    const steal = pd ? (m?.special === "drain" ? 0.4 : 0) + (this.now < pd.lifestealUntil ? 0.2 : 0) : 0;
+    if (pd && steal && pd.p.act !== Act.Dead && pd.p.hp < pd.p.hpMax) {
+      const heal = Math.min(pd.p.hpMax - pd.p.hp, Math.max(1, Math.round(dealt * steal)));
+      pd.p.hp += heal;
+      this.emit("heal", { p: pd.sid, d: heal, x: pd.p.x, y: pd.p.y }, pd.p.x, pd.p.y);
+    }
     if (pd) {
       ed.contrib.set(pd.sid, (ed.contrib.get(pd.sid) ?? 0) + dealt);
       pd.combatUntil = this.now + 6000;
@@ -700,6 +808,8 @@ export class Sim {
     const mistimed = pd.timeline.length > 0 && pd.timeline[pd.timeline.length - 1].act === Act.Parry && p.act === Act.Parry;
     let amount = Math.max(1, Math.round((dmg * 100) / (100 + pd.defense)));
     if (this.now < pd.guardUntil) amount = Math.max(1, Math.round(amount * 0.5));
+    const src = source.ed ?? (source.proj?.enemyId ? this.enemies.get(source.proj.enemyId) : undefined);
+    if (src && pd.ch) amount = Math.max(1, Math.round(amount * levelGapTaken(src.e.level - pd.ch.data.level)));
     if (result === HitResult.Armor) amount = Math.round(amount * 0.75);
     p.hp = Math.max(0, p.hp - amount);
     if (p.hp <= 0 && pd.ch?.hasPerk("unbroken") && this.now >= pd.ch.unbrokenReadyAt) {
@@ -858,7 +968,7 @@ export class Sim {
 
   spawnProjectile(o: {
     kind: number; team: number; owner: string; x: number; y: number; angle: number; speed: number; range: number; radius: number;
-    damage: number; poise: number; knockback: number; sid?: string; enemyId?: string; atk?: EnemyAttack; weapon?: number; pierce?: boolean;
+    damage: number; poise: number; knockback: number; sid?: string; enemyId?: string; atk?: EnemyAttack; weapon?: number; pierce?: boolean; burn?: boolean;
   }) {
     const id = this.id("j");
     const pr = new Projectile();
@@ -874,7 +984,7 @@ export class Sim {
     pr.born = this.now;
     this.state.projectiles.set(id, pr);
     this.onSpawn?.(pr, o.x, o.y);
-    this.projectiles.set(id, { id, pr, damage: o.damage, poise: o.poise, knockback: o.knockback, atk: o.atk, enemyId: o.enemyId, sid: o.sid, weapon: o.weapon, pierce: !!o.pierce, hits: new Set() });
+    this.projectiles.set(id, { id, pr, damage: o.damage, poise: o.poise, knockback: o.knockback, atk: o.atk, enemyId: o.enemyId, sid: o.sid, weapon: o.weapon, pierce: !!o.pierce, hits: new Set(), burn: o.burn });
   }
 
   projPos(pr: Projectile, t: number): { x: number; y: number } | undefined {
@@ -890,7 +1000,7 @@ export class Sim {
     this.state.projectiles.delete(id);
   }
 
-  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number }) {
+  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean }) {
     const id = this.id("h");
     const hz = new Hazard();
     hz.kind = o.kind;
@@ -902,7 +1012,7 @@ export class Sim {
     hz.delay = o.delay;
     this.state.hazards.set(id, hz);
     this.onSpawn?.(hz, o.x, o.y);
-    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, lifeUntil: this.now + o.delay + (o.life ?? 600) });
+    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
   }
 
@@ -918,8 +1028,34 @@ export class Sim {
     if (e.hp <= 0) this.killEnemy(ed, pd);
   }
 
+  /** Set an enemy burning: an eighth of the blow again, every half second for four seconds. */
+  ignite(ed: EnemyData, pd: PlayerData, base: number) {
+    const burning = ed.burnUntil !== undefined && this.now < ed.burnUntil;
+    ed.burnUntil = this.now + 4000;
+    ed.burnNext = Math.min(ed.burnNext ?? Infinity, this.now + 500);
+    ed.burnDmg = Math.max(burning ? ed.burnDmg ?? 0 : 0, base * 0.125);
+    ed.burnBy = pd.sid;
+    ed.e.flags |= EFlag.Burning;
+  }
+
   private updatePoison() {
     for (const ed of this.enemies.values()) {
+      if (ed.markUntil && (this.now > ed.markUntil || ed.e.act === EAct.Dead)) {
+        ed.markUntil = undefined;
+        ed.e.flags &= ~EFlag.Marked;
+      }
+      if (ed.burnUntil) {
+        if (this.now > ed.burnUntil || ed.e.act === EAct.Dead) {
+          ed.burnUntil = undefined;
+          ed.burnNext = undefined;
+          ed.burnDmg = undefined;
+          ed.e.flags &= ~EFlag.Burning;
+        } else if (this.now >= (ed.burnNext ?? 0)) {
+          ed.burnNext = this.now + 500;
+          this.damageEnemy(ed, ed.burnBy ? this.players.get(ed.burnBy) : undefined, ed.burnDmg ?? 1, 0, 0, 0, undefined, true);
+          if (ed.e.act === EAct.Dead) continue;
+        }
+      }
       if (!ed.poisonUntil) continue;
       if (this.now > ed.poisonUntil || ed.e.act === EAct.Dead) {
         ed.poisonUntil = undefined;
@@ -957,6 +1093,10 @@ export class Sim {
         if (Math.hypot(e.x - pos.x, e.y - 10 - pos.y) > ed.def.radius + pj.pr.radius) continue;
         pj.hits.add(ed.id);
         this.damageEnemy(ed, pd, pj.damage / (pd?.atkMul ?? 1), pj.poise, pj.knockback, pj.pr.angle);
+        if (pj.burn && pd && ed.e.act !== EAct.Dead) {
+          this.ignite(ed, pd, pj.damage / (pd.atkMul || 1));
+          this.emit("fx", { k: "fireburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
+        }
         if (!pj.pierce) {
           this.removeProjectile(pj.id);
           break;
@@ -975,6 +1115,7 @@ export class Sim {
           const e = ed.e;
           if (e.act === EAct.Dead || Math.hypot(e.x - hz.hz.x, e.y - hz.hz.y) > hz.hz.radius + ed.def.radius) continue;
           this.damageEnemy(ed, pd, hz.damage / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
+          if (hz.burn && pd && ed.e.act !== EAct.Dead) this.ignite(ed, pd, hz.damage / (pd.atkMul || 1));
         }
       }
       if (this.now > hz.lifeUntil) {
@@ -1015,7 +1156,7 @@ export class Sim {
       id, e, def, spawner: opts.spawner, homeX: x, homeY: y, cooldowns: def.attacks.map(() => 0), attackSeq: 0, attacks: [],
       poiseDmg: 0, poiseAt: 0, flinches: 0, flinchAt: 0, hyperUntil: 0, stateUntil: this.now + 500, kbx: 0, kby: 0, pathAt: 0,
       orbit: Math.random() * Math.PI * 2, thinkAt: 0, contrib: new Map(), phase: 0, enrageUntil: 0, slowUntil: 0, minions: new Set(),
-      master: opts.master, removeAt: 0, specialFired: 0,
+      master: opts.master, removeAt: 0, specialFired: 0, baseLevel: e.level, hpScale: opts.hpScale,
     };
     this.enemies.set(id, ed);
     this.state.enemies.set(id, e);
@@ -1037,7 +1178,10 @@ export class Sim {
 
   tick(dt: number, now: number) {
     this.now = now;
-    for (const ed of [...this.enemies.values()]) this.ai.update(ed, dt);
+    for (const ed of [...this.enemies.values()]) {
+      this.levelToTarget(ed);
+      this.ai.update(ed, dt);
+    }
     this.updateProjectiles();
     this.updatePoison();
     this.updateHazards();
@@ -1046,8 +1190,10 @@ export class Sim {
       const p = pd.p as unknown as PlayerSim;
       if (p.act === Act.Dead && this.now - pd.deadAt > RESPAWN_DELAY_MS) this.respawn(pd);
       // Out of combat, wounds close slowly (2% of max health a second, a few seconds after the last blow).
+      if (pd.p.sit && (p.act !== Act.None || p.gait !== 0)) pd.p.sit = 0;
       if (p.act !== Act.Dead && pd.p.hp > 0 && pd.p.hp < pd.p.hpMax && this.now > pd.combatUntil) {
-        pd.regen += pd.p.hpMax * 0.02 * dt;
+        // Sitting down to rest closes them faster.
+        pd.regen += pd.p.hpMax * 0.02 * (pd.p.sit ? REST_REGEN : 1) * dt;
         if (pd.regen >= 1) {
           const add = Math.floor(pd.regen);
           pd.regen -= add;
@@ -1056,6 +1202,34 @@ export class Sim {
       } else pd.regen = 0;
       // Keep the server's view of hurt/knockdown timers moving even if the client stalls.
       if ((p.act === Act.Hurt || p.act === Act.Knockdown) && p.actTick > actionLength(p) + 30) p.act = Act.None;
+    }
+  }
+
+  /**
+   * Out-levelled monsters never become trivial: when a normal enemy engages a player, it
+   * rises to that player's level less one, up to this floor's cap (0 = never, e.g. dungeons).
+   * When it loses interest it settles back to its own level.
+   */
+  levelCap = 0;
+
+  private levelToTarget(ed: EnemyData) {
+    const e = ed.e;
+    if (!this.levelCap || ed.def.boss || ed.def.behavior === "dummy" || ed.def.behavior === "sparring" || e.act === EAct.Dead) return;
+    const setLevel = (level: number) => {
+      if (level === e.level) return;
+      const frac = e.hp / Math.max(1, e.hpMax);
+      e.level = level;
+      e.hpMax = Math.min(65535, enemyMaxHp(ed.def, level, (e.flags & EFlag.Elite) !== 0, ed.hpScale));
+      e.hp = Math.max(1, Math.round(e.hpMax * frac));
+    };
+    if (ed.target && !ed.raised) {
+      ed.raised = true;
+      const pl = this.players.get(ed.target)?.ch?.data.level ?? 0;
+      const want = Math.min(this.levelCap, Math.max(ed.baseLevel, pl - 1));
+      setLevel(want);
+    } else if (!ed.target && ed.raised) {
+      ed.raised = false;
+      setLevel(ed.baseLevel);
     }
   }
 

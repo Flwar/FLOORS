@@ -4,7 +4,7 @@ import type { ArmorStyle, WeaponArtKey } from "@floors/shared";
 /** Textures are painted at RES× their world size and displayed at 1/RES scale. */
 export const RES = 2;
 
-export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown";
+export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet";
 
 export interface CharLook {
   key: string;
@@ -112,6 +112,8 @@ export const ARMOR_BULK: Record<ArmorStyle, number> = {
   clothes: 1, padded: 1.03, leather: 1.03, ranger: 1.03, chain: 1.06, robes: 1.04, plate: 1.12, warden: 1.16, dawn: 1.14,
   scale: 1.08, brigandine: 1.1, shadow: 1.02, arcanist: 1.04,
   gilded: 1.14, skyguard: 1.08, stormweave: 1.04,
+  hide: 1.04, ringmail: 1.06, templar: 1.12, windrunner: 1.03, sunforged: 1.16, mystic: 1.04,
+  dragonscale: 1.15, drakehide: 1.05, emberweave: 1.04,
 };
 
 function outfit(look: CharLook): Outfit {
@@ -148,6 +150,26 @@ function outfit(look: CharLook): Outfit {
       return { finish: "brigandine", base: "#3f6a9a", trim: "#e8c867", belt: "#2a3a52", sleeve: "#aab4be", hand: "#7d8792", leg: "#4a5a6e", boot: "#2e3a4a", pauldron: "#c9d3dd", cape: "#2f5580", capeTrim: "#e8c867" };
     case "stormweave":
       return { finish: "robe", base: "#34466e", trim: "#bfe6ff", belt: "#bfe6ff", sleeve: "#34466e", hand: look.skin, leg: "#2a385a", boot: "#1a2238", rune: "#bfe6ff" };
+    // The third wave.
+    case "hide":
+      return { finish: "leather", base: "#7a6a52", trim: "#b8a07a", belt: "#4a3a2a", sleeve: "#6a5a44", hand: "#5a4a36", leg: "#4d4234", boot: "#3a2e22", straps: true };
+    case "ringmail":
+      return { finish: "mail", base: "#8a7458", trim: "#c9a24a", belt: "#3e2a1a", sleeve: "#7d858e", hand: "#6b5430", leg: "#6e5a44", boot: "#3a2e25", tabard: acc };
+    case "templar":
+      return { finish: "plate", base: "#e6e8ea", trim: "#d8b35a", belt: "#6b1e1a", sleeve: "#c9ced4", hand: "#aab2ba", leg: "#d0d4d8", boot: "#6f7984", tabard: "#b0302a", pauldron: "#f2f4f6" };
+    case "windrunner":
+      return { finish: "leather", base: "#4f6a3a", trim: "#e8c867", belt: "#3a2a1a", sleeve: "#435a33", hand: "#5a3b24", leg: "#3d3a2c", boot: "#2e2618", cape: "#3a6a3a", capeTrim: "#e8c867", straps: true };
+    case "sunforged":
+      return { finish: "plate", base: "#f2ead2", trim: "#e8b840", belt: "#d9a93a", sleeve: "#e6dcc0", hand: "#d8c89a", leg: "#ece2c6", boot: "#b8964a", pauldron: "#f6d67a", cape: "#fff6de", capeTrim: "#e8b840", rune: "#ffe9a8" };
+    case "mystic":
+      return { finish: "robe", base: "#1f5a5a", trim: "#e8c867", belt: "#e8c867", sleeve: "#1f5a5a", hand: look.skin, leg: "#184848", boot: "#0f2e2e", rune: "#9ff0e0" };
+    // Floor 3: the Dragonscale set — dragon-red scale, drake leather and ember-thread robes.
+    case "dragonscale":
+      return { finish: "scale", base: "#9a2e22", trim: "#e8b840", belt: "#3a140e", sleeve: "#7a221a", hand: "#4a1a14", leg: "#6a1e18", boot: "#2a1410", pauldron: "#b8402c", cape: "#4a120e", capeTrim: "#e8b840", rune: "#ff8a3a" };
+    case "drakehide":
+      return { finish: "leather", base: "#5e3a2a", trim: "#ff9a4a", belt: "#2e1a12", sleeve: "#4e2e20", hand: "#3a2218", leg: "#3e2a20", boot: "#22140e", cape: "#6b2a1a", capeTrim: "#ff9a4a", straps: true, rune: "#ffb060" };
+    case "emberweave":
+      return { finish: "robe", base: "#3a1612", trim: "#ff8a3a", belt: "#ffb060", sleeve: "#3a1612", hand: look.skin, leg: "#2a0f0c", boot: "#160806", rune: "#ffb060" };
     default:
       return { finish: "cloth", base: look.cloth, trim: look.trim, belt: look.trim, sleeve: look.cloth, hand: look.skin, leg: shade(look.cloth, -55), boot: "#4a3526" };
   }
@@ -585,7 +607,7 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
   blob(g, cx, cy, 11, 11);
   g.fill();
 
-  const closed = h === "helm" || h === "crown" || h === "iron" || h === "horned" || h === "greathelm";
+  const closed = h === "helm" || h === "crown" || h === "iron" || h === "horned" || h === "greathelm" || h === "templar" || h === "coif";
   if (!closed && h !== "hood" && !look.faceless) drawHair(g, look.hair, view, cx, cy);
 
   switch (h) {
@@ -908,6 +930,95 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
       }
       break;
     }
+    case "dragonhelm": {
+      // A dragon-red helm with swept-back horns of bone, a crest of spines, and eyes that smoulder.
+      const horn = (side: number) => {
+        g.beginPath();
+        g.moveTo(cx + side * 9, cy - 5);
+        g.quadraticCurveTo(cx + side * 16, cy - 8, cx + side * 15, cy - 17);
+        g.quadraticCurveTo(cx + side * 11, cy - 11, cx + side * 5, cy - 9);
+        g.closePath();
+        g.fillStyle = "#e8dcc0";
+        g.fill();
+        g.strokeStyle = OUTLINE;
+        g.lineWidth = 1.4;
+        g.stroke();
+      };
+      if (view === "side") horn(-1);
+      else {
+        horn(-1);
+        horn(1);
+      }
+      drawDome(g, cx, cy, "#e0664a", "#4a140e");
+      // Crest of spines along the crown.
+      g.fillStyle = OUTLINE;
+      for (const dx of view === "side" ? [-6, -2, 2] : [0]) {
+        g.beginPath();
+        g.moveTo(cx + dx - 2.6, cy - 10);
+        g.lineTo(cx + dx, cy - 16);
+        g.lineTo(cx + dx + 2.6, cy - 10);
+        g.fill();
+      }
+      g.fillStyle = "#e8b840";
+      g.fillRect(cx - 12, cy - 2.4, 24, 2.4);
+      if (view !== "back") {
+        const ex = view === "side" ? [cx + 7] : [cx - 4, cx + 4];
+        g.fillStyle = OUTLINE;
+        g.fillRect(view === "side" ? cx + 2 : cx - 9, cy - 1, view === "side" ? 10 : 18, 3.4);
+        glow(g, "#ff6a1a", 6);
+        g.fillStyle = "#ffb060";
+        for (const x of ex) g.fillRect(x - 1.5, cy - 0.2, 3, 1.8);
+        noGlow(g);
+      }
+      break;
+    }
+    case "embercirclet": {
+      // A band of dark gold with tongues of flame rising from it, and an ember at the brow.
+      g.beginPath();
+      if (view === "front") {
+        g.moveTo(cx - 11.5, cy - 5);
+        g.quadraticCurveTo(cx, cy - 2, cx + 11.5, cy - 5);
+      } else if (view === "side") {
+        g.moveTo(cx - 10, cy - 7);
+        g.lineTo(cx + 11, cy - 4);
+      } else {
+        g.moveTo(cx - 11.5, cy - 4);
+        g.quadraticCurveTo(cx, cy - 7, cx + 11.5, cy - 4);
+      }
+      inked(g, "#c98a2a", 2);
+      if (view !== "back") {
+        const flames: [number, number, number][] = view === "front" ? [[cx - 7, cy - 4.6, 6], [cx, cy - 3.6, 9], [cx + 7, cy - 4.6, 6]] : [[cx + 3, cy - 5.6, 7], [cx + 8, cy - 4.8, 5]];
+        glow(g, "#ff7a2a", 7);
+        for (const [fx, fy, len] of flames) {
+          g.fillStyle = OUTLINE;
+          g.beginPath();
+          g.moveTo(fx - 3, fy + 1);
+          g.quadraticCurveTo(fx - 2, fy - len * 0.6, fx, fy - len - 1.5);
+          g.quadraticCurveTo(fx + 2, fy - len * 0.6, fx + 3, fy + 1);
+          g.fill();
+        }
+        noGlow(g);
+        for (const [fx, fy, len] of flames) {
+          const fg = g.createLinearGradient(0, fy, 0, fy - len);
+          fg.addColorStop(0, "#ff7a2a");
+          fg.addColorStop(1, "#ffe08a");
+          g.fillStyle = fg;
+          g.beginPath();
+          g.moveTo(fx - 1.8, fy);
+          g.quadraticCurveTo(fx - 1, fy - len * 0.6, fx, fy - len);
+          g.quadraticCurveTo(fx + 1, fy - len * 0.6, fx + 1.8, fy);
+          g.fill();
+        }
+        if (view === "front") {
+          glow(g, "#ff6a1a", 5);
+          g.fillStyle = "#ff4a1a";
+          blob(g, cx, cy - 3.2, 1.8, 1.8);
+          g.fill();
+          noGlow(g);
+        }
+      }
+      break;
+    }
     case "stormcrown": {
       // A thin gold band holding three splinters of stormglass above the brow.
       g.beginPath();
@@ -946,6 +1057,114 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
           g.fill();
         }
       }
+      break;
+    }
+    case "coif": {
+      // A hood of mail rings.
+      g.fillStyle = OUTLINE;
+      blob(g, cx, cy - 1, 14.5, 14);
+      g.fill();
+      const cg = g.createRadialGradient(cx - 4, cy - 6, 2, cx, cy, 14);
+      cg.addColorStop(0, "#d6dde4");
+      cg.addColorStop(1, "#7d858e");
+      g.fillStyle = cg;
+      blob(g, cx, cy - 1, 12.6, 12.2);
+      g.fill();
+      g.strokeStyle = "rgba(40,44,50,0.45)";
+      g.lineWidth = 0.9;
+      for (let yy = cy - 11; yy < cy + 10; yy += 3) {
+        g.beginPath();
+        for (let xx = cx - 12; xx < cx + 12; xx += 3) g.arc(xx + ((yy / 3) % 2 ? 1.5 : 0), yy, 1.2, 0, Math.PI);
+        g.stroke();
+      }
+      if (view !== "back") {
+        // The face opening.
+        const fx = view === "side" ? cx + 5 : cx;
+        g.fillStyle = OUTLINE;
+        blob(g, fx, cy + 2, view === "side" ? 5.5 : 8.5, 8);
+        g.fill();
+        g.fillStyle = look.skin;
+        blob(g, fx, cy + 2.5, view === "side" ? 4.2 : 7, 6.8);
+        g.fill();
+        g.fillStyle = OUTLINE;
+        for (const ex of view === "side" ? [fx + 2] : [fx - 3, fx + 3]) {
+          blob(g, ex, cy + 1.5, 1.1, 1.3);
+          g.fill();
+        }
+      }
+      break;
+    }
+    case "templar": {
+      // The great helm, with a gilded cross over the eye slit.
+      const pail = (inset: number) => {
+        g.beginPath();
+        g.moveTo(cx - 12 + inset, cy - 11 + inset);
+        g.lineTo(cx + 12 - inset, cy - 11 + inset);
+        g.lineTo(cx + 12.5 - inset, cy + 11 - inset);
+        g.quadraticCurveTo(cx, cy + 14 - inset, cx - 12.5 + inset, cy + 11 - inset);
+        g.closePath();
+      };
+      g.fillStyle = OUTLINE;
+      pail(-1.5);
+      g.fill();
+      const hg = g.createLinearGradient(cx - 12, 0, cx + 12, 0);
+      hg.addColorStop(0, "#9aa3ad");
+      hg.addColorStop(0.35, "#f4f6f8");
+      hg.addColorStop(1, "#8b96a1");
+      g.fillStyle = hg;
+      pail(0.5);
+      g.fill();
+      g.fillStyle = OUTLINE;
+      if (view === "front") {
+        g.fillRect(cx - 9, cy - 2, 18, 2.6);
+        g.fillStyle = "#e8c867";
+        g.fillRect(cx - 1.4, cy - 9, 2.8, 18);
+        g.fillRect(cx - 7, cy + 3, 14, 2.4);
+      } else if (view === "side") {
+        g.fillRect(cx + 2, cy - 2, 10, 2.6);
+        g.fillStyle = "#e8c867";
+        g.fillRect(cx + 8, cy - 9, 2.4, 16);
+      } else {
+        g.fillStyle = "#e8c867";
+        g.fillRect(cx - 1.2, cy - 10, 2.4, 20);
+      }
+      break;
+    }
+    case "suncrown": {
+      // A circlet of gilded rays.
+      glow(g, "#ffe9a8", 6);
+      for (let i = -3; i <= 3; i++) {
+        if (view === "back" && Math.abs(i) < 2) continue;
+        const a = -Math.PI / 2 + i * 0.32;
+        const bx = cx + Math.cos(a) * 11;
+        const by = cy - 3 + Math.sin(a) * 7;
+        const len = i === 0 ? 9 : 6;
+        g.fillStyle = OUTLINE;
+        g.beginPath();
+        g.moveTo(bx - 2.4, by + 1);
+        g.lineTo(bx + Math.cos(a) * (len + 1.5), by + Math.sin(a) * (len + 1.5));
+        g.lineTo(bx + 2.4, by + 1);
+        g.fill();
+        g.fillStyle = "#f6d67a";
+        g.beginPath();
+        g.moveTo(bx - 1.4, by + 0.5);
+        g.lineTo(bx + Math.cos(a) * len, by + Math.sin(a) * len);
+        g.lineTo(bx + 1.4, by + 0.5);
+        g.fill();
+      }
+      noGlow(g);
+      g.beginPath();
+      if (view === "front") {
+        g.moveTo(cx - 11.5, cy - 5);
+        g.quadraticCurveTo(cx, cy - 2, cx + 11.5, cy - 5);
+      } else if (view === "side") {
+        g.moveTo(cx - 10, cy - 7);
+        g.lineTo(cx + 11, cy - 4);
+      } else {
+        g.moveTo(cx - 11.5, cy - 4);
+        g.quadraticCurveTo(cx, cy - 7, cx + 11.5, cy - 4);
+      }
+      inked(g, "#f0c860", 2.2);
       break;
     }
     case "circlet": {
@@ -1361,6 +1580,27 @@ export function weaponTrail(kind: WeaponArt): number {
     case "sp_storm":
     case "st_storm":
       return 0xcfeaff;
+    case "sword_royal":
+      return 0xb8d4ff;
+    case "sword_dragon":
+    case "gs_dragon":
+    case "dg_dragon":
+    case "sp_dragon":
+    case "st_dragon":
+      return 0xff9a4a;
+    case "gs_moon":
+      return 0xd8d0ff;
+    case "gs_gilded":
+    case "dg_gilded":
+    case "sp_sun":
+    case "st_sun":
+      return 0xffe39a;
+    case "st_crystal":
+      return 0xe0b8ff;
+    case "st_bone":
+    case "gs_bone":
+    case "dg_bone":
+      return 0xf2ead8;
     case "staff":
     case "st_oak":
       return 0x7fc8ff;
@@ -1410,6 +1650,26 @@ const WEAPON_SIZE: Record<WeaponArt, [number, number, number]> = {
   dg_storm: [36, 16, 7],
   sp_storm: [110, 26, 22],
   st_storm: [80, 32, 10],
+  sword_bronze: [48, 18, 8],
+  sword_falchion: [56, 22, 8],
+  sword_royal: [62, 24, 9],
+  gs_bone: [80, 28, 12],
+  gs_moon: [88, 30, 14],
+  gs_gilded: [96, 34, 14],
+  dg_bone: [32, 14, 7],
+  dg_duel: [40, 14, 7],
+  dg_gilded: [38, 18, 7],
+  sp_partisan: [100, 26, 20],
+  sp_halberd: [108, 32, 22],
+  sp_sun: [110, 30, 22],
+  st_bone: [74, 30, 10],
+  st_crystal: [78, 30, 10],
+  st_sun: [82, 34, 10],
+  sword_dragon: [66, 24, 9],
+  gs_dragon: [96, 34, 14],
+  dg_dragon: [38, 16, 7],
+  sp_dragon: [112, 28, 22],
+  st_dragon: [84, 36, 10],
 };
 
 export function weaponSize(kind: WeaponArt) {
@@ -1978,6 +2238,334 @@ export function drawWeapon(g: CanvasRenderingContext2D, kind: WeaponArt, rarity 
       g.fillRect(0, cy - 2.8, x0 - 2, 5.6);
       g.fillStyle = night ? "#15121c" : "#5a3b24";
       g.fillRect(1, cy - 1.8, x0 - 4, 3.6);
+      break;
+    }
+    // --- The third wave ---------------------------------------------------------------
+    case "sword_bronze":
+      straightBlade(g, w, h, grip, { width: 7, hi: "#ffe6b0", mid: "#d8a45a", lo: "#8a5a2a", guard: "#b07a3a", guardW: 12, grip: "#5a3b24", fuller: rarity >= 2 ? accent : "#e8c080", pommel: "#b07a3a" });
+      break;
+    case "sword_falchion": {
+      straightBlade(g, w, h, grip, { width: 7.5, hi: "#ffffff", mid: "#d6dde4", lo: "#6f7984", guard: "#6b5a4a", guardW: 14, grip: "#4a3121", fuller: rarity >= 2 ? accent : undefined });
+      // The hooked back of the blade.
+      g.fillStyle = OUTLINE;
+      g.beginPath();
+      g.moveTo(w - 16, cy - 4.8);
+      g.lineTo(w - 10, cy - 8);
+      g.lineTo(w - 8, cy - 4);
+      g.fill();
+      g.fillStyle = "#d6dde4";
+      g.beginPath();
+      g.moveTo(w - 15, cy - 4);
+      g.lineTo(w - 10.5, cy - 6.6);
+      g.lineTo(w - 9, cy - 4);
+      g.fill();
+      break;
+    }
+    case "sword_royal": {
+      straightBlade(g, w, h, grip, { width: 6.5, hi: "#e8f0ff", mid: "#8fa8d8", lo: "#3c4e7a", guard: "#e8c867", guardW: 18, grip: "#1e2a4a", edge: "#f4f8ff", fuller: rarity >= 2 ? accent : "#d8e4ff", pommel: "#e8c867" });
+      // A gilded basket over the grip.
+      g.beginPath();
+      g.moveTo(grip + 5, cy - 8);
+      g.quadraticCurveTo(grip - 4, cy - 9, 3, cy - 2);
+      inked(g, "#e8c867", 1.6);
+      break;
+    }
+    case "gs_bone":
+    case "gs_moon":
+    case "gs_gilded": {
+      const pal = kind === "gs_bone"
+        ? { hi: "#fffaf0", mid: "#e6dcc4", lo: "#a8987a", guard: "#6b5a4a", grip: "#4a3121" }
+        : kind === "gs_moon"
+          ? { hi: "#9aa0b8", mid: "#4a4e66", lo: "#1e2030", guard: "#c4b4ff", grip: "#1d1a26" }
+          : { hi: "#fff8e0", mid: "#f0cf6e", lo: "#a8802a", guard: "#fff0b8", grip: "#6b1e1a" };
+      straightBlade(g, w, h, grip + 2, { width: kind === "gs_gilded" ? 11 : 9.5, ...pal, guardW: kind === "gs_gilded" ? 28 : 22, fuller: rarity >= 2 ? accent : undefined, pommel: pal.guard, edge: kind === "gs_bone" ? undefined : "#ffffff", edgeGlow: kind === "gs_moon" ? "#c4b4ff" : undefined });
+      if (kind === "gs_bone") {
+        // Lashings and notches.
+        g.strokeStyle = "#8a5a34";
+        g.lineWidth = 1.2;
+        for (const x of [grip + 14, grip + 17]) line(g, x, cy - 5, x + 1, cy + 5);
+        g.globalCompositeOperation = "destination-out";
+        for (const x of [w * 0.55, w * 0.7]) {
+          g.beginPath();
+          g.moveTo(x, cy + 5.5); g.lineTo(x + 2.5, cy + 3); g.lineTo(x + 5, cy + 5.5);
+          g.fill();
+        }
+        g.globalCompositeOperation = "source-over";
+      } else if (kind === "gs_moon") {
+        glow(g, "#c4b4ff", 5);
+        g.beginPath();
+        g.arc(w * 0.62, cy, 3.4, 0.6, Math.PI * 2 - 0.6);
+        inked(g, "#e4dcff", 1.2);
+        noGlow(g);
+      } else {
+        glow(g, "#ffe9a8", 6);
+        g.fillStyle = "#fff6de";
+        for (const x of [w * 0.45, w * 0.6, w * 0.75]) {
+          blob(g, x, cy, 1.6, 1.6);
+          g.fill();
+        }
+        noGlow(g);
+      }
+      break;
+    }
+    case "dg_bone":
+      straightBlade(g, w, h, grip, { width: 4.2, hi: "#fffaf0", mid: "#e6dcc4", lo: "#a8987a", guard: "#8a5a34", guardW: 7, grip: "#6b4a2b" });
+      break;
+    case "dg_duel":
+      straightBlade(g, w, h, grip, { width: 3, hi: "#ffffff", mid: "#e2e8ec", lo: "#7d8792", guard: "#c9a24a", guardW: 12, grip: "#5a1e2a", fuller: rarity >= 2 ? accent : undefined, pommel: "#c9a24a" });
+      break;
+    case "dg_gilded":
+      straightBlade(g, w, h, grip, { width: 5, hi: "#fff8e0", mid: "#f0cf6e", lo: "#a8802a", guard: "#bfe6ff", guardW: 11, grip: "#2c3a58", edge: "#ffffff", edgeGlow: "#ffe9a8", pommel: "#bfe6ff" });
+      break;
+    case "sp_partisan":
+    case "sp_halberd":
+    case "sp_sun": {
+      const gold = kind === "sp_sun";
+      shaft(g, 0, w - 20, cy, kind === "sp_partisan" ? "#6b4a2b" : gold ? "#d9b85a" : "#5a5f66", 3.4);
+      const metal = kind === "sp_partisan" ? ["#ffe6b0", "#b07a3a"] : gold ? ["#fff6de", "#d9a93a"] : ["#ffffff", "#7d8792"];
+      const head = (inset: number) => {
+        g.beginPath();
+        if (kind === "sp_sun") {
+          // A flame-shaped blade.
+          g.moveTo(w - 24 + inset, cy);
+          g.quadraticCurveTo(w - 18, cy - 9 + inset, w - 12, cy - 3);
+          g.quadraticCurveTo(w - 8, cy - 7 + inset, w - 1 - inset, cy);
+          g.quadraticCurveTo(w - 8, cy + 7 - inset, w - 12, cy + 3);
+          g.quadraticCurveTo(w - 18, cy + 9 - inset, w - 24 + inset, cy);
+        } else {
+          g.moveTo(w - 22 + inset, cy - 2);
+          g.lineTo(w - 1 - inset, cy);
+          g.lineTo(w - 22 + inset, cy + 2);
+        }
+        g.closePath();
+      };
+      if (gold) glow(g, "#ffe9a8", 6);
+      g.fillStyle = OUTLINE;
+      head(-1.5);
+      g.fill();
+      noGlow(g);
+      const hg = g.createLinearGradient(0, cy - 6, 0, cy + 6);
+      hg.addColorStop(0, metal[0]);
+      hg.addColorStop(1, metal[1]);
+      g.fillStyle = hg;
+      head(0.4);
+      g.fill();
+      if (kind === "sp_partisan") {
+        // Two swept wings at the base of the head.
+        for (const d of [-1, 1]) {
+          g.fillStyle = OUTLINE;
+          g.beginPath();
+          g.moveTo(w - 24, cy + d * 1.5); g.lineTo(w - 18, cy + d * 11); g.lineTo(w - 16, cy + d * 2);
+          g.fill();
+          g.fillStyle = metal[1];
+          g.beginPath();
+          g.moveTo(w - 23, cy + d * 1.8); g.lineTo(w - 18.5, cy + d * 9); g.lineTo(w - 17, cy + d * 2.2);
+          g.fill();
+        }
+      } else if (kind === "sp_halberd") {
+        // An axe blade on one side, a hook on the other.
+        g.fillStyle = OUTLINE;
+        g.beginPath();
+        g.moveTo(w - 30, cy - 2); g.quadraticCurveTo(w - 30, cy - 15, w - 20, cy - 15); g.lineTo(w - 20, cy - 2);
+        g.fill();
+        const ag = g.createLinearGradient(0, cy - 14, 0, cy);
+        ag.addColorStop(0, "#ffffff");
+        ag.addColorStop(1, "#8b96a1");
+        g.fillStyle = ag;
+        g.beginPath();
+        g.moveTo(w - 28.5, cy - 2.5); g.quadraticCurveTo(w - 28.5, cy - 13.5, w - 21.5, cy - 13.5); g.lineTo(w - 21.5, cy - 2.5);
+        g.fill();
+        g.beginPath();
+        g.moveTo(w - 25, cy + 2);
+        g.quadraticCurveTo(w - 22, cy + 9, w - 17, cy + 8);
+        inked(g, "#b9c2cb", 1.8);
+        if (rarity >= 2) {
+          g.fillStyle = accent;
+          g.fillRect(w - 34, cy - 2.2, 3, 4.4);
+        }
+      }
+      break;
+    }
+    case "st_bone": {
+      shaft(g, 0, w - 16, cy, "#6b4a2b", 3.6);
+      g.strokeStyle = "#e6dcc4";
+      g.lineWidth = 1;
+      for (let x = w - 30; x < w - 18; x += 2.5) line(g, x, cy - 2.4, x + 1, cy + 2.4);
+      // A small skull, eyes glowing.
+      const sx = w - 10;
+      g.fillStyle = OUTLINE;
+      blob(g, sx, cy, 9.5, 8.5);
+      g.fill();
+      g.fillStyle = "#f2ead8";
+      blob(g, sx, cy, 8, 7);
+      g.fill();
+      g.fillRect(sx + 2, cy - 4, 5, 8);
+      glow(g, rarity >= 2 ? accent : "#9fe06a", 6);
+      g.fillStyle = rarity >= 2 ? accent : "#9fe06a";
+      for (const dy of [-2.5, 2.5]) {
+        blob(g, sx + 1, cy + dy, 1.8, 1.6);
+        g.fill();
+      }
+      noGlow(g);
+      break;
+    }
+    case "st_crystal": {
+      shaft(g, 0, w - 18, cy, "#c9d3dd", 3.2);
+      g.fillStyle = "#8a6ae0";
+      for (const x of [grip, w - 30]) g.fillRect(x, cy - 2.6, 2.4, 5.2);
+      glow(g, "#e0b8ff", 9);
+      const shards: [number, number, number][] = [[0, 14, 4], [-0.7, 9, 3], [0.7, 9, 3]];
+      for (const [a, len, wd] of shards) {
+        const bx = w - 16;
+        const tx = bx + Math.cos(a) * len;
+        const ty = cy + Math.sin(a) * len;
+        const nx = -Math.sin(a) * wd;
+        const ny = Math.cos(a) * wd;
+        g.fillStyle = OUTLINE;
+        g.beginPath();
+        g.moveTo(bx + nx * 1.4, cy + ny * 1.4);
+        g.lineTo(tx + Math.cos(a) * 1.5, ty + Math.sin(a) * 1.5);
+        g.lineTo(bx - nx * 1.4, cy - ny * 1.4);
+        g.fill();
+        const sg = g.createLinearGradient(bx, cy, tx, ty);
+        sg.addColorStop(0, "#6a3aa8");
+        sg.addColorStop(1, "#f4e0ff");
+        g.fillStyle = sg;
+        g.beginPath();
+        g.moveTo(bx + nx, cy + ny);
+        g.lineTo(tx, ty);
+        g.lineTo(bx - nx, cy - ny);
+        g.fill();
+      }
+      noGlow(g);
+      break;
+    }
+    case "st_sun": {
+      shaft(g, 0, w - 20, cy, "#d9b85a", 3.6);
+      g.fillStyle = "#6b1e1a";
+      for (const x of [6, grip + 12]) g.fillRect(x, cy - 3, 2.6, 6);
+      const ox = w - 13;
+      glow(g, "#ffe9a8", 12);
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(ox + Math.cos(a) * 8, cy + Math.sin(a) * 8);
+        g.lineTo(ox + Math.cos(a) * 13, cy + Math.sin(a) * 13);
+        inked(g, "#f6d67a", 1.6);
+      }
+      g.fillStyle = OUTLINE;
+      blob(g, ox, cy, 8.4, 8.4);
+      g.fill();
+      noGlow(g);
+      const sg = g.createRadialGradient(ox - 2, cy - 2, 1, ox, cy, 7.4);
+      sg.addColorStop(0, "#ffffff");
+      sg.addColorStop(0.5, "#ffe08a");
+      sg.addColorStop(1, "#e8a030");
+      g.fillStyle = sg;
+      blob(g, ox, cy, 7, 7);
+      g.fill();
+      break;
+    }
+    // --- Floor 3: the Dragonscale set ----------------------------------------------
+    case "sword_dragon":
+    case "gs_dragon":
+    case "dg_dragon": {
+      const big = kind === "gs_dragon";
+      const small = kind === "dg_dragon";
+      straightBlade(g, w, h, grip, {
+        width: big ? 12 : small ? 4.6 : 7.6, hi: "#f08a5a", mid: "#9a2e22", lo: "#3a100c", guard: "#e8b840", guardW: big ? 30 : small ? 12 : 20,
+        grip: "#3a1a10", edge: "#ffc070", edgeGlow: "#ff6a1a", pommel: "#ff8a3a",
+      });
+      // Fire runs in cracks down the blade's heart.
+      const x0 = grip + 10;
+      const x1 = w - (big ? 14 : 10);
+      glow(g, "#ff6a1a", 6);
+      g.strokeStyle = rarity >= 3 ? accent : "#ffb060";
+      g.lineWidth = big ? 1.8 : 1.2;
+      g.beginPath();
+      g.moveTo(x0, cy);
+      const step = (x1 - x0) / 6;
+      for (let i = 1; i <= 6; i++) g.lineTo(x0 + step * i, cy + (i % 2 ? -1 : 1) * (big ? 2.6 : small ? 0.8 : 1.6) * (i < 6 ? 1 : 0));
+      g.stroke();
+      noGlow(g);
+      // Dragon-wing quillons.
+      if (!small) {
+        for (const sgn of [-1, 1]) {
+          g.beginPath();
+          g.moveTo(grip + 5, cy + sgn * 4);
+          g.quadraticCurveTo(grip + 2, cy + sgn * (big ? 16 : 11), grip + 10, cy + sgn * (big ? 16 : 11));
+          g.quadraticCurveTo(grip + 7, cy + sgn * 8, grip + 9, cy + sgn * 4);
+          g.closePath();
+          g.fillStyle = "#e8b840";
+          g.fill();
+          g.strokeStyle = OUTLINE;
+          g.lineWidth = 1.2;
+          g.stroke();
+        }
+      }
+      break;
+    }
+    case "sp_dragon": {
+      shaft(g, 0, w - 26, cy, "#3a1a10", 3.6);
+      g.fillStyle = "#e8b840";
+      for (const x of [grip, grip + 30, w - 32]) g.fillRect(x, cy - 3, 2.6, 6);
+      // A dragon's fang for a head, glowing along its cutting edge.
+      const head = (inset: number) => {
+        g.beginPath();
+        g.moveTo(w - 30 + inset, cy - 6 + inset);
+        g.quadraticCurveTo(w - 10, cy - 7 + inset, w - 1 - inset, cy + 1);
+        g.quadraticCurveTo(w - 14, cy + 6 - inset, w - 30 + inset, cy + 6 - inset);
+        g.closePath();
+      };
+      glow(g, "#ff6a1a", 8);
+      g.fillStyle = OUTLINE;
+      head(-1.5);
+      g.fill();
+      noGlow(g);
+      const hg = g.createLinearGradient(0, cy - 7, 0, cy + 7);
+      hg.addColorStop(0, "#fff0d8");
+      hg.addColorStop(0.5, "#e8dcc0");
+      hg.addColorStop(1, "#a89878");
+      g.fillStyle = hg;
+      head(0.4);
+      g.fill();
+      g.strokeStyle = rarity >= 3 ? accent : "#ff9a4a";
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(w - 28, cy - 4.5);
+      g.quadraticCurveTo(w - 10, cy - 5.5, w - 3, cy + 0.5);
+      g.stroke();
+      g.fillStyle = OUTLINE;
+      g.fillRect(w - 34, cy - 6, 6, 12);
+      g.fillStyle = "#9a2e22";
+      g.fillRect(w - 33, cy - 5, 4, 10);
+      break;
+    }
+    case "st_dragon": {
+      shaft(g, 0, w - 20, cy, "#3a1a10", 3.8);
+      g.fillStyle = "#e8b840";
+      for (const x of [6, grip + 12, w - 34]) g.fillRect(x, cy - 3, 2.6, 6);
+      // Dragon claws of bone clutching a living ember.
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(w - 26, cy);
+        g.quadraticCurveTo(w - 20, cy + sgn * 15, w - 7, cy + sgn * 13);
+        g.lineTo(w - 10, cy + sgn * 9);
+        inked(g, "#e8dcc0", 2.2);
+      }
+      const ox = w - 13;
+      glow(g, "#ff6a1a", 13);
+      g.fillStyle = OUTLINE;
+      blob(g, ox, cy, 9.6, 9.6);
+      g.fill();
+      noGlow(g);
+      const og = g.createRadialGradient(ox - 3, cy - 3, 1, ox, cy, 8.6);
+      og.addColorStop(0, "#fff6d8");
+      og.addColorStop(0.45, "#ffb347");
+      og.addColorStop(1, "#b8342c");
+      g.fillStyle = og;
+      blob(g, ox, cy, 8.2, 8.2);
+      g.fill();
       break;
     }
     // --- Floor 2: the Stormglass set -----------------------------------------------

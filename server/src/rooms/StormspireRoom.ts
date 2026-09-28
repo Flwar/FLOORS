@@ -1,6 +1,8 @@
 import type { Client } from "colyseus";
 import { buildStormspire, HazardKind, SS_CONDUIT_BIT, SS_GATE, STORMSPIRE_ROOMS as R, TILE, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Character } from "../game/character.ts";
+import type { EnemyData } from "../game/sim.ts";
+import { openFloor } from "../game/floors.ts";
 import { InstanceRoom, inRect, type BossArena, type MinibossHall } from "./InstanceRoom.ts";
 
 const CONDUITS = ["West", "High", "East"];
@@ -53,6 +55,12 @@ export class StormspireRoom extends InstanceRoom {
     return { kind: HazardKind.Lightning, damage: 18, knockback: 90, radius: 16 };
   }
 
+  /** Vaelra is dead: Floor 3 opens for everyone. */
+  protected onCleared(boss: EnemyData) {
+    const by = this.climbers();
+    if (by.length) openFloor(3, by, boss.def.name);
+  }
+
   protected setupInstance() {
     this.setGates((1 << SS_GATE.gallerySouth) | (1 << SS_GATE.wardenSouth) | (1 << SS_GATE.bossSouth));
     this.state.stage = "The Lightning Bridge";
@@ -68,6 +76,7 @@ export class StormspireRoom extends InstanceRoom {
     const inside = this.living().filter((pd) => inRect(pd.p.x, pd.p.y, R.gallery));
     if (this.galleryState === "idle") {
       if (!inside.length) return;
+      this.gatherParty((x, y) => inRect(x, y, R.gallery), this.insideGate(SS_GATE.gallerySouth), "the Gallery");
       this.gate(SS_GATE.gallerySouth, false);
       this.state.stage = "The Gallery";
       this.emitAll("banner", { title: "The Gallery", sub: "The Skyguard were waiting" });
@@ -112,7 +121,8 @@ export class StormspireRoom extends InstanceRoom {
 
   protected useObject(client: Client, obj: WorldObject) {
     if (obj.kind === "gate" && obj.id === "ascent") {
-      client.send("lore", { name: obj.name, text: obj.text ?? "" });
+      if (this.cleared) client.send("travel", { room: "floor3" });
+      else client.send("lore", { name: obj.name, text: obj.text ?? "" });
       return;
     }
     if (obj.kind !== "lever") return;

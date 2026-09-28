@@ -41,7 +41,7 @@ export interface EnemyAttack {
 export type Behavior = "dummy" | "sparring" | "pack" | "melee" | "ranged" | "defender" | "brute" | "caster" | "assassin" | "boss";
 
 export interface EnemyLook {
-  rig: "humanoid" | "wolf" | "construct";
+  rig: "humanoid" | "wolf" | "construct" | "dragon";
   scale: number;
   skin: string;
   cloth: string;
@@ -409,33 +409,35 @@ export const ENEMIES: EnemyDef[] = [
  * meant to take a couple of full combos and to punish a player who trades hits.
  */
 export const ENEMY_TUNING = {
-  hp: 2.2,
-  dmg: 1.7,
-  hpPerLevel: 0.16,
-  dmgPerLevel: 0.09,
+  /** Normal enemies: ~6–12 s to kill for an on-level climber (npm run curve). */
+  hp: 3.3,
+  dmg: 1.85,
+  /** Per level: enough to keep pace with how players grow (level, gear tier, rarity, mastery). */
+  hpPerLevel: 0.2,
+  dmgPerLevel: 0.1,
   /** Bosses keep their tested health curve (their fights are built on phases and posture) but hit harder. */
   bossHp: 1,
   bossHpPerLevel: 0.12,
   bossDmg: 1.35,
   eliteHp: 2,
   eliteDmg: 1.35,
-  /** Longer fights are worth more. */
-  xp: 1.6,
+  /** Longer fights are worth more (but levels are hard-won: the story carries most of the way). */
+  xp: 1.3,
   /**
-   * Per-enemy corrections, from the time-to-kill / time-to-die table (tools/_curve.ts):
-   * a normal enemy should fall to roughly 7–14 light hits from an on-level character,
-   * and should take noticeably longer to kill you than you take to kill it.
+   * Per-enemy corrections, from the time-to-kill / time-to-die table (npm run curve):
+   * a normal enemy should fall in ~6–12 s to an on-level climber (heavies up to ~16 s),
+   * and should take several times longer to kill you than you take to kill it.
    */
   per: {
     goblin: { hp: 0.85 },
     cutpurse: { dmg: 0.85 },
     shieldbearer: { hp: 0.7 },
-    alpha: { hp: 0.65, dmg: 0.85 },
-    brute: { hp: 0.6, dmg: 0.9 },
+    alpha: { hp: 0.5, dmg: 0.85 },
+    brute: { hp: 0.42, dmg: 0.9 },
     // Floor 2
     skyguard: { hp: 0.85 },
     aegis: { hp: 0.62 },
-    sentinel: { hp: 0.55 },
+    sentinel: { hp: 0.42 },
   } as Record<string, { hp?: number; dmg?: number }>,
 };
 
@@ -483,6 +485,10 @@ export const EFlag = {
   Hidden: 32,
   /** Taking poison damage over time (Venom Edge). */
   Poisoned: 64,
+  /** Death Mark: takes 30% more damage from everyone. */
+  Marked: 128,
+  /** Burning (dragonfire skills, Emberblood). */
+  Burning: 256,
 } as const;
 
 /** Tick timeline of an enemy attack. */

@@ -1,11 +1,12 @@
 import * as Phaser from "phaser";
 import {
-  Act, aimToRad, attackTicks, EAct, EFlag, ENEMIES, getMove, TICK_MS, weaponArt, WEAPONS, windupTicks, type EnemyDef, type PlayerSim,
+  Act, aimToRad, attackTicks, EAct, EFlag, EMOTE_MS, EMOTES, ENEMIES, getMove, Sit, TICK_MS, weaponArt, WEAPONS, windupTicks, type Emote, type EnemyDef, type PlayerSim,
 } from "@floors/shared";
 import type { Enemy, Player } from "../../../server/src/state.ts";
 import { paintDummy, RES, shade, type CharLook, type WeaponArt } from "../art/characters.ts";
 import { personLook } from "../art/looks.ts";
 import { attackPose, blendPose, HumanoidRig, locomotionPose, restAngle, restPose, WolfRig, type Pose } from "./rig.ts";
+import { DragonRig } from "./dragon.ts";
 
 
 /** Knock-back on hit, purely visual: a damped spring that shoves the body away from the blow. */
@@ -64,6 +65,44 @@ export function enemyLook(def: EnemyDef): CharLook {
   };
 }
 
+/** Emote poses, `t` ms in. */
+function emotePose(e: Emote, t: number, face: number, out: Pose) {
+  Object.assign(out, restPose(face));
+  switch (e) {
+    case "wave":
+      out.offArm = -2.7 + Math.sin(t / 140) * 0.35;
+      out.bob = Math.sin(t / 300) * 0.4;
+      break;
+    case "cheer":
+      out.offArm = -2.9;
+      out.wAngle = -Math.PI / 2;
+      out.wReach = 12;
+      out.lift = -Math.abs(Math.sin(t / 190)) * 6;
+      break;
+    case "dance":
+      out.face = face + Math.floor(t / 360) * (Math.PI / 2);
+      out.tilt = Math.sin(t / 180) * 0.22;
+      out.step = t * 0.02;
+      out.stepAmp = 1;
+      out.bob = -Math.abs(Math.sin(t / 180)) * 2.2;
+      out.offArm = Math.sin(t / 180) * 1.2 - 1.2;
+      break;
+    case "bow": {
+      const k = t < 300 ? t / 300 : t > EMOTE_MS - 400 ? Math.max(0, (EMOTE_MS - t) / 400) : 1;
+      out.lean = 4 * k;
+      out.sy = 1 - 0.12 * k;
+      out.offArm = 0.5 * k;
+      break;
+    }
+    case "laugh":
+      out.bob = Math.sin(t / 60) * 1.1;
+      out.sy = 1 + Math.sin(t / 60) * 0.03;
+      out.tilt = Math.sin(t / 110) * 0.07;
+      out.offArm = -0.6;
+      break;
+  }
+}
+
 export class PlayerView {
   readonly rig: HumanoidRig;
   readonly label: Phaser.GameObjects.Text;
@@ -78,6 +117,9 @@ export class PlayerView {
   private target: Pose;
 
   lastTip?: { x: number; y: number; a: number };
+  private bubble?: { box: Phaser.GameObjects.Container; until: number };
+  private emoteName?: Emote;
+  private emoteUntil = 0;
   /** For remote players: local time an action was first seen, to derive animation time. */
   private seenSeq = -1;
   private seenAt = 0;
@@ -183,10 +225,25 @@ export class PlayerView {
         tgt.offArm = -2.6;
         tgt.bob = Math.sin(t / 90) * 0.6;
         break;
-      default:
-        key = `loco${s.gait}`;
-        this.stepPhase += dtMs;
-        locomotionPose(face, s.gait, this.stepPhase, tgt);
+      default: {
+        const still = s.gait === 0;
+        if (!still) this.emoteUntil = 0;
+        if (still && p.sit) {
+          key = "sit";
+          Object.assign(tgt, restPose(face));
+          tgt.sit = 1;
+          tgt.bob = Math.sin(now / 700) * 0.3;
+          tgt.wAngle = restAngle(face) + 0.35;
+          tgt.wReach = 7;
+        } else if (still && this.emoteName && now < this.emoteUntil) {
+          key = `emote-${this.emoteName}`;
+          emotePose(this.emoteName, now - (this.emoteUntil - EMOTE_MS), face, tgt);
+        } else {
+          key = `loco${s.gait}`;
+          this.stepPhase += dtMs;
+          locomotionPose(face, s.gait, this.stepPhase, tgt);
+        }
+      }
     }
 
     if (key !== this.clipKey) {
@@ -201,13 +258,50 @@ export class PlayerView {
     Object.assign(this.pose, this.scratch);
     this.rig.apply(this.pose);
     this.recoil.update(dtMs);
-    this.rig.root.setPosition(x + this.recoil.x, y + this.recoil.y).setDepth(y);
-    this.label.setPosition(x, y - 40 + this.pose.lift).setDepth(y + 0.5).setAlpha(s.act === Act.Dead ? 0.4 : 1);
+    // On a bench or logs, the body is drawn up on the seat; the feet stay on the ground in front.
+    const seat = p.sit === Sit.Seat && s.gait === 0 && s.act === Act.None ? -12 : 0;
+    this.rig.root.setPosition(x + this.recoil.x, y + seat + this.recoil.y).setDepth(y);
+    this.label.setPosition(x, y - 40 + seat + this.pose.lift).setDepth(y + 0.5).setAlpha(s.act === Act.Dead ? 0.4 : 1);
+    if (this.bubble) {
+      const left = this.bubble.until - now;
+      if (left <= 0) {
+        this.bubble.box.destroy();
+        this.bubble = undefined;
+      } else this.bubble.box.setPosition(x, y + seat - (this.isMe ? 42 : 52) + this.pose.lift).setAlpha(Math.min(1, left / 400));
+    }
+  }
+
+  /** A speech bubble over the head (what they said, or *waves* for an emote). */
+  say(text: string, emote = false) {
+    this.bubble?.box.destroy();
+    const t = this.scene.add
+      .text(0, -4, text, { fontFamily: "Trebuchet MS", fontSize: "20px", color: emote ? "#ffe9a8" : "#2a2118", fontStyle: emote ? "italic" : "normal", align: "center", wordWrap: { width: 320 } })
+      .setOrigin(0.5, 1)
+      .setScale(0.5);
+    const w = t.displayWidth + 12;
+    const h = t.displayHeight + 8;
+    const g = this.scene.add.graphics();
+    g.fillStyle(emote ? 0x2a2118 : 0xfff8e8, emote ? 0.88 : 0.96);
+    g.lineStyle(1.5, 0x1d1a17, 1);
+    g.fillRoundedRect(-w / 2, -h, w, h, 6);
+    g.strokeRoundedRect(-w / 2, -h, w, h, 6);
+    g.fillTriangle(-4.5, -0.8, 4.5, -0.8, 0, 5);
+    g.lineBetween(-4.5, 0, 0, 5);
+    g.lineBetween(4.5, 0, 0, 5);
+    const box = this.scene.add.container(0, 0, [g, t]).setDepth(1e6 - 3);
+    this.bubble = { box, until: performance.now() + Math.min(8000, 3000 + text.length * 60) };
+  }
+
+  emote(e: Emote) {
+    this.emoteName = e;
+    this.emoteUntil = performance.now() + EMOTE_MS;
+    this.say(`*${EMOTES[e]}*`, true);
   }
 
   destroy() {
     this.rig.destroy();
     this.label.destroy();
+    this.bubble?.box.destroy();
   }
 }
 
@@ -216,6 +310,9 @@ export class EnemyView {
   readonly clock = new AnimClock();
   readonly human?: HumanoidRig;
   readonly wolf?: WolfRig;
+  readonly dragon?: DragonRig;
+  /** While a dragon breathes fire: where from and which way (world pixels). */
+  fire?: { x: number; y: number; a: number };
   readonly label?: Phaser.GameObjects.Text;
   /** Static props (training dummies): an image that wobbles when struck. */
   readonly prop?: { root: Phaser.GameObjects.Container; img: Phaser.GameObjects.Image; wobble: number; vel: number };
@@ -244,6 +341,8 @@ export class EnemyView {
       this.prop = { root: scene.add.container(0, 0, [shadow, img]), img, wobble: 0, vel: 0 };
     } else if (l.rig === "wolf") {
       this.wolf = new WolfRig(scene, `wolf:${this.def.key}`, l.skin, l.cloth, l.trim, l.glow ?? "#ffd26b", l.scale);
+    } else if (l.rig === "dragon") {
+      this.dragon = new DragonRig(scene, `dragon:${this.def.key}`, l.skin, l.cloth, l.trim, l.glow ?? "#ffb347", l.scale);
     } else {
       const shield = l.shield ? { color: l.rig === "construct" ? "#c9a24a" : "#7a5a3a", trim: l.trim } : undefined;
       this.human = new HumanoidRig(scene, enemyLook(this.def), l.weapon === "shield" ? "none" : (l.weapon as WeaponArt), l.rig === "construct" ? 4 : 0, l.scale, shield);
@@ -263,12 +362,13 @@ export class EnemyView {
   }
 
   get root() {
-    return (this.human?.root ?? this.wolf?.root ?? this.prop?.root)!;
+    return (this.human?.root ?? this.wolf?.root ?? this.dragon?.root ?? this.prop?.root)!;
   }
 
   flash() {
     this.human?.flash();
     this.wolf?.flash();
+    this.dragon?.flash();
     if (this.prop) {
       this.prop.img.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       this.prop.vel += (Math.random() < 0.5 ? -1 : 1) * 9;
@@ -303,6 +403,28 @@ export class EnemyView {
       pr.img.setRotation(pr.wobble * 0.05);
       if (performance.now() - this.hitAt > 80) pr.img.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
       pr.root.setPosition(x, y).setDepth(y);
+      return;
+    }
+    if (this.dragon) {
+      let anim = this.speed > 110 ? "run" : this.speed > 12 ? "walk" : "idle";
+      let wind = 0, act = 0, rec = 0;
+      if (e.act === EAct.Attack) {
+        const a = def.attacks[e.atk];
+        anim = a.anim;
+        wind = windupTicks(a, e.flags) * TICK_MS;
+        act = a.active * TICK_MS;
+        rec = a.recovery * TICK_MS;
+      } else if (e.act === EAct.Hurt || e.act === EAct.Stagger) anim = "hurt";
+      else if (e.act === EAct.Dead) anim = "dead";
+      const alpha = e.act === EAct.Dead ? Math.max(0, 1 - Math.max(0, t - 1400) / 900) : e.act === EAct.Spawn ? Math.min(1, t / 400) : alphaBase;
+      const tt = e.act === EAct.Attack || e.act === EAct.Dead ? t : performance.now() - this.clock.lag;
+      this.dragon.apply(anim, tt, aim, wind, act, rec, alpha);
+      const shake = performance.now() - this.hitAt < 70 ? (Math.random() - 0.5) * 1.2 : 0;
+      this.dragon.root.setPosition(x + rx + shake, y + ry).setDepth(y);
+      const breathing = anim === "breath" && tt >= wind && tt < wind + act;
+      this.fire = breathing ? { x: x + this.dragon.mouth.x, y: y + this.dragon.mouth.y, a: aim } : undefined;
+      this.label?.setPosition(x, y - 44 * def.look.scale).setDepth(y + 0.5);
+      this.label?.setVisible(!(def.boss && e.flags & EFlag.Aggro));
       return;
     }
     if (this.wolf) {
@@ -398,6 +520,7 @@ export class EnemyView {
   destroy() {
     this.human?.destroy();
     this.wolf?.destroy();
+    this.dragon?.destroy();
     this.prop?.root.destroy();
     this.label?.destroy();
   }

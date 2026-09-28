@@ -92,8 +92,12 @@ check("Above the Clouds accepted", !!f.inv?.quests?.f2_arrival, JSON.stringify(f
 
 // Skyreach Landing's services: the Quartermaster's map, the Skysmith's stock, the vault, the inn.
 f.room.send("dev:give", { key: "", gold: 2000 });
-const talkTo = async (npc: string, tx: number, ty: number) => {
-  await tp(f, tx, ty);
+const f2map = buildFloor2();
+/** Walk up to an NPC wherever they stand (shopkeepers work indoors now). */
+const talkTo = async (npc: string, _tx?: number, _ty?: number) => {
+  const n = f2map.npcs.find((q) => q.id === npc)!;
+  f.room.send("dev:teleport", { x: n.x, y: n.y + 30 });
+  await wait(350);
   const m = f.msgs.length;
   f.room.send("interact", npc);
   return waitFor(() => since(f, m, "dialog")[0]);

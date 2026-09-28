@@ -50,11 +50,10 @@
 .pk-cell.r4 { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 0 0 2px var(--r4), inset 0 0 18px color-mix(in srgb, var(--r4) 55%, transparent); animation: pkshine 2.4s ease-in-out infinite; }
 @keyframes pkshine { 50% { box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 0 0 2px #ffd88a, inset 0 0 24px color-mix(in srgb, var(--r4) 75%, transparent), 0 0 12px color-mix(in srgb, var(--r4) 45%, transparent); } }
 
-.pk-qty, .pk-plus, .pk-mastery, .pk-broken { position: absolute; font: 700 11px/1 "Trebuchet MS", sans-serif; text-shadow: 0 1px 2px #000, 0 0 3px #000; pointer-events: none; }
+.pk-qty, .pk-plus, .pk-mastery { position: absolute; font: 700 11px/1 "Trebuchet MS", sans-serif; text-shadow: 0 1px 2px #000, 0 0 3px #000; pointer-events: none; }
 .pk-qty { right: 4px; bottom: 3px; color: #fff; }
 .pk-plus { right: 4px; top: 3px; color: #9fe0a6; }
 .pk-mastery { left: 4px; bottom: 3px; color: #f2d27a; font-size: 10px; }
-.pk-broken { left: 4px; top: 2px; color: #fff; background: #c4402c; border-radius: 50%; width: 14px; height: 14px; display: grid; place-items: center; text-shadow: none; }
 .pk-new { position: absolute; top: 4px; left: 4px; width: 8px; height: 8px; border-radius: 50%; background: #f2d27a; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 8px #f2d27a; animation: pknew 1.2s ease-in-out infinite alternate; pointer-events: none; }
 @keyframes pknew { to { transform: scale(0.7); opacity: 0.6; } }
 .pk-cell.pk-dim { opacity: 0.25; }
@@ -95,10 +94,6 @@ body.pk-dragging .panel[data-id="bank"].pk-over, body.pk-dragging .panel[data-id
 .tt-mrow b { margin-left: auto; color: #fff3d0; font-size: 12px; }
 .tt-bar { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin: 5px 0 4px; flex: 1; }
 .tt-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c9953a, #f2d27a); }
-.tt-bar.dur i { background: linear-gradient(90deg, #6fae52, #9fe0a6); }
-.tt-bar.dur.low i { background: linear-gradient(90deg, #c4402c, #ff8a70); }
-.tt-dur { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-dim); margin-top: 6px; }
-.tt-dur .tt-bar { margin: 0; }
 .tt-warn { color: #ff8a70; font-size: 12px; margin-top: 4px; }
 .tt-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11.5px; color: var(--ink-dim); }
 .tt-price { display: flex; align-items: center; gap: 4px; color: #f2c94c; font-weight: bold; }

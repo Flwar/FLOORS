@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { itemBase, QUESTS, RARITY_COLORS, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { itemBase, missionReady, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Drop } from "../../../server/src/state.ts";
 import { RES } from "../art/characters.ts";
 import { itemIconCanvas } from "../ui/icons.ts";
@@ -8,7 +8,8 @@ import { HumanoidRig, locomotionPose, restPose } from "./rig.ts";
 
 interface NpcView {
   def: NpcDef;
-  rig: HumanoidRig;
+  /** People have a rig; a Mission Board is just its board (a prop on the map). */
+  rig?: HumanoidRig;
   label: Phaser.GameObjects.Text;
   marker: Phaser.GameObjects.Text;
   phase: number;
@@ -28,7 +29,7 @@ interface DropView {
 }
 
 export interface Interactable {
-  kind: "npc" | "object" | "drop" | "player" | "ally";
+  kind: "npc" | "object" | "drop" | "player" | "ally" | "seat";
   id: string;
   x: number;
   y: number;
@@ -47,6 +48,12 @@ export class WorldObjects {
   constructor(private scene: Phaser.Scene, private map: WorldMap) {
     paintObjects(scene);
     for (const def of map.npcs) {
+      if (def.role === "board") {
+        const label = scene.add.text(def.x, def.y - 74, def.name, { fontFamily: "Georgia, serif", fontSize: "17px", color: "#ffe1a0", stroke: "#1d1a17", strokeThickness: 4 }).setOrigin(0.5, 1).setScale(0.5);
+        const marker = scene.add.text(def.x, def.y - 86, "", { fontFamily: "Georgia, serif", fontSize: "34px", color: "#ffd24a", stroke: "#1d1a17", strokeThickness: 5, fontStyle: "bold" }).setOrigin(0.5, 1).setScale(0.5);
+        this.npcs.push({ def, label, marker, phase: Math.random() * 1000 });
+        continue;
+      }
       const rig = new HumanoidRig(scene, { key: `npc:${def.id}`, skin: def.look.skin, hair: def.look.hair, cloth: def.look.cloth, trim: def.look.trim, helm: def.look.helm ?? "none", bulk: 1 }, "none", 0, 1);
       const label = scene.add.text(def.x, def.y - 40, def.name, { fontFamily: "Georgia, serif", fontSize: "17px", color: "#fff1c0", stroke: "#1d1a17", strokeThickness: 4 }).setOrigin(0.5, 1).setScale(0.5);
       const marker = scene.add.text(def.x, def.y - 52, "", { fontFamily: "Georgia, serif", fontSize: "34px", color: "#ffd24a", stroke: "#1d1a17", strokeThickness: 5, fontStyle: "bold" }).setOrigin(0.5, 1).setScale(0.5);
@@ -63,6 +70,15 @@ export class WorldObjects {
   update(dtMs: number, inv: InvView | undefined, stage: string, playerX: number, playerY: number) {
     for (const n of this.npcs) {
       const visible = n.def.role !== "merchant" || this.merchantActive;
+      if (!n.rig) {
+        n.phase += dtMs;
+        const m = markerFor(n.def.id, inv);
+        n.marker.setText(m);
+        n.marker.setColor(m === "?" ? "#9fe0a6" : "#ffd24a");
+        n.marker.setPosition(n.def.x, n.def.y - 84 + Math.sin(n.phase / 300) * 2).setDepth(n.def.y + 2);
+        n.label.setDepth(n.def.y + 1);
+        continue;
+      }
       n.rig.root.setVisible(visible);
       n.label.setVisible(visible);
       n.marker.setVisible(visible);
@@ -139,12 +155,19 @@ export class WorldObjects {
   }
 
   /** Everything the player could press F on, nearest first. */
-  interactables(x: number, y: number, drops: Map<string, Drop> | undefined, myKey: string | undefined): Interactable[] {
+  interactables(x: number, y: number, drops: Map<string, Drop> | undefined, myKey: string | undefined, sitting = false): Interactable[] {
     const out: (Interactable & { d: number })[] = [];
+    this.map.props.forEach((pr, i) => {
+      const what = SEAT_PROPS[pr.kind];
+      if (!what || sitting) return; // seated: moving (or X) stands you up
+      const s = seatPoint(pr);
+      const d = Math.hypot(s.x - x, s.y - y);
+      if (d < 44) out.push({ kind: "seat", id: String(i), x: s.x, y: s.y - 36, label: `Sit on the ${what}`, d: d + 6 });
+    });
     for (const n of this.npcs) {
       if (n.def.role === "merchant" && !this.merchantActive) continue;
       const d = Math.hypot(n.def.x - x, n.def.y - y);
-      if (d < 56) out.push({ kind: "npc", id: n.def.id, x: n.def.x, y: n.def.y - 44, label: `Talk to ${n.def.name}`, d });
+      if (d < 56) out.push({ kind: "npc", id: n.def.id, x: n.def.x, y: n.def.y - 44, label: n.def.role === "board" ? "Read the Mission Board" : `Talk to ${n.def.name}`, d });
     }
     for (const o of this.objs) {
       if (o.def.id === "ascent" && o.state !== "open") continue;
@@ -161,7 +184,7 @@ export class WorldObjects {
 
   destroy() {
     for (const n of this.npcs) {
-      n.rig.destroy();
+      n.rig?.destroy();
       n.label.destroy();
       n.marker.destroy();
     }
@@ -190,11 +213,17 @@ function markerFor(npc: string, inv?: InvView): string {
       if (n >= stage.count) return "?";
     }
   }
-  for (const q of QUESTS) if (q.giver === npc && !inv.quests[q.id] && (!q.requires || inv.quests[q.requires]?.done)) return "!";
+  for (const q of QUESTS) {
+    if (q.giver !== npc) continue;
+    const st = inv.quests[q.id];
+    if ((q.mission ? missionReady(st, Date.now()) : !st) && questOpen(q, (id) => !!inv.quests[id]?.done, inv.floor)) return "!";
+  }
   return "";
 }
 
-const isConduit = (o: WorldObject) => o.kind === "lever" && o.name.endsWith("Conduit");
+/** Levers whose lit state is synced in the gate mask: the Stormspire's conduits and the Roost's flame seals. */
+const isConduit = (o: WorldObject) => o.kind === "lever" && (o.name.endsWith("Conduit") || o.name.startsWith("Seal of"));
+const isSeal = (o: WorldObject) => o.kind === "lever" && o.name.startsWith("Seal of");
 
 function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates: number): string {
   switch (o.kind) {
@@ -205,10 +234,10 @@ function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates
     case "waystone":
       return inv?.discovered.includes(`ws:${o.id}`) ? "on" : "";
     case "gate":
-      if (o.dest === "floor3") return ""; // the stair above is not built yet
+      if (o.dest === "floor4") return ""; // the stair above is not built yet
       if (o.id === "ascent") return stage === "cleared" ? "open" : "";
-      if (o.id === "descent") return "open";
-      return (inv?.floor ?? 1) >= 2 ? "open" : "";
+      if (o.id === "descent" || o.id === "descent3") return "open";
+      return (inv?.floor ?? 1) >= (o.dest === "floor3" ? 3 : 2) ? "open" : "";
     case "lore":
       return inv?.discovered.includes(`lore:${o.id}`) ? "read" : "";
     default:
@@ -227,10 +256,16 @@ function objLabel(o: WorldObject, state: string): string {
     case "door":
       return o.id === "exit" ? o.name : `Unseal ${o.name}`;
     case "gate":
-      return o.dest === "floor3" ? `Examine ${o.name}` : o.id === "ascent" ? "Ascend to Floor 2" : o.id === "descent" ? "Descend to Emberwatch" : state === "open" ? "Ascend to Floor 2" : `Examine ${o.name}`;
+      if (state !== "open") return `Examine ${o.name}`;
+      if (o.id === "descent") return "Descend to Emberwatch";
+      if (o.id === "descent3") return "Descend to the Gilded Terraces";
+      return `Ascend to Floor ${o.dest === "floor3" ? 3 : 2}`;
+    case "entry":
+      return o.id.startsWith("enter-") ? `Enter ${o.name}` : "Step outside";
     case "campfire":
       return `Rest at ${o.name}`;
     case "lever":
+      if (isSeal(o)) return state === "lit" ? `${o.name} (burning)` : `Light the ${o.name}`;
       return isConduit(o) ? (state === "lit" ? `${o.name} (awake)` : `Wake the ${o.name}`) : `Pull the ${o.name}`;
   }
 }
@@ -250,7 +285,10 @@ function texFor(o: WorldObject, state: string): string {
     case "campfire":
       return "objBrazier";
     case "lever":
+      if (isSeal(o)) return state === "lit" ? "objBrazier" : "objSeal";
       return isConduit(o) ? (state === "lit" ? "objConduitLit" : "objConduit") : "objLever";
+    case "entry":
+      return o.id.startsWith("enter-") ? "objNone" : "objDoormat";
   }
 }
 
@@ -295,6 +333,68 @@ function paintObjects(scene: Phaser.Scene) {
       g.fillRect(28, 26, 8, 10);
     }
   };
+  make("objNone", 2, 2, () => {});
+  // An unlit flame seal: a basalt pedestal holding a cold basin.
+  make("objSeal", 70, 110, (g) => {
+    g.fillStyle = "rgba(0,0,0,0.3)";
+    g.beginPath();
+    g.ellipse(35, 104, 24, 6, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = O;
+    g.fillRect(21, 50, 28, 56);
+    g.fillStyle = "#4a423c";
+    g.fillRect(24, 53, 22, 51);
+    g.fillStyle = "#ff8a3a";
+    g.fillRect(33, 64, 4, 26);
+    g.fillStyle = O;
+    g.beginPath();
+    g.ellipse(35, 48, 24, 10, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#5e5650";
+    g.beginPath();
+    g.ellipse(35, 46, 21, 8, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#2a2220";
+    g.beginPath();
+    g.ellipse(35, 45, 15, 5, 0, 0, Math.PI * 2);
+    g.fill();
+  });
+  // The way out of a building: daylight through the doorway, and a rug in front of it.
+  make("objDoormat", 96, 84, (g) => {
+    g.fillStyle = O;
+    g.beginPath();
+    g.roundRect(18, 30, 60, 54, [16, 16, 0, 0]);
+    g.fill();
+    const day = g.createLinearGradient(0, 34, 0, 84);
+    day.addColorStop(0, "#fff2c8");
+    day.addColorStop(1, "#e8c070");
+    g.fillStyle = day;
+    g.beginPath();
+    g.roundRect(24, 36, 48, 48, [12, 12, 0, 0]);
+    g.fill();
+    g.fillStyle = "rgba(255,240,190,0.35)";
+    g.beginPath();
+    g.moveTo(24, 84);
+    g.lineTo(72, 84);
+    g.lineTo(84, 60);
+    g.lineTo(12, 60);
+    g.closePath();
+    g.fill();
+    // Rug.
+    g.fillStyle = O;
+    g.beginPath();
+    g.roundRect(10, 2, 76, 30, 6);
+    g.fill();
+    g.fillStyle = "#8a3a2a";
+    g.beginPath();
+    g.roundRect(13, 5, 70, 24, 5);
+    g.fill();
+    g.strokeStyle = "#e8c86a";
+    g.lineWidth = 2;
+    g.beginPath();
+    g.roundRect(18, 9, 60, 16, 3);
+    g.stroke();
+  });
   make("objChest", 64, 64, chest(false));
   make("objChestOpen", 64, 64, chest(true));
   make("objLore", 60, 90, (g) => {

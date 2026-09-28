@@ -19,6 +19,8 @@ export interface Pose {
   alpha: number;
   /** Facing used to pick the view (radians). */
   face: number;
+  /** 0 standing … 1 seated: the body settles and the legs fold forward. */
+  sit: number;
 }
 
 /** Arm length when the weapon hangs at rest. */
@@ -36,7 +38,7 @@ export function restAngle(face: number): number {
 }
 
 export const restPose = (face: number): Pose => ({
-  bob: 0, lift: 0, lean: 0, tilt: 0, step: 0, stepAmp: 0, wAngle: restAngle(face), wReach: REST_REACH, offArm: 0, sx: 1, sy: 1, alpha: 1, face,
+  bob: 0, lift: 0, lean: 0, tilt: 0, step: 0, stepAmp: 0, wAngle: restAngle(face), wReach: REST_REACH, offArm: 0, sx: 1, sy: 1, alpha: 1, face, sit: 0,
 });
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -64,6 +66,7 @@ export function blendPose(a: Pose, b: Pose, t: number, out: Pose): Pose {
   out.sy = lerp(a.sy, b.sy, t);
   out.alpha = lerp(a.alpha, b.alpha, t);
   out.face = lerpAngle(a.face, b.face, t);
+  out.sit = lerp(a.sit ?? 0, b.sit ?? 0, t);
   return out;
 }
 
@@ -403,6 +406,23 @@ export class HumanoidRig {
     const legSpread = view === "side" ? 1.5 : 3.5 * look.bulk;
     this.legL.setPosition(-legSpread + stepX * s1 + lean.x * 0.3, -7 + stepY * s1 - Math.max(0, s1) * 1.5 * p.stepAmp + p.lift);
     this.legR.setPosition(legSpread - stepX * s1 + lean.x * 0.3, -7 - stepY * s1 - Math.max(0, -s1) * 1.5 * p.stepAmp + p.lift);
+    // Sitting: the body settles, and the legs fold toward the facing (in profile) or
+    // foreshorten toward the camera (front and back).
+    const k = 1 / RES;
+    const sit = p.sit ?? 0;
+    if (sit > 0.01) {
+      const drop = 5 * sit;
+      this.upper.y += drop;
+      const dir = Math.cos(p.face) >= 0 ? 1 : -1;
+      for (const leg of [this.legL, this.legR]) {
+        if (view === "side") leg.setRotation(-dir * 1.45 * sit).setScale(k, k);
+        else leg.setRotation(0).setScale(k, k * (1 - (view === "front" ? 0.5 : 0.62) * sit));
+        leg.y += drop * 0.85;
+      }
+    } else {
+      this.legL.setRotation(0).setScale(k, k);
+      this.legR.setRotation(0).setScale(k, k);
+    }
     for (const im of this.images) im.setAlpha(p.alpha);
 
     this.torso.setPosition(0, -13);

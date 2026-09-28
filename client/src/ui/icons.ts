@@ -1,5 +1,6 @@
 import { armorStyle, DEFAULT_WEAPON_ART, helmStyle, itemBase, RARITY_COLORS } from "@floors/shared";
 import { drawGearIcon } from "../art/characters.ts";
+import { drawEntryIcon } from "./skillIcons.ts";
 import { drawUiIcon } from "./uiIcons.ts";
 
 const cache = new Map<string, string>();
@@ -43,7 +44,124 @@ export function itemIcon(key: string, rarity = 0): string {
   if (base && (base.kind === "weapon" || base.kind === "armor" || base.kind === "helm")) {
     const style = base.kind === "weapon" ? base.art ?? DEFAULT_WEAPON_ART[base.weapon ?? "sword"] : base.kind === "armor" ? armorStyle(base.look ?? 0) : helmStyle(base.look ?? 0);
     drawGearIcon(g, S, base.kind, style, rarity);
+  } else if (base?.kind === "scroll") {
+    drawScroll(g, base.skill ?? "", accent);
+  } else if (key.startsWith("map_")) {
+    drawMap(g);
   } else switch (base?.kind === "consumable" || base?.kind === "material" || base?.kind === "artifact" || base?.kind === "key" ? key : base?.kind) {
+    case "mat_cinder": {
+      // A lump of black stone, glowing through its cracks.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(14, 40); g.lineTo(22, 18); g.lineTo(40, 14); g.lineTo(52, 30); g.lineTo(46, 50); g.lineTo(24, 52);
+      g.closePath();
+      g.fill();
+      const cg = g.createLinearGradient(16, 16, 48, 50);
+      cg.addColorStop(0, "#4a4440");
+      cg.addColorStop(1, "#1f1b19");
+      g.fillStyle = cg;
+      g.beginPath();
+      g.moveTo(18, 40); g.lineTo(24, 21); g.lineTo(39, 18); g.lineTo(48, 31); g.lineTo(43, 47); g.lineTo(25, 48);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "#ff8a3a";
+      g.lineWidth = 2.5;
+      g.shadowColor = "#ff6a1a";
+      g.shadowBlur = 8;
+      g.beginPath();
+      g.moveTo(26, 24); g.lineTo(32, 33); g.lineTo(28, 42);
+      g.moveTo(32, 33); g.lineTo(42, 30);
+      g.stroke();
+      g.shadowBlur = 0;
+      break;
+    }
+    case "mat_dragonscale": {
+      // A single great scale, ridged and red-bronze.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(32, 8);
+      g.quadraticCurveTo(54, 20, 48, 42);
+      g.quadraticCurveTo(40, 56, 32, 58);
+      g.quadraticCurveTo(24, 56, 16, 42);
+      g.quadraticCurveTo(10, 20, 32, 8);
+      g.fill();
+      const sg = g.createLinearGradient(16, 10, 48, 56);
+      sg.addColorStop(0, "#e87a4a");
+      sg.addColorStop(0.6, "#9a2e22");
+      sg.addColorStop(1, "#5a1a14");
+      g.fillStyle = sg;
+      g.beginPath();
+      g.moveTo(32, 12);
+      g.quadraticCurveTo(50, 22, 45, 41);
+      g.quadraticCurveTo(38, 53, 32, 54);
+      g.quadraticCurveTo(26, 53, 19, 41);
+      g.quadraticCurveTo(14, 22, 32, 12);
+      g.fill();
+      g.strokeStyle = "rgba(255,210,150,0.55)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(32, 16); g.lineTo(32, 50);
+      g.moveTo(24, 26); g.quadraticCurveTo(32, 32, 40, 26);
+      g.moveTo(22, 38); g.quadraticCurveTo(32, 44, 42, 38);
+      g.stroke();
+      break;
+    }
+    case "mat_emberheart":
+    case "art_dragonheart": {
+      // A living coal: the heart of a dragon's fire.
+      const big = key === "art_dragonheart";
+      const halo = g.createRadialGradient(32, 34, 4, 32, 34, 30);
+      halo.addColorStop(0, "rgba(255,160,60,0.85)");
+      halo.addColorStop(1, "rgba(255,80,20,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(32, 54);
+      g.bezierCurveTo(8, 38, 12, 14, 26, 16);
+      g.quadraticCurveTo(32, 18, 32, 24);
+      g.quadraticCurveTo(32, 18, 38, 16);
+      g.bezierCurveTo(52, 14, 56, 38, 32, 54);
+      g.fill();
+      const hg = g.createRadialGradient(28, 28, 2, 32, 34, 22);
+      hg.addColorStop(0, "#fff6d8");
+      hg.addColorStop(0.4, big ? "#ff7a2a" : "#ffb347");
+      hg.addColorStop(1, big ? "#8a1a14" : "#c4402c");
+      g.fillStyle = hg;
+      g.beginPath();
+      g.moveTo(32, 50);
+      g.bezierCurveTo(12, 36, 15, 18, 26, 19);
+      g.quadraticCurveTo(31, 21, 32, 27);
+      g.quadraticCurveTo(33, 21, 38, 19);
+      g.bezierCurveTo(49, 18, 52, 36, 32, 50);
+      g.fill();
+      break;
+    }
+    case "key_roost": {
+      // The Emberwyrm Sigil: a bronze disc bearing a coiled dragon.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 32, 22, 0, Math.PI * 2);
+      g.fill();
+      const dg = g.createRadialGradient(26, 24, 2, 32, 32, 20);
+      dg.addColorStop(0, "#ffd08a");
+      dg.addColorStop(1, "#9a4a22");
+      g.fillStyle = dg;
+      g.beginPath();
+      g.arc(32, 32, 19, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "#3a1a10";
+      g.lineWidth = 4;
+      g.beginPath();
+      g.arc(32, 32, 10, Math.PI * 0.2, Math.PI * 1.8);
+      g.stroke();
+      g.fillStyle = "#3a1a10";
+      g.beginPath();
+      g.moveTo(40, 26); g.lineTo(48, 22); g.lineTo(44, 30);
+      g.closePath();
+      g.fill();
+      break;
+    }
     case "charm": {
       g.strokeStyle = "#c9a24a";
       g.lineWidth = 2;
@@ -342,4 +460,79 @@ export function goldIcon(): string {
   const url = c.toDataURL();
   cache.set(id, url);
   return url;
+}
+
+/** A skill scroll: rolled parchment with a wax seal in its rarity's colour, and the skill's own icon. */
+function drawScroll(g: CanvasRenderingContext2D, skill: string, accent: string) {
+  const outline = "#1d1a17";
+  // The open sheet.
+  g.fillStyle = outline;
+  rr(g, 10, 12, 44, 42, 4);
+  g.fill();
+  const pg = g.createLinearGradient(0, 12, 0, 54);
+  pg.addColorStop(0, "#f4e6c4");
+  pg.addColorStop(1, "#d6bf8e");
+  g.fillStyle = pg;
+  rr(g, 13, 15, 38, 36, 3);
+  g.fill();
+  // Rolled ends.
+  for (const y of [10, 50]) {
+    g.fillStyle = outline;
+    rr(g, 6, y - 2, 52, 10, 5);
+    g.fill();
+    g.fillStyle = "#c9a878";
+    rr(g, 8, y, 48, 6, 3);
+    g.fill();
+  }
+  // The skill, inked on the page.
+  g.save();
+  g.translate(19, 18);
+  g.scale(26 / 64, 26 / 64);
+  drawEntryIcon(g, skill);
+  g.restore();
+  // Wax seal in the rarity's colour.
+  g.fillStyle = outline;
+  g.beginPath();
+  g.arc(47, 46, 8, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = accent;
+  g.beginPath();
+  g.arc(47, 46, 6, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "rgba(255,255,255,0.35)";
+  g.beginPath();
+  g.arc(45, 44, 2, 0, Math.PI * 2);
+  g.fill();
+}
+
+/** A folded map. */
+function drawMap(g: CanvasRenderingContext2D) {
+  const outline = "#1d1a17";
+  g.fillStyle = outline;
+  g.beginPath();
+  g.moveTo(8, 16); g.lineTo(24, 10); g.lineTo(40, 16); g.lineTo(56, 10); g.lineTo(56, 48); g.lineTo(40, 54); g.lineTo(24, 48); g.lineTo(8, 54);
+  g.closePath();
+  g.fill();
+  const panels: [number, number, string][] = [[8, 24, "#e8d6ae"], [24, 40, "#d9c49a"], [40, 56, "#e8d6ae"]];
+  for (const [x0, x1, col] of panels) {
+    g.fillStyle = col;
+    g.beginPath();
+    const top = (x: number) => (x === 24 || x === 56 ? 13 : 19);
+    const bot = (x: number) => (x === 24 || x === 56 ? 45 : 51);
+    g.moveTo(x0 + 2, top(x0) + 1); g.lineTo(x1 - 2, top(x1) + 1); g.lineTo(x1 - 2, bot(x1) - 1); g.lineTo(x0 + 2, bot(x0) - 1);
+    g.closePath();
+    g.fill();
+  }
+  g.strokeStyle = "#b8342c";
+  g.lineWidth = 2;
+  g.setLineDash([3, 3]);
+  g.beginPath();
+  g.moveTo(14, 42); g.quadraticCurveTo(28, 26, 36, 36); g.quadraticCurveTo(44, 44, 50, 24);
+  g.stroke();
+  g.setLineDash([]);
+  g.strokeStyle = "#b8342c";
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(46, 20); g.lineTo(54, 28); g.moveTo(54, 20); g.lineTo(46, 28);
+  g.stroke();
 }

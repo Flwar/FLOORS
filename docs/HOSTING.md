@@ -24,6 +24,17 @@ command, and limits password guessing (8 wrong tries per name per 10 minutes) an
 - **Open to anyone:** forward TCP port 2567 on your router to your PC and share your public IP.
   Only do this if you are comfortable running a public server from your PC.
 
+## Quick public link with ngrok
+1. `npm run build` then `npm start` (nothing else may be using port 2567).
+2. Open `http://localhost:2567` on this PC and log in as **Ofir** once, so the admin account exists.
+   The admin name can only be claimed from this PC directly, never through the tunnel.
+3. In another terminal: `ngrok http 2567`, and share the `https://….ngrok-free.app` address it prints.
+   (Once per PC, ngrok needs your authtoken: `ngrok config add-authtoken <your token>`.)
+- The page switches to `wss://` by itself, so the game runs through the tunnel as is.
+- On ngrok's free plan, visitors see an ngrok notice once; they click **Visit Site**.
+- Sign-up and login limits count each player's real address (the one ngrok reports), not the tunnel.
+- The link changes every time ngrok restarts (unless you set a fixed domain in your ngrok account).
+
 ## Online all the time
 Any host that runs Docker works (a small VPS, Fly.io, Railway, Render):
 ```

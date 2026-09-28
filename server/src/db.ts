@@ -96,6 +96,20 @@ export class Db {
     return row ? (JSON.parse(row.value) as T) : undefined;
   }
 
+  /** Names of characters who have defeated a boss (for seeding the world's open floors). */
+  bossSlayers(boss: string): string[] {
+    const names: string[] = [];
+    for (const row of this.db.prepare("SELECT data FROM characters").all() as { data: string }[]) {
+      try {
+        const d = JSON.parse(row.data) as { name?: string; bossKills?: string[] };
+        if (d.bossKills?.includes(boss) && d.name) names.push(d.name);
+      } catch {
+        // A broken row never blocks startup.
+      }
+    }
+    return names;
+  }
+
   setWorld(key: string, value: unknown) {
     this.db.prepare("INSERT INTO world (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, JSON.stringify(value));
   }

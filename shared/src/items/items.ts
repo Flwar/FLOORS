@@ -5,7 +5,7 @@ export const Rarity = { Common: 0, Uncommon: 1, Rare: 2, Epic: 3, Legendary: 4 }
 export const RARITY_NAMES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
 export const RARITY_COLORS = ["#d8d4cc", "#7fd67a", "#5aa7f0", "#b77af2", "#f2a93b"];
 
-export type ItemKind = "weapon" | "armor" | "helm" | "charm" | "material" | "consumable" | "artifact" | "key";
+export type ItemKind = "weapon" | "armor" | "helm" | "charm" | "material" | "consumable" | "artifact" | "key" | "scroll";
 export type EquipSlot = "weapon" | "armor" | "helm" | "charm";
 export const EQUIP_SLOTS: EquipSlot[] = ["weapon", "armor", "helm", "charm"];
 
@@ -39,8 +39,10 @@ export interface ItemBase {
   effect?: ItemEffect;
   /** Never dropped on death, never sold (quest items, keys). */
   bound?: boolean;
-  /** Fixed rarity (uniques). */
+  /** Fixed rarity (uniques, scrolls). */
   rarity?: number;
+  /** Scrolls: the skill it teaches. */
+  skill?: string;
 }
 
 export const ITEMS: ItemBase[] = [
@@ -73,6 +75,24 @@ export const ITEMS: ItemBase[] = [
   { key: "greatsword_warden", name: "Warden's Halberd-Sword", kind: "weapon", weapon: "greatsword", art: "gs_warden", power: 150, value: 450, tier: 3, rarity: 3, desc: "It kept the Undercroft for a thousand years." },
 
   // Armour (chest). `look` indexes ARMOR_STYLES.
+  // --- The third wave (Floor 1: tiers 1–3) ---------------------------------------------
+  { key: "sword_bronze", name: "Bronze Gladius", kind: "weapon", weapon: "sword", art: "sword_bronze", power: 106, value: 30, tier: 1, desc: "Short, broad and heavy for its size. Old soldiers still swear by bronze." },
+  { key: "sword_falchion", name: "Bandit Falchion", kind: "weapon", weapon: "sword", art: "sword_falchion", power: 126, value: 70, tier: 2, desc: "A cleaver of a sword with a hooked back. Grakk's lieutenants carry them." },
+  { key: "sword_royal", name: "Royal Guard Sabre", kind: "weapon", weapon: "sword", art: "sword_royal", power: 150, value: 300, tier: 3, desc: "Blued steel and a gilded basket. It was made to be seen as much as used." },
+  { key: "greatsword_bone", name: "Bonecleaver", kind: "weapon", weapon: "greatsword", art: "gs_bone", power: 126, value: 80, tier: 2, desc: "A slab of old bone lashed to a haft. It breaks shields and nerve alike." },
+  { key: "greatsword_moon", name: "Moonsplitter", kind: "weapon", weapon: "greatsword", art: "gs_moon", power: 154, value: 320, tier: 3, desc: "Dark steel etched with a crescent that catches light that isn't there." },
+  { key: "daggers_bone", name: "Bone Shivs", kind: "weapon", weapon: "daggers", art: "dg_bone", power: 104, value: 24, tier: 1, desc: "Two sharpened ribs. Crude, quick, and nobody expects them." },
+  { key: "daggers_duelist", name: "Duelist's Pair", kind: "weapon", weapon: "daggers", art: "dg_duel", power: 142, value: 280, tier: 3, desc: "A matched pair of needle blades. Every thrust finds a seam." },
+  { key: "spear_partisan", name: "Bronze Partisan", kind: "weapon", weapon: "spear", art: "sp_partisan", power: 126, value: 75, tier: 2, desc: "A broad winged head that catches blades as well as it cuts." },
+  { key: "spear_halberd", name: "Halberd", kind: "weapon", weapon: "spear", art: "sp_halberd", power: 150, value: 300, tier: 3, desc: "Spike, hook and axe on one long haft: a small army in one weapon." },
+  { key: "staff_bone", name: "Bone Totem", kind: "weapon", weapon: "staff", art: "st_bone", power: 126, value: 80, tier: 2, desc: "Cultist work: a skull on a staff, and something in the skull still listening." },
+  { key: "staff_crystal", name: "Crystal Rod", kind: "weapon", weapon: "staff", art: "st_crystal", power: 146, value: 300, tier: 3, desc: "Amethyst grown around a silver rod. Spells come out of it sharper." },
+  { key: "armor_hide", name: "Hide Armour", kind: "armor", defense: 10, hp: 4, look: 16, value: 22, tier: 1, desc: "Layered hides stitched with sinew. Warm, stiff, and better than cloth." },
+  { key: "armor_ring", name: "Ring Mail", kind: "armor", defense: 22, hp: 8, look: 17, value: 110, tier: 2, desc: "Rings sewn onto leather: most of the protection of chain for half the weight." },
+  { key: "armor_templar", name: "Templar Plate", kind: "armor", defense: 44, hp: 22, stamina: -4, look: 18, value: 340, tier: 3, desc: "White plate under a red tabard. The order that wore it held the ruins for a century." },
+  { key: "armor_windrunner", name: "Windrunner Leathers", kind: "armor", defense: 28, hp: 6, stamina: 16, look: 19, value: 300, tier: 3, desc: "Supple leathers and a green cape. For those who win by never being where the blow lands." },
+  { key: "helm_coif", name: "Mail Coif", kind: "helm", defense: 12, hp: 6, look: 13, value: 70, tier: 2, desc: "A hood of mail that rolls down to the shoulders." },
+  { key: "helm_templar", name: "Templar Helm", kind: "helm", defense: 20, hp: 14, stamina: -2, look: 14, value: 260, tier: 3, desc: "A great helm with a gilded cross over the eyes." },
   { key: "armor_padded", name: "Padded Tunic", kind: "armor", defense: 6, look: 1, value: 6, tier: 1, desc: "Quilted cloth. Better than nothing. Barely." },
   { key: "armor_leather", name: "Leather Jerkin", kind: "armor", defense: 14, stamina: 5, look: 2, value: 30, tier: 1, desc: "Light, quiet, trusted by scouts." },
   { key: "armor_ranger", name: "Ranger's Garb", kind: "armor", defense: 18, stamina: 12, look: 3, value: 90, tier: 2, desc: "Forest leathers and a travelling cloak. Built for long roads." },
@@ -131,8 +151,6 @@ export interface Item {
   qty: number;
   /** Upgrade level from the blacksmith (+0..+5). */
   plus: number;
-  /** 0–100; broken (0) gear gives half its stats until repaired. */
-  dur: number;
   /** Bonus stats from rarity. */
   bonus: { atk?: number; hp?: number; stamina?: number; defense?: number };
   /** Weapons: mastery XP earned fighting with this very weapon. */
@@ -147,17 +165,16 @@ export function itemName(it: Item) {
 export const isEquipment = (b: ItemBase) => b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm";
 export const slotOf = (b: ItemBase): EquipSlot | undefined => (isEquipment(b) ? (b.kind as EquipSlot) : undefined);
 
-/** Stats an equipped item contributes (durability and upgrades applied). */
+/** Stats an equipped item contributes (upgrades applied). */
 export function itemStats(it: Item) {
   const b = itemBase(it.key);
   if (!b) return { power: 0, defense: 0, hp: 0, stamina: 0 };
-  const broken = it.dur <= 0 ? 0.5 : 1;
-  const plus = 1 + it.plus * 0.06;
+  const plus = 1 + it.plus * 0.05;
   return {
-    power: ((b.power ?? 0) * plus + (it.bonus.atk ?? 0)) * broken,
-    defense: ((b.defense ?? 0) * plus + (it.bonus.defense ?? 0)) * broken,
-    hp: ((b.hp ?? 0) + (it.bonus.hp ?? 0)) * broken,
-    stamina: ((b.stamina ?? 0) + (it.bonus.stamina ?? 0)) * broken,
+    power: (b.power ?? 0) * plus + (it.bonus.atk ?? 0),
+    defense: (b.defense ?? 0) * plus + (it.bonus.defense ?? 0),
+    hp: (b.hp ?? 0) + (it.bonus.hp ?? 0),
+    stamina: (b.stamina ?? 0) + (it.bonus.stamina ?? 0),
   };
 }
 
@@ -167,20 +184,25 @@ export function upgradeCost(it: Item): { gold: number; mats: { key: string; qty:
   const b = itemBase(it.key);
   if (!b || !isEquipment(b)) return undefined;
   const n = it.plus + 1;
+  // Floor 3's own gear (tier 5) is worked with dragon materials.
+  if (b.tier >= 5) {
+    const mats = [{ key: "mat_dragonscale", qty: 2 * n }];
+    if (n >= 3) mats.push({ key: "mat_cinder", qty: n - 1 });
+    if (n >= 5) mats.push({ key: "mat_emberheart", qty: 1 });
+    return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
+  }
   // Floor 2's own gear (tier 4 without a fixed rarity) is worked with Floor 2 materials.
   if (b.tier >= 4 && !b.rarity) {
     const sky = [{ key: "mat_gilded", qty: 2 * n }];
     if (n >= 3) sky.push({ key: "mat_stormglass", qty: n - 1 });
     if (n >= 5) sky.push({ key: "mat_feather", qty: 3 });
-    return { gold: Math.round(25 * n * n * (1 + b.tier * 0.5)), mats: sky };
+    return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats: sky };
   }
   const mats = [{ key: "mat_scrap", qty: 2 * n }];
   if (n >= 3) mats.push({ key: "mat_shard", qty: n - 2 });
   if (n >= 5) mats.push({ key: "mat_ember", qty: 1 });
-  return { gold: Math.round(25 * n * n * (1 + b.tier * 0.5)), mats };
+  return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
 }
-
-export const repairCost = (it: Item) => Math.ceil(((100 - it.dur) / 100) * (itemBase(it.key)?.value ?? 10) * 0.3);
 
 export function sellPrice(it: Item) {
   const b = itemBase(it.key);
