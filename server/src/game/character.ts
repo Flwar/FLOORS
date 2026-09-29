@@ -147,15 +147,19 @@ export class Character {
       const wk = itemBase(w.key)?.weapon;
       if (wk && w.mxp === undefined && d.mastery[wk]) w.mxp = d.mastery[wk];
     }
-    // Skill scrolls replaced the skill tree: every skill learned is kept, and every point
-    // not spent on one becomes Marks to buy scrolls with.
+    // Skill scrolls replaced the skill tree, and everyone's skills were reset once
+    // (SKILLS_VERSION): back to Whirlwind, with what they had paid back in Marks.
     let refund = 0;
     if (!d.skills) {
-      const kept = [...new Set([...(d.tree ?? []), ...(d.perks ?? [])])].filter((id) => skillEntry(id));
+      // Still on the old skill tree: every point it ever had (spent or not) comes back as Marks.
+      const learned = [...new Set([...(d.tree ?? []), ...(d.perks ?? [])])].filter((id) => skillEntry(id) && id !== "sword.whirlwind");
       const points = d.level + (d.tree ? d.bonusPoints ?? 0 : OLD_QUEST_POINTS.filter((id) => d.quests[id]?.done).length);
-      refund = Math.max(0, points - kept.length) * MARKS_PER_POINT;
-      d.skills = kept.length ? kept : ["sword.whirlwind"];
+      refund = points * MARKS_PER_POINT;
+      d.skills = ["sword.whirlwind"];
+      d.loadout = { sword: [0, NO_SKILL] };
       d.marks = (d.marks ?? 0) + refund;
+      d.skillsVersion = SKILLS_VERSION;
+      this.skillbookNews = { lost: learned.length, marks: refund };
     }
     // Everyone's skills were reset: back to Whirlwind, with every lost skill paid back in Marks.
     if ((d.skillsVersion ?? 1) < SKILLS_VERSION) {
