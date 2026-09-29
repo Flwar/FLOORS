@@ -52,6 +52,15 @@ export class Hud {
     this.set("lv", level, () => ($("#level").textContent = String(level)));
   }
 
+  /** The inn meal doing you good (name, colour, minutes left), or nothing. */
+  meal(m: { name: string; color: string; min: number } | undefined) {
+    this.set("meal", m ? `${m.name}|${m.min}` : "", () => {
+      const box = $("#meal");
+      box.hidden = !m;
+      if (m) box.innerHTML = `<i style="background:${m.color}"></i>${m.name} · ${m.min} min`;
+    });
+  }
+
   /** Clicking an empty skill slot (to open the skill tree). */
   onEmptySkillSlot?: () => void;
 

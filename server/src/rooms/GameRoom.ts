@@ -6,6 +6,7 @@ import {
 import { db } from "../db.ts";
 import { Character, newCharacter, type CharacterData } from "../game/character.ts";
 import { online, roomSenders, sendToKey, broadcastAll } from "../game/registry.ts";
+import { settleQuests } from "../game/quests.ts";
 import { acceptInvite, declineInvite, invite, kick, leaveParty, memberOffline, partyMembers, partyOf, promote, syncParty } from "../game/parties.ts";
 import { RESPAWN_DELAY_MS, Sim, type EnemyData, type PlayerData, type RewindLike } from "../game/sim.ts";
 import { Trades } from "../game/trade.ts";
@@ -151,6 +152,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         this.partyTickAt = now + 500;
         this.tickParties();
         this.trades.tick();
+        for (const [sid, ch] of this.chars) if (ch.expireMeal()) this.clients.getById(sid)?.send("notice", { text: "The good meal has worn off.", kind: "info" });
       }
       if (now - this.lastSave > SAVE_EVERY_MS) {
         this.lastSave = now;
@@ -278,6 +280,8 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       this.notify(client, `Skills were reset for everyone${n.marks ? `: you got ${n.marks} Marks back` : ""}. Skills are learned from scrolls now: earn Marks on missions (the Mission Board) and buy scrolls from the Archivist. Rare scrolls drop from elites and bosses.`, "good");
     }
     ch.dirty = false;
+    const settled = settleQuests(ch);
+    if (settled.length) client.send("quest", settled);
     this.onPlayerJoined(client.sessionId, ch);
     // Joining can move quests on (entering a dungeon). Send that now: during a room switch the
     // old room still holds this character and could flush the change to the departing client.
@@ -970,7 +974,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       const pd = this.sim.players.get(sid);
       if (!ch || !pd || credited.has(sid)) return;
       credited.add(sid);
-      const xp = Math.round(killXp(baseXp, e.level, ch.data.level) * share);
+      const xp = Math.round(killXp(baseXp, e.level, ch.data.level) * share * (1 + (ch.meal()?.xpPct ?? 0)));
       const levels = ch.addXp(xp);
       if (share === 1) ch.data.stats.kills++;
       this.clients.getById(sid)?.send("xp", { amount: xp, x: e.x, y: e.y, party: party || undefined });

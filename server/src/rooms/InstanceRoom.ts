@@ -47,6 +47,7 @@ export abstract class InstanceRoom extends GameRoom {
   protected boss?: EnemyData;
   protected cleared = false;
   private minibossFight = false;
+  private minibossDown = false;
   private bossFight = false;
   private bossWipeAt = 0;
   private trapAt = [400, 1200, 2000];
@@ -269,7 +270,9 @@ export abstract class InstanceRoom extends GameRoom {
     const w = this.miniboss;
     const h = this.hall();
     if (!w || w.e.act === EAct.Dead) {
-      if (this.minibossFight) {
+      // (However it fell: even struck down from outside its hall, the way on opens.)
+      if (w && !this.minibossDown) {
+        this.minibossDown = true;
         this.minibossFight = false;
         this.gate(h.southGate, true);
         this.gate(h.northGate, true);
@@ -359,6 +362,9 @@ export abstract class InstanceRoom extends GameRoom {
     ed.phase = 0;
     ed.target = undefined;
     ed.contrib.clear();
+    ed.threat.clear();
+    ed.strayAt = 0;
+    ed.restAt = 0;
     ed.attacks.length = 0;
     e.x = Math.fround(ed.homeX);
     e.y = Math.fround(ed.homeY);

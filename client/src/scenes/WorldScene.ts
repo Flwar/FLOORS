@@ -3,8 +3,7 @@ import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from
 import {
   AFFIXES, Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
   isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, skillEntry, skillMove, streetPoint, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
-  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone,
-} from "@floors/shared";
+  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, mealById } from "@floors/shared";
 import type { Enemy, Hazard, Player, Projectile, WorldState } from "../../../server/src/state.ts";
 import { ambience } from "../audio/ambience.ts";
 import { Minimap } from "../ui/minimap.ts";
@@ -794,12 +793,16 @@ export class WorldScene extends Phaser.Scene {
       sfx.parry(true);
       ui.toast(`${itemBase(m.key)?.name} +${m.plus} forged!`, "good");
     });
-    r.onMessage("quest", (updates: { id: string; name: string; text: string; done?: boolean; accepted?: boolean }[]) => {
+    r.onMessage("quest", (updates: { id: string; name: string; text: string; done?: boolean; accepted?: boolean; pitch?: string; thanks?: string }[]) => {
       for (const u of updates) {
         if (u.done) {
           this.hud.title("Quest complete", u.name);
           sfx.levelUp();
-        } else if (u.accepted) ui.toast(`New quest: ${u.name}`, "good");
+          if (u.thanks) ui.system(`${u.name}: ${u.thanks}`);
+        } else if (u.accepted) {
+          ui.toast(`New quest: ${u.name} — ${u.text}`, "good");
+          if (u.pitch) ui.system(`${u.name}: ${u.pitch}`);
+        }
         else ui.toast(`${u.name}: ${u.text}`);
       }
     });
@@ -1169,7 +1172,7 @@ export class WorldScene extends Phaser.Scene {
       if (m.p === me()) this.zone = undefined;
     });
     this.room.onMessage("impact", (m: { x: number; y: number }) => this.fx.burst(m.x, m.y, 0xc9e8ff, 6, 60, 2, 300));
-    this.room.onMessage("fx", (m: { k: string; x: number; y: number; r?: number; x2?: number; y2?: number; p?: string; ms?: number }) => {
+    this.room.onMessage("fx", (m: { k: string; x: number; y: number; r?: number; x2?: number; y2?: number; p?: string; ms?: number; c?: string }) => {
       if (this.skillFx.event(m.k, m.x, m.y, m.r ?? 90)) return;
       switch (m.k) {
         case "bloodlust":
@@ -1245,6 +1248,21 @@ export class WorldScene extends Phaser.Scene {
           this.fx.burst(m.x, m.y - 20, 0xffb347, 18, 110, 2.4, 600);
           this.fx.rise(m.x, m.y - 10, 0xffd27a, 8);
           sfx.chime(2);
+          break;
+        case "eat": {
+          // A good meal: warm steam and a glow of its colour.
+          const c = Number.parseInt(String(m.c ?? "#f3e6c4").slice(1), 16);
+          this.fx.rise(m.x, m.y - 16, c, 14, 14, 40, 900, 2);
+          this.fx.ring(m.x, m.y - 10, c, 6, 28, 500, 3);
+          sfx.chime(2);
+          break;
+        }
+        case "gatestone":
+          // A Floor Boss trophy opens the way: a pillar of gold light, and you're gone.
+          this.fx.ring(m.x, m.y - 10, 0xffe08a, 8, 60, 700, 5);
+          this.fx.streak(m.x, m.y + 6, m.x, m.y - 120, 0xfff0c0, 700, 22);
+          this.fx.rise(m.x, m.y - 10, 0xffe08a, 24, 20, 80, 1100, 2.6);
+          sfx.chime(4);
           break;
         case "perfectdodge":
           // A perfect dodge: an afterimage where the blow fell, and a counter waiting.
@@ -1638,6 +1656,9 @@ export class WorldScene extends Phaser.Scene {
     if (!this.me || !p) return;
     const s = this.me.state;
     this.hud.vitals(p.hp, p.hpMax, s.stamina, s.staminaMax, s.exhausted, p.level);
+    const meal = this.ui.inv?.meal;
+    const mealDef = meal && meal.until > Date.now() ? mealById(meal.id) : undefined;
+    this.hud.meal(mealDef && { name: mealDef.name, color: mealDef.color, min: Math.ceil((meal!.until - Date.now()) / 60000) });
     const w = WEAPONS[s.weapon];
     this.hud.weapon(w.name);
     const quick = s.mods & Mod.QuickCast ? 0.75 : 1;

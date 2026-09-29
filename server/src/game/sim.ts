@@ -155,6 +155,14 @@ export interface EnemyData {
   sunderUntil?: number;
   /** Elite affix (Affix.*). */
   affix: number;
+  /** Threat per player (damage dealt, taunts), fading over time: the enemy fights whoever tops it. */
+  threat: Map<string, number>;
+  /** When the enemy next reconsiders who to fight (and a taunt holds it until then). */
+  retargetAt: number;
+  /** When its target first strayed past its leash range (0 while in range): it keeps after them a while. */
+  strayAt: number;
+  /** When a hurt enemy, home and left alone, starts to recover (0 until it settles). */
+  restAt: number;
   /** Packleader: has it called its pack yet? */
   packCalled?: boolean;
   /** The level it spawned at; engaging a stronger player can raise it (see levelToTarget). */
@@ -210,6 +218,8 @@ const SAFE_RESPAWN_MS = 2500;
 const CURSE_DAMAGE = 0.7;
 /** Lightning strikes soaked enemies this much harder. */
 const SOAK_SHOCK = 1.35;
+/** How long a taunt holds an enemy before it reconsiders. */
+const TAUNT_MS = 3000;
 /** A dodge that evades a blow within this many ticks of starting is perfect. */
 const PERFECT_DODGE_TICKS = 4;
 /** How long the counter from a perfect dodge waits for your next blow. */
@@ -304,7 +314,13 @@ export class Sim {
   removePlayer(sid: string) {
     this.players.delete(sid);
     this.tokens.delete(sid);
-    for (const ed of this.enemies.values()) if (ed.target === sid) ed.target = undefined;
+    for (const ed of this.enemies.values()) {
+      ed.threat.delete(sid);
+      if (ed.target === sid) {
+        ed.target = undefined;
+        ed.token = undefined;
+      }
+    }
   }
 
   /** Apply one input frame for a player. `renderTime` is the server time the client was viewing. */
@@ -527,6 +543,8 @@ export class Sim {
             ed.slowUntil = this.now + 4000;
             e.flags |= EFlag.Chilled;
           }
+          // A battle cry is a challenge: everything it reaches turns on you.
+          if (m.special === "warcry") this.taunt(ed, pd);
           this.damageEnemy(ed, pd, m.damage, m.poise, m.knockback, ang, m);
         }
         const off = shape.kind === "circle" ? shape.offset : 0;
@@ -608,8 +626,12 @@ export class Sim {
     if (e.act === EAct.Dead || e.act === EAct.Spawn) return;
     if (dot) return this.dotDamage(ed, pd, base);
     if (e.act === EAct.Leash) {
-      this.emit("hit", { t: ed.id, d: 0, r: HitResult.Blocked, x: e.x, y: e.y }, e.x, e.y);
-      return;
+      // Struck on its way home, it turns and fights, as long as whoever struck it is near enough
+      // to chase. A blow from far beyond its reach glances off: no sniping from out of range.
+      if (!pd || !this.ai.reengage(ed, pd)) {
+        this.emit("hit", { t: ed.id, d: 0, r: HitResult.Blocked, x: e.x, y: e.y }, e.x, e.y);
+        return;
+      }
     }
     const def = ed.def;
     const attacker = pd?.p;
@@ -714,6 +736,7 @@ export class Sim {
     }
     if (pd) {
       ed.contrib.set(pd.sid, (ed.contrib.get(pd.sid) ?? 0) + dealt);
+      this.addThreat(ed, pd, dealt);
       pd.combatUntil = this.now + 6000;
       if (!ed.target && def.behavior !== "dummy") ed.target = pd.sid;
     }
@@ -1180,7 +1203,10 @@ export class Sim {
     const amount = Math.max(1, Math.round(base * (pd?.atkMul ?? 1) * (pd?.ch?.derived.mdmg.dmg ?? 1) * (1 - ed.def.armor)));
     const dealt = Math.min(amount, e.hp);
     e.hp = Math.max(0, e.hp - amount);
-    if (pd) ed.contrib.set(pd.sid, (ed.contrib.get(pd.sid) ?? 0) + dealt);
+    if (pd) {
+      ed.contrib.set(pd.sid, (ed.contrib.get(pd.sid) ?? 0) + dealt);
+      this.addThreat(ed, pd, dealt);
+    }
     this.emit("hit", { t: ed.id, d: amount, r: HitResult.Hit, x: e.x, y: e.y, a: pd?.sid, dot: 1 }, e.x, e.y);
     if (pd) this.onDamageDealt?.(pd, ed, dealt);
     if (e.hp <= 0) {
@@ -1211,6 +1237,27 @@ export class Sim {
     if (ed.e.flags & EFlag.Soaked) ms *= 2;
     ed.slowUntil = Math.max(ed.slowUntil, this.now + ms);
     ed.e.flags |= EFlag.Chilled;
+  }
+
+  /** Damage (and damage over time) builds threat on whoever dealt it. */
+  private addThreat(ed: EnemyData, pd: PlayerData, amount: number) {
+    if (ed.def.behavior === "dummy" || ed.def.behavior === "sparring") return;
+    ed.threat.set(pd.sid, (ed.threat.get(pd.sid) ?? 0) + amount);
+  }
+
+  /** Taunt: this player becomes the enemy's target at once, and stays it for a few seconds. */
+  taunt(ed: EnemyData, pd: PlayerData) {
+    if (ed.def.behavior === "dummy" || ed.def.behavior === "sparring" || ed.e.act === EAct.Dead) return;
+    let top = 0;
+    for (const v of ed.threat.values()) top = Math.max(top, v);
+    ed.threat.set(pd.sid, top * 1.5 + 50);
+    if (ed.target !== pd.sid) {
+      this.releaseToken(ed);
+      ed.target = pd.sid;
+    }
+    ed.e.flags |= EFlag.Aggro;
+    ed.retargetAt = this.now + TAUNT_MS;
+    this.emit("fx", { k: "taunt", x: ed.e.x, y: ed.e.y, t: ed.id }, ed.e.x, ed.e.y);
   }
 
   /** Packleader: two of its kind answer when it is badly hurt. */
@@ -1410,7 +1457,7 @@ export class Sim {
       id, e, def, spawner: opts.spawner, homeX: x, homeY: y, cooldowns: def.attacks.map(() => 0), attackSeq: 0, attacks: [],
       poiseDmg: 0, poiseAt: 0, flinches: 0, flinchAt: 0, hyperUntil: 0, stateUntil: this.now + 500, kbx: 0, kby: 0, pathAt: 0,
       orbit: Math.random() * Math.PI * 2, thinkAt: 0, contrib: new Map(), phase: 0, enrageUntil: 0, slowUntil: 0, minions: new Set(),
-      master: opts.master, removeAt: 0, specialFired: 0, baseLevel: e.level, hpScale: opts.hpScale, affix,
+      master: opts.master, removeAt: 0, specialFired: 0, baseLevel: e.level, hpScale: opts.hpScale, affix, threat: new Map(), retargetAt: 0, strayAt: 0, restAt: 0,
     };
     this.enemies.set(id, ed);
     this.state.enemies.set(id, e);
@@ -1479,7 +1526,8 @@ export class Sim {
     if (ed.target && !ed.raised) {
       ed.raised = true;
       const pl = this.players.get(ed.target)?.ch?.data.level ?? 0;
-      const want = Math.min(this.levelCap, Math.max(ed.baseLevel, pl - 1));
+      // (Never below its own level: one placed above the floor's cap stays as strong as it is.)
+      const want = Math.max(ed.baseLevel, Math.min(this.levelCap, pl - 1));
       setLevel(want);
     } else if (!ed.target && ed.raised) {
       ed.raised = false;

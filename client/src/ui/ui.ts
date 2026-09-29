@@ -1,7 +1,7 @@
 import {
   ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, itemMasteryLevel, MAX_LEVEL, questDef, QUESTS, RARITY_COLORS,
   RARITY_NAMES, roomLabel, scrollSkill, SCROLL_SOURCES, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
-  masteryProgress, weaponMasteryDamage, gearSetOf,
+  masteryProgress, weaponMasteryDamage, gearSetOf, relicOf, relicPower, isDungeonRoom, TOWER, MEALS, MEAL_MS,
 } from "@floors/shared";
 import type { Room } from "@colyseus/sdk";
 import { sfx } from "../audio/sfx.ts";
@@ -41,6 +41,10 @@ export interface InvView {
   stats: { kills: number; deaths: number; parries: number; perfects: number };
   achievements: string[];
   derived: { atk: number; defense: number; hpMax: number; staminaMax: number };
+  /** When a Floor Boss trophy will carry you again. */
+  relicAt?: number;
+  /** The inn meal doing you good, and when it wears off. */
+  meal?: { id: string; until: number };
 }
 
 export interface DialogMsg {
@@ -51,6 +55,8 @@ export interface DialogMsg {
   offers: { id: string; name: string; pitch: string; main: boolean }[];
   done: { id: string; name: string; thanks: string }[];
   services: string[];
+  /** What a meal costs at this inn. */
+  mealPrice?: number;
   shop?: { key: string; price: number; rarity?: number; marks?: number }[];
 }
 
@@ -322,6 +328,39 @@ export class GameUI {
     else if (b.kind === "scroll") this.readScroll(it);
     else if (b.kind === "consumable") this.toast("Drink tonics with R — it takes a moment, so choose it well.");
     else if (b.kind === "key") this.toast(b.desc);
+    else if (relicOf(it.key)) this.useRelic(it);
+  }
+
+  /** A Floor Boss trophy: the First Gate lets you pick a floor; the others take you home. */
+  private useRelic(it: Item) {
+    const relic = relicOf(it.key);
+    const inv = this.inv;
+    if (!relic || !inv) return;
+    if (this.adminKind && isDungeonRoom(this.adminKind)) return this.toast("Its pull can't reach you in here. Leave the dungeon first.", "error");
+    const left = (inv.relicAt ?? 0) - Date.now();
+    if (left > 0) return this.toast(`It is still gathering itself: ${Math.ceil(left / 60000)} more minute${left > 60000 ? "s" : ""}.`, "error");
+    if (!relic.gate) {
+      this.room?.send("relic:use", { key: it.key });
+      return;
+    }
+    this.root.querySelector(".menu")?.remove();
+    const m = el(`<div class="menu relic-menu"><div class="tt-dim">Step through the First Gate to…</div></div>`);
+    const top = Math.min(inv.floor, TOWER.length);
+    for (let n = 1; n <= top; n++) {
+      const f = TOWER[n - 1];
+      const btn = el(`<button>Floor ${n} · ${esc(f.town)}</button>`);
+      btn.addEventListener("click", () => {
+        m.remove();
+        this.room?.send("relic:use", { key: it.key, floor: n });
+      });
+      m.append(btn);
+    }
+    const cancel = el(`<button>Cancel</button>`);
+    cancel.addEventListener("click", () => m.remove());
+    m.append(cancel);
+    m.style.left = `${Math.round(window.innerWidth / 2 - 110)}px`;
+    m.style.top = `${Math.round(window.innerHeight / 3)}px`;
+    this.root.append(m);
   }
 
   /** A scroll in the pack teaches something new. */
@@ -363,6 +402,7 @@ export class GameUI {
     };
     if (b && (b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm")) add("Equip", () => this.room?.send("equip", it.uid));
     if (b?.kind === "scroll") add("Read", () => this.readScroll(it));
+    if (relicOf(it.key)) add("Use", () => this.useRelic(it));
     if (!b?.bound) add("Drop", () => confirm(`Drop ${itemName(it)} on the ground?`) && this.room?.send("discard", it.uid));
     add("Cancel", () => {});
     m.style.left = `${x}px`;
@@ -429,6 +469,11 @@ export class GameUI {
       lines.push(`<div class="tt-set"><div class="tt-setname">${esc(set.name)} set <span class="tt-dim">(${worn}/3 worn)</span></div>
         <div class="${worn >= 2 ? "tt-up" : "tt-dim"}">2 pieces: +${set.two.hp} health, +${set.two.defense} defense</div>
         <div class="${worn >= 3 ? "tt-up" : "tt-dim"}">3 pieces: ${esc(set.three.desc)}</div></div>`);
+    }
+    const power = relicPower(it.key);
+    if (power) {
+      const left = (this.inv?.relicAt ?? 0) - Date.now();
+      lines.push(`<div class="tt-effect">${esc(power)}</div><div class="tt-dim">${left > 0 ? `Ready again in ${Math.ceil(left / 60000)} min.` : "Ready. Click to use (not mid-fight, not in a dungeon; trophies share a 5-minute rest)."}</div>`);
     }
     if (b.bound) lines.push(`<div class="tt-dim">Bound — never lost on death, can't be traded.</div>`);
     const price = sellPrice(it);
@@ -781,6 +826,22 @@ export class GameUI {
 
   // --- Dialog, shops, smith, bank -----------------------------------------------------
 
+  /** The inn's four dishes: one meal at a time, a new one replaces the old. */
+  private mealMenu(d: DialogMsg) {
+    const box = el(`<div class="meals"><div class="tt-dim">Order a meal (${d.mealPrice ?? 0}g · lasts ${MEAL_MS / 60000} minutes · a new one replaces the old)</div></div>`);
+    const cur = this.inv?.meal && this.inv.meal.until > Date.now() ? this.inv.meal : undefined;
+    for (const m of MEALS) {
+      const eating = cur?.id === m.id;
+      const row = el(`<button class="meal-row${eating ? " active" : ""}"><i style="background:${m.color}"></i><b>${esc(m.name)}</b><span>${esc(m.desc)}${eating ? ` · ${Math.ceil((cur!.until - Date.now()) / 60000)} min left` : ""}</span></button>`);
+      row.addEventListener("click", () => {
+        this.room?.send("inn:eat", { npc: d.npc, meal: m.id });
+        window.setTimeout(() => this.dialog === d && this.render("dialog"), 400);
+      });
+      box.append(row);
+    }
+    return box;
+  }
+
   showDialog(d: DialogMsg) {
     this.dialog = d;
     this.mode = "none";
@@ -819,6 +880,7 @@ export class GameUI {
       });
     }
     if (services.childElementCount) body.append(services);
+    if (d.services.includes("meals")) body.append(this.mealMenu(d));
     if (this.mode === "shop" && d.shop) {
       const shopKey = d.services.find((s) => s.startsWith("shop:"))!.slice(5);
       const list = el(`<div class="shop"></div>`);

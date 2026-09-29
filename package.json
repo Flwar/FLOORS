@@ -35,7 +35,11 @@
     "worldfloor": "tsx tools/worldfloor.ts",
     "social": "tsx tools/social.ts",
     "loot": "tsx tools/loot.ts",
-    "curve": "tsx tools/curve.ts"
+    "curve": "tsx tools/curve.ts",
+    "aggro": "tsx tools/aggro.ts",
+    "leash": "tsx tools/leash.ts",
+    "relics": "tsx tools/relics.ts",
+    "questflow": "tsx tools/questflow.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

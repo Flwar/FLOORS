@@ -1,8 +1,7 @@
 import { matchMaker, type Client } from "colyseus";
 import {
   Act, floorDef, floorOfRoom, itemBase, makeItem, questDef, SKILLBOOK, sellPrice, SHOPS, TILE, TOWER, upgradeCost, WEAPONS,
-  type FloorDef, type NpcDef, type WorldMap, type WorldObject,
-} from "@floors/shared";
+  type FloorDef, type NpcDef, type WorldMap, type WorldObject, relicOf, RELIC_COOLDOWN_MS, mealById, mealPrice, MEAL_MS } from "@floors/shared";
 import { BANK_SIZE, type Character } from "../game/character.ts";
 import { accept, offers, questEvent, turnIns, type QuestEvent } from "../game/quests.ts";
 import { Spawners } from "../game/spawners.ts";
@@ -211,6 +210,46 @@ export class WorldRoom extends GameRoom {
       this.quest(client.sessionId, me.ch, { kind: "talk", npc: q.giver });
     });
 
+    // Floor Boss trophies: the Fragment of the First Gate opens the way to any open floor's
+    // town; the others take you home to their own. Only the one who won them has them.
+    this.onMessage("relic:use", (client, msg: { key: string; floor?: number }) => {
+      const me = this.player(client);
+      const key = String(msg?.key);
+      const relic = relicOf(key);
+      if (!me || !relic || me.p.act === Act.Dead || !me.ch.data.inventory.some((it) => it?.key === key)) return;
+      if (me.pd.combatUntil > this.sim.now) return this.notify(client, "You can't hold on to it in the middle of a fight.", "error");
+      const left = (me.ch.data.relicAt ?? 0) - Date.now();
+      if (left > 0) return this.notify(client, `It is still gathering itself: ${Math.ceil(left / 60000)} more minute${left > 60000 ? "s" : ""}.`, "error");
+      const n = relic.gate ? Math.round(Number(msg?.floor)) : relic.floor;
+      if (!(n >= 1 && n <= Math.min(me.ch.data.floor, TOWER.length))) return this.notify(client, "That floor isn't open to you.", "error");
+      const to = floorDef(n);
+      me.ch.data.relicAt = Date.now() + RELIC_COOLDOWN_MS;
+      me.ch.dirty = true;
+      this.emitNear("fx", { k: "gatestone", x: me.p.x, y: me.p.y, p: client.sessionId }, me.p.x, me.p.y);
+      this.notify(client, `${itemBase(key)?.name} carries you to ${to.town}.`, "good");
+      if (to.room === this.kind) {
+        // Already on that floor: straight to its town.
+        const gate = to.down ? this.map.object(to.down) : undefined;
+        me.p.x = Math.fround(gate ? gate.x : this.map.spawn.x);
+        me.p.y = Math.fround(gate ? gate.y + 44 : this.map.spawn.y);
+        return;
+      }
+      this.travel(client.sessionId, me.ch, to.room, to.down ?? "");
+    });
+    // Inn meals: order from the innkeeper; one at a time, and a new one replaces the old.
+    this.onMessage("inn:eat", (client, msg: { npc: string; meal: string }) => {
+      const me = this.player(client);
+      const meal = mealById(String(msg?.meal));
+      const npc = this.map.npcs.find((n) => n.id === String(msg?.npc));
+      if (!me || !meal || !npc || npc.role !== "inn" || me.p.act === Act.Dead || !this.npcNear(client, undefined, npc.id)) return;
+      const price = mealPrice(this.floor.n);
+      if (me.ch.data.gold < price) return this.notify(client, `${meal.name} costs ${price} gold.`, "error");
+      me.ch.data.gold -= price;
+      me.ch.data.meal = { id: meal.id, until: Date.now() + MEAL_MS };
+      me.ch.recompute();
+      this.emitNear("fx", { k: "eat", x: me.p.x, y: me.p.y, p: client.sessionId, c: meal.color }, me.p.x, me.p.y);
+      this.notify(client, `${meal.name}: ${meal.desc} (${MEAL_MS / 60000} minutes)`, "good");
+    });
     this.onMessage("shop:buy", (client, msg: { shop: string; idx: number }) => {
       const me = this.player(client);
       const merchant = msg?.shop === "merchant";
@@ -344,7 +383,7 @@ export class WorldRoom extends GameRoom {
     if (npc.role === "smith") services.push("smith");
     if (shop) services.push("sell");
     if (npc.role === "storage") services.push("bank");
-    if (npc.role === "inn") services.push("rumour");
+    if (npc.role === "inn") services.push("rumour", "meals");
     const done = updates.filter((u) => u.done).map((u) => ({ id: u.id, name: u.name, thanks: questDef(u.id)!.thanks }));
     client.send("dialog", {
       npc: npc.id,
@@ -355,6 +394,7 @@ export class WorldRoom extends GameRoom {
       done,
       services,
       shop: shop === "merchant" ? this.events.merchantStock : shop ? SHOPS[shop] : undefined,
+      mealPrice: npc.role === "inn" ? mealPrice(this.floor.n) : undefined,
     });
   }
 
@@ -521,6 +561,31 @@ export class WorldRoom extends GameRoom {
         if (Math.hypot(ed.e.x - me.p.x, ed.e.y - me.p.y) > (Number(radius) || 600)) continue;
         this.sim.damageEnemy(ed, me.pd, 99999, 0, 0, 0);
       }
+    });
+    // Tests: strike nearby enemies for a given amount (as this player), and ask who each is fighting.
+    this.onDev("dev:strike", (client, m: { damage: number; radius?: number }) => {
+      const me = this.player(client);
+      if (!me) return;
+      for (const ed of [...this.sim.enemies.values()]) {
+        if (ed.e.act === 5 || Math.hypot(ed.e.x - me.p.x, ed.e.y - me.p.y) > (Number(m?.radius) || 300)) continue;
+        this.sim.damageEnemy(ed, me.pd, Number(m?.damage) || 1, 0, 0, 0);
+      }
+    });
+    this.onDev("dev:taunt", (client, radius: number) => {
+      const me = this.player(client);
+      if (!me) return;
+      for (const ed of this.sim.enemies.values()) if (Math.hypot(ed.e.x - me.p.x, ed.e.y - me.p.y) <= (Number(radius) || 200)) this.sim.taunt(ed, me.pd);
+    });
+    this.onDev("dev:targets", (client, radius: number) => {
+      const me = this.player(client);
+      if (!me) return;
+      const out: { id: string; key: string; target?: string; hp: number; hpMax: number; act: number; x: number; y: number; hx: number; hy: number }[] = [];
+      for (const ed of this.sim.enemies.values()) {
+        if (Math.hypot(ed.e.x - me.p.x, ed.e.y - me.p.y) > (Number(radius) || 400)) continue;
+        const e = ed.e;
+        out.push({ id: ed.id, key: ed.def.key, target: ed.target ? this.chars.get(ed.target)?.data.name : undefined, hp: e.hp, hpMax: e.hpMax, act: e.act, x: e.x, y: e.y, hx: ed.homeX, hy: ed.homeY });
+      }
+      client.send("targets", out);
     });
     // Tests: bring nearby enemies down to a share of their health with one small blow.
     this.onDev("dev:hitnear", (client, m: { frac: number; radius?: number }) => {

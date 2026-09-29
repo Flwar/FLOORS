@@ -1,8 +1,7 @@
 import {
   baseHp, baseStamina, combatBonus, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemMasteryLevel, itemStats, knownIndices, makeItem, masteryProgress,
   MAX_LEVEL, Mod, NO_SKILL, scrollSkill, setsWorn, skillEntry, skillMods, WEAPON_ARTS, WEAPONS, xpToNext,
-  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type SkillEntry, type WeaponKey,
-} from "@floors/shared";
+  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type SkillEntry, type WeaponKey, mealById, type MealDef } from "@floors/shared";
 
 /** Main-story quests that used to award a skill point (for converting old characters). */
 const OLD_QUEST_POINTS = ["q_welcome", "q_grakk", "q_undercroft", "q_keeper", "f2_causeway", "f2_storm", "f2_spire"];
@@ -30,6 +29,10 @@ export interface QuestState {
 /** Everything persisted for a character. */
 export interface CharacterData {
   version: 1;
+  /** When a Floor Boss trophy will carry you again (Date.now() time). */
+  relicAt?: number;
+  /** The inn meal you last ate, and when it wears off (Date.now() time). */
+  meal?: { id: string; until: number };
   name: string;
   hue: number;
   level: number;
@@ -286,7 +289,12 @@ export class Character {
     if (this.hasPerk("deepLungs")) stamina += 15;
     if (this.hasPerk("tidalGrace")) stamina += 20;
     if (this.hasPerk("clockworkHeart")) stamina += 25;
+    // An inn meal: one thing, done well, for a while.
+    const meal = this.meal();
+    if (meal?.stamina) stamina += meal.stamina;
+    if (meal?.dmgPct) power *= 1 + meal.dmgPct;
     let hpMax = baseHp(d.level) + hp;
+    if (meal?.hpPct) hpMax *= 1 + meal.hpPct;
     if (this.hasPerk("wardensGrace")) hpMax = Math.round(hpMax * 1.1);
     if (this.hasPerk("glacialHide")) hpMax = Math.round(hpMax * 1.08);
     if (this.hasPerk("clockworkHeart")) hpMax = Math.round(hpMax * 1.08);
@@ -302,6 +310,21 @@ export class Character {
       mdmg: combatBonus(wk, mlevel),
     };
     this.dirty = true;
+  }
+
+  /** The inn meal still doing you good, if any. */
+  meal(): MealDef | undefined {
+    const m = this.data.meal;
+    return m && m.until > Date.now() ? mealById(m.id) : undefined;
+  }
+
+  /** A meal has worn off: forget it, and lose what it gave. Returns true if one did. */
+  expireMeal(): boolean {
+    const m = this.data.meal;
+    if (!m || m.until > Date.now()) return false;
+    this.data.meal = undefined;
+    this.recompute();
+    return true;
   }
 
   /** Push derived stats and visible gear onto the synced player. */
@@ -510,6 +533,8 @@ export class Character {
       floor: d.floor,
       stats: d.stats,
       achievements: d.achievements,
+      relicAt: d.relicAt && d.relicAt > Date.now() ? d.relicAt : undefined,
+      meal: this.meal() ? d.meal : undefined,
       derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax, effects: [...this.derived.effects] },
       ...extra,
     };

@@ -228,3 +228,14 @@ button.small { padding: 2px 8px; font-size: 11px; min-height: 0; }
 #minimap .mm-n { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font: bold 12px Georgia, serif; color: #ffe1a0;
   background: #1d1a17; border: 2px solid #c9a24a; border-radius: 50%; width: 20px; height: 20px; line-height: 17px; text-align: center; }
 @media (max-width: 700px) { #minimap { width: 112px; height: 112px; } #minimap canvas { width: 112px; height: 112px; } }
+
+/* The First Gate's floor picker. */
+.relic-menu { min-width: 220px; }
+.relic-menu .tt-dim { padding: 4px 6px 6px; }
+
+/* The inn's menu. */
+.dialog .meals { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.dialog .meal-row { display: grid; grid-template-columns: 10px auto 1fr; align-items: center; gap: 8px; text-align: left; }
+.dialog .meal-row i { width: 10px; height: 10px; border-radius: 50%; }
+.dialog .meal-row span { opacity: 0.8; font-size: 0.92em; }
+.dialog .meal-row.active { outline: 1px solid #e8c55a; }

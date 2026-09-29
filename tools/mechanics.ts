@@ -1,10 +1,10 @@
 /**
  * Core mechanics (npm run mechanics): gear set bonuses (two pieces: health and defense;
  * three: the set's power) and elite affixes (Frenzied, Warded, Volatile, Packleader).
- * Perfect dodges are covered by npm run combat.
+ * inn meals (a timed buff from the innkeeper). Perfect dodges are covered by npm run combat.
  */
 import { Client, type Room } from "@colyseus/sdk";
-import { Affix, AFFIXES, EAct, EFlag, ENEMIES, GEAR_SETS, HazardKind, SERVER_PORT } from "@floors/shared";
+import { Affix, AFFIXES, buildFloor1, EAct, EFlag, ENEMIES, GEAR_SETS, HazardKind, SERVER_PORT } from "@floors/shared";
 
 const endpoint = process.env.SERVER ?? `ws://localhost:${SERVER_PORT}`;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -93,6 +93,28 @@ for (const [name, affix] of Object.entries(Affix)) {
   }
 }
 room.send("dev:killnear", 700);
+
+// --- Inn meals -----------------------------------------------------------------------------
+const inn = buildFloor1().npcs.find((n) => n.id === "innkeep")!;
+room.send("dev:give", { key: "", gold: 1000 });
+await wait(300);
+const hpBefore = inv.derived.hpMax;
+const goldBefore = inv.gold;
+room.send("dev:teleport", { x: inn.x, y: inn.y + 30 });
+await wait(400);
+room.send("inn:eat", { npc: "innkeep", meal: "stew" });
+await wait(600);
+check("a Hearty Stew at the inn adds 12% health", inv.meal?.id === "stew" && Math.abs(inv.derived.hpMax / hpBefore - 1.12) < 0.02, `${hpBefore} → ${inv.derived.hpMax}`);
+check("…and costs gold", inv.gold < goldBefore, `${goldBefore} → ${inv.gold}`);
+room.send("inn:eat", { npc: "innkeep", meal: "skewers" });
+await wait(600);
+check("another meal replaces it", inv.meal?.id === "skewers" && inv.derived.hpMax === hpBefore && inv.derived.atk > 0, `meal ${inv.meal?.id}, health ${inv.derived.hpMax}`);
+room.send("dev:teleport", { x: 1500, y: 1500 });
+await wait(300);
+const far = inv.meal?.until;
+room.send("inn:eat", { npc: "innkeep", meal: "stew" });
+await wait(500);
+check("you can only order at the inn", inv.meal?.id === "skewers" && inv.meal?.until === far, inv.meal?.id ?? "none");
 await Promise.race([room.leave().catch(() => {}), wait(1200)]);
 console.log(failures ? `\n${failures} check(s) failed` : "\nall checks passed");
 process.exit(failures ? 1 : 0);

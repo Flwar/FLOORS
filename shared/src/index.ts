@@ -38,3 +38,5 @@ export * from "./content/floor7.ts";
 export * from "./world/stormspire.ts";
 export * from "./social.ts";
 export * from "./tower.ts";
+export * from "./relics.ts";
+export * from "./meals.ts";

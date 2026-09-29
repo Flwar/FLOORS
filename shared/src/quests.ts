@@ -25,6 +25,11 @@ export interface QuestDef {
   mission?: boolean;
   /** The floor the quest's giver is on (default 1). */
   floor?: number;
+  /**
+   * Starts by itself the moment its prerequisite is finished, wherever you are, so the story
+   * runs straight on (e.g. deeper into the same dungeon) instead of sending you back to town.
+   */
+  autoStart?: boolean;
 }
 
 /**
@@ -113,12 +118,11 @@ export const QUESTS: QuestDef[] = [
     giver: "guildmaster",
     main: true,
     requires: "q_grakk",
-    pitch: "Use the key. Beneath the ruins waits a Warden, and past it — if the old tablets are right — the Keeper of the First Gate. Take friends. Rest at the braziers.",
+    pitch: "Use the key. Beneath the ruins waits a Warden, and past it — if the old tablets are right — the Keeper of the First Gate. Take friends. Rest at the braziers. And don't come back up to tell me about the Warden: keep going.",
     thanks: "The Warden has fallen. Only the Keeper remains between us and the Floor above.",
     stages: [
       { kind: "dungeon", dungeon: "dungeon", text: "Unseal the Undercroft (Sunken Ruins court)" },
       { kind: "kill", enemy: ["warden"], count: 1, text: "Defeat the Undercroft Warden" },
-      { kind: "talk", npc: "guildmaster", text: "Return to Guildmaster Rhea" },
     ],
     rewards: { xp: 500, gold: 150, items: [{ key: "tonic", qty: 3 }, { key: "scroll_any_blink" }] },
   },
@@ -128,6 +132,8 @@ export const QUESTS: QuestDef[] = [
     giver: "guildmaster",
     main: true,
     requires: "q_undercroft",
+    // Picks up the moment the Warden falls, right there in the Undercroft.
+    autoStart: true,
     pitch: "Aurelion, the Keeper, guards the way up. Learn him. Parry the thrust at the instant of light. Stand in the glyphs when he passes judgement. And then — climb.",
     thanks: "The Ascent Gate is open. There's a whole world above us. Go and see it — then come back and tell me.",
     stages: [
