@@ -497,13 +497,15 @@ export const EFlag = {
   Soaked: 1024,
   /** Sundered (clockwork skills, Siegebreaker): its armour counts for nothing, and it staggers half again as fast. */
   Sundered: 2048,
+  /** A Shielded elite's ward is up: it soaks blows until it breaks. */
+  Shielded: 4096,
 } as const;
 
 /**
  * Elite affixes: most elites carry one trait that changes how they fight.
  * Synced as a number on the enemy (0 = none); the names and colours are for the client.
  */
-export const Affix = { None: 0, Vampiric: 1, Frenzied: 2, Warded: 3, Volatile: 4, Packleader: 5 } as const;
+export const Affix = { None: 0, Vampiric: 1, Frenzied: 2, Warded: 3, Volatile: 4, Packleader: 5, Thorned: 6, Shielded: 7 } as const;
 export const AFFIXES: { name: string; color: string; desc: string }[] = [
   { name: "", color: "#f2c46b", desc: "" },
   { name: "Vampiric", color: "#ff5a4a", desc: "Heals itself with every blow it lands." },
@@ -511,6 +513,8 @@ export const AFFIXES: { name: string; color: string; desc: string }[] = [
   { name: "Warded", color: "#9fd3ff", desc: "Takes a third less damage until it is below half health." },
   { name: "Volatile", color: "#ffd24a", desc: "Explodes a moment after it dies. Step away." },
   { name: "Packleader", color: "#b8e07a", desc: "Calls two of its kind when badly hurt." },
+  { name: "Thorned", color: "#6fd08a", desc: "Strike it up close and a share of the blow comes back to you." },
+  { name: "Shielded", color: "#bfe8ff", desc: "A ward soaks its first blows, and returns if it goes unhit for a while." },
 ];
 
 /** Tick timeline of an enemy attack. */

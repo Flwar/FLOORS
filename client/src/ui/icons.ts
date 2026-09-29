@@ -49,6 +49,33 @@ export function itemIcon(key: string, rarity = 0): string {
   } else if (key.startsWith("map_")) {
     drawMap(g);
   } else switch (base?.kind === "consumable" || base?.kind === "material" || base?.kind === "artifact" || base?.kind === "key" ? key : base?.kind) {
+    case "mat_essence": {
+      const halo = g.createRadialGradient(32, 34, 3, 32, 34, 28);
+      halo.addColorStop(0, "rgba(214,160,255,0.95)");
+      halo.addColorStop(1, "rgba(120,60,200,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(32, 8); g.lineTo(46, 30); g.lineTo(32, 58); g.lineTo(18, 30);
+      g.closePath();
+      g.fill();
+      const eg = g.createLinearGradient(20, 10, 44, 56);
+      eg.addColorStop(0, "#fbeaff");
+      eg.addColorStop(0.45, "#c07cff");
+      eg.addColorStop(1, "#5a2a9a");
+      g.fillStyle = eg;
+      g.beginPath();
+      g.moveTo(32, 12); g.lineTo(42, 30); g.lineTo(32, 53); g.lineTo(22, 30);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.7)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(32, 14); g.lineTo(27, 30); g.lineTo(32, 48);
+      g.stroke();
+      break;
+    }
     case "mat_rimeshard": {
       // A long shard of blue-white ice.
       g.fillStyle = outline;

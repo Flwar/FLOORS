@@ -1,7 +1,7 @@
 import { matchMaker, type Client } from "colyseus";
 import {
   Act, floorDef, floorOfRoom, itemBase, makeItem, questDef, SKILLBOOK, sellPrice, SHOPS, TILE, TOWER, upgradeCost, WEAPONS,
-  type FloorDef, type NpcDef, type WorldMap, type WorldObject, relicOf, RELIC_COOLDOWN_MS, mealById, mealPrice, MEAL_MS } from "@floors/shared";
+  type FloorDef, type NpcDef, type WorldMap, type WorldObject, relicOf, RELIC_COOLDOWN_MS, mealById, mealPrice, MEAL_MS, salvageYield, temperCost } from "@floors/shared";
 import { BANK_SIZE, type Character } from "../game/character.ts";
 import { accept, offers, questEvent, turnIns, type QuestEvent } from "../game/quests.ts";
 import { Spawners } from "../game/spawners.ts";
@@ -311,6 +311,48 @@ export class WorldRoom extends GameRoom {
       client.send("forged", { key: it.key, plus: it.plus });
     });
 
+    // Salvage: break an unwanted item down into materials and essence.
+    this.onMessage("smith:salvage", (client, uid: string) => {
+      const me = this.player(client);
+      if (!me || !this.npcNear(client, "smith")) return;
+      const it = me.ch.data.inventory.find((x) => x?.uid === uid);
+      const yields = it && salvageYield(it);
+      if (!it || !yields) return this.notify(client, "That can't be broken down.", "error");
+      // Room for what comes out (the item's own slot frees up first).
+      const free = me.ch.data.inventory.filter((x) => !x).length + 1;
+      const newStacks = yields.filter((y) => !me.ch.data.inventory.some((x) => x?.key === y.key && x.qty + y.qty <= (itemBase(y.key)?.stack ?? 1))).length;
+      if (newStacks > free) return this.notify(client, "Make room in your pack first.", "error");
+      me.ch.takeItem(uid);
+      for (const y of yields) {
+        me.ch.addItem(makeItem(y.key, 0, y.qty));
+        client.send("looted", { key: y.key, rarity: 0, qty: y.qty });
+      }
+      me.ch.recompute();
+      this.save(client.sessionId);
+      client.send("salvaged", { key: it.key, rarity: it.rarity });
+    });
+    // Temper: raise an item one rarity with essence and gold.
+    this.onMessage("smith:temper", (client, uid: string) => {
+      const me = this.player(client);
+      if (!me || !this.npcNear(client, "smith")) return;
+      const it = me.ch.data.inventory.find((x) => x?.uid === uid) ?? Object.values(me.ch.data.equipment).find((x) => x?.uid === uid);
+      const cost = it && temperCost(it);
+      if (!it || !cost) return this.notify(client, "That can't be tempered any further.", "error");
+      if (me.ch.data.gold < cost.gold) return this.notify(client, "Not enough gold.", "error");
+      if (me.ch.count("mat_essence") < cost.essence) return this.notify(client, `You need ${cost.essence} Arcane Essence.`, "error");
+      me.ch.data.gold -= cost.gold;
+      me.ch.consume("mat_essence", cost.essence);
+      const fresh = makeItem(it.key, it.rarity + 1);
+      // Keep the extra it already had (health or stamina), if any.
+      if (it.bonus.hp && fresh.bonus.stamina) fresh.bonus = { ...fresh.bonus, hp: fresh.bonus.stamina * 2, stamina: undefined };
+      else if (it.bonus.stamina && fresh.bonus.hp) fresh.bonus = { ...fresh.bonus, stamina: Math.round(fresh.bonus.hp / 2), hp: undefined };
+      it.rarity = fresh.rarity;
+      it.bonus = fresh.bonus;
+      me.ch.recompute();
+      this.save(client.sessionId);
+      client.send("tempered", { key: it.key, rarity: it.rarity });
+    });
+
     this.onMessage("bank:open", (client) => {
       const me = this.player(client);
       if (!me || !this.npcNear(client, "storage")) return;
@@ -602,6 +644,24 @@ export class WorldRoom extends GameRoom {
       const me = this.player(client);
       if (!me) return;
       me.ch.data.floor = Math.max(1, Math.min(TOWER.length, Math.round(Number(n) || 1)));
+      me.ch.dirty = true;
+    });
+    // Tests: something falls to the ground at your feet, as loot would.
+    this.onDev("dev:drop", (client, m: { key: string; qty?: number; dx?: number }) => {
+      const me = this.player(client);
+      if (!me || !itemBase(String(m?.key))) return;
+      this.spawnDrop(me.p.x + (Number(m?.dx) || 0), me.p.y, { item: makeItem(String(m.key), 0, Number(m?.qty) || 1) }, this.keys.get(client.sessionId)!);
+    });
+    this.onDev("dev:rested", (client, xp: number) => {
+      const me = this.player(client);
+      if (!me) return;
+      me.ch.data.rested = Math.max(0, Math.round(Number(xp) || 0));
+      me.ch.dirty = true;
+    });
+    this.onDev("dev:hunts", (client, m: { key: string; kills: number }) => {
+      const me = this.player(client);
+      if (!me) return;
+      (me.ch.data.hunts ??= {})[String(m?.key)] = Math.max(0, Math.round(Number(m?.kills) || 0));
       me.ch.dirty = true;
     });
     this.onDev("dev:questdone", (client, id: string) => {

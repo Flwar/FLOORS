@@ -36,8 +36,7 @@ import {
   REST_REGEN,
   type PlayerSim,
   type Shape,
-  type WorldMap,
-} from "@floors/shared";
+  type WorldMap, huntBonus } from "@floors/shared";
 import { Enemy, Hazard, Projectile, type Player, type WorldState } from "../state.ts";
 import { EnemyAI } from "./ai.ts";
 import type { Character } from "./character.ts";
@@ -163,6 +162,11 @@ export interface EnemyData {
   strayAt: number;
   /** When a hurt enemy, home and left alone, starts to recover (0 until it settles). */
   restAt: number;
+  /** It has already cried out for help in this fight. */
+  calledHelp?: boolean;
+  /** Shielded elites: what's left of the ward, and when it comes back if broken. */
+  shield?: number;
+  shieldAt?: number;
   /** Packleader: has it called its pack yet? */
   packCalled?: boolean;
   /** The level it spawned at; engaging a stronger player can raise it (see levelToTarget). */
@@ -218,6 +222,11 @@ const SAFE_RESPAWN_MS = 2500;
 const CURSE_DAMAGE = 0.7;
 /** Lightning strikes soaked enemies this much harder. */
 const SOAK_SHOCK = 1.35;
+/** Shielded elites: the ward is this share of their health, and returns this long after the last blow. */
+const SHIELD_SHARE = 0.2;
+const SHIELD_BACK_MS = 8000;
+/** Thorned elites send back this share of a melee blow. */
+const THORNS = 0.12;
 /** How long a taunt holds an enemy before it reconsiders. */
 const TAUNT_MS = 3000;
 /** A dodge that evades a blow within this many ticks of starting is perfect. */
@@ -718,12 +727,37 @@ export class Sim {
     if (m?.special === "sunder" || m?.sunder || (m && heavyBlow && pd?.ch?.hasPerk("siegebreaker")) || (dv?.effects.has("tinkercog") && Math.random() < 1 / 6) || (dv?.effects.has("setBrass") && Math.random() < 0.3)) this.sunder(ed);
     if (m?.special === "soak" || m?.soak || (dv?.effects.has("tideshell") && Math.random() < 1 / 6) || (dv?.effects.has("setTide") && Math.random() < 0.3)) this.soak(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
+    // Hunter's Lore: you know how to kill what you've killed many times.
+    if (pd?.ch) dmg *= 1 + huntBonus(pd.ch.data.hunts?.[def.key]);
     if (m?.special === "mark" && pd) {
       ed.markUntil = this.now + 6000;
       e.flags |= EFlag.Marked;
     }
     dmg *= 1 - (e.flags & EFlag.Sundered ? 0 : def.armor);
-    const amount = Math.max(1, Math.round(dmg));
+    let amount = Math.max(1, Math.round(dmg));
+    // Shielded: the ward takes the blow first; once broken it returns after a while unhit.
+    if (ed.affix === Affix.Shielded) {
+      ed.shieldAt = this.now + SHIELD_BACK_MS;
+      if (ed.shield === undefined) ed.shield = Math.round(e.hpMax * SHIELD_SHARE);
+      if (ed.shield > 0) {
+        const soak = Math.min(ed.shield, amount);
+        ed.shield -= soak;
+        amount -= soak;
+        if (ed.shield <= 0) {
+          e.flags &= ~EFlag.Shielded;
+          this.emit("fx", { k: "shieldbreak", x: e.x, y: e.y, t: ed.id }, e.x, e.y);
+        }
+        if (amount <= 0) {
+          if (pd) {
+            this.addThreat(ed, pd, soak);
+            pd.combatUntil = this.now + 6000;
+            if (!ed.target) ed.target = pd.sid;
+          }
+          this.emit("hit", { t: ed.id, d: 0, r: HitResult.Blocked, x: e.x, y: e.y, a: pd?.sid }, e.x, e.y);
+          return;
+        }
+      }
+    }
     // Credit (kill share, weapon mastery) counts only health actually removed, never overkill.
     const dealt = Math.min(amount, e.hp);
     e.hp = Math.max(0, e.hp - amount);
@@ -743,6 +777,15 @@ export class Sim {
     this.emit("hit", { t: ed.id, d: amount, c: crit, r: HitResult.Hit, x: e.x, y: e.y, a: pd?.sid, hs: m?.hitstop ?? 50, im: m?.impact ?? 0.1 }, e.x, e.y);
     if (pd) this.onDamageDealt?.(pd, ed, dealt);
     if (ed.affix === Affix.Packleader && !ed.packCalled && e.hp > 0 && e.hp < e.hpMax / 2) this.callPack(ed, pd);
+    // Thorned: strike it up close and some of the blow comes back (never enough to kill you).
+    if (ed.affix === Affix.Thorned && pd && attacker && attacker.act !== Act.Dead && Math.hypot(attacker.x - e.x, attacker.y - e.y) < 120 + def.radius) {
+      const back = Math.min(attacker.hp - 1, Math.max(1, Math.round(dealt * THORNS)));
+      if (back > 0) {
+        attacker.hp -= back;
+        this.emit("hit", { t: `p:${pd.sid}`, d: back, r: HitResult.Armor, x: attacker.x, y: attacker.y, heavy: 0, mis: 0, ang: 0 }, attacker.x, attacker.y);
+        this.emit("fx", { k: "thorns", x: attacker.x, y: attacker.y, x2: e.x, y2: e.y }, attacker.x, attacker.y);
+      }
+    }
     if (crit === 2 && pd && dv?.effects.has("emberbrand")) {
       // Emberbrand: ripostes erupt in flame around the target.
       this.spawnHazard({ kind: HazardKind.Meteor, team: 0, x: e.x, y: e.y, radius: 54, delay: 60, damage: 16, poise: 20, knockback: 90, heavy: false, sid: pd.sid, life: 300 });
@@ -1451,6 +1494,7 @@ export class Sim {
     const affix = opts.affix ?? (opts.elite && !def.boss && def.behavior !== "dummy" && def.behavior !== "sparring" && !opts.master && Math.random() < AFFIX_CHANCE ? 1 + Math.floor(Math.random() * (AFFIXES.length - 1)) : 0);
     e.affix = affix;
     if (affix === Affix.Frenzied) e.flags |= EFlag.Enraged;
+    if (affix === Affix.Shielded) e.flags |= EFlag.Shielded;
     e.act = EAct.Spawn;
     e.actStart = this.now;
     const ed: EnemyData = {

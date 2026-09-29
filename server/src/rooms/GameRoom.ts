@@ -1,7 +1,7 @@
 import { Room, ServerError, type AuthContext, type Client } from "colyseus";
 import { StateView } from "@colyseus/schema";
 import {
-  Act, EMOTES, isEmote, SEAT_PROPS, seatPoint, Sit, EAct, EFlag, enemyXp, EQUIP_SLOTS, itemBase, killXp, makeItem, masteryWorth, MAX_LEVEL, newAchievements, QUESTS, floorOfRoom, isWorldRoom, roomLabel, randomScroll, rollScroll, SKILLBOOK, WEAPONS, PATCH_RATE, rollLoot, sanitizeSettings, TICK_RATE, TILE, type EquipSlot, type Item, type PlayerSim, type WorldMap,
+  Act, huntRank, restedCap, restedGain, EMOTES, isEmote, SEAT_PROPS, seatPoint, Sit, EAct, EFlag, enemyXp, EQUIP_SLOTS, itemBase, killXp, makeItem, masteryWorth, MAX_LEVEL, newAchievements, QUESTS, floorOfRoom, isWorldRoom, roomLabel, randomScroll, rollScroll, SKILLBOOK, WEAPONS, PATCH_RATE, rollLoot, sanitizeSettings, TICK_RATE, TILE, type EquipSlot, type Item, type PlayerSim, type WorldMap,
 } from "@floors/shared";
 import { db } from "../db.ts";
 import { Character, newCharacter, type CharacterData } from "../game/character.ts";
@@ -19,6 +19,9 @@ export const DEV = process.env.NODE_ENV !== "production";
 const EVENT_RADIUS = 900;
 const PICKUP_RANGE = 44;
 const GOLD_MAGNET = 30;
+/** Materials, tonics, scrolls and keepsakes are gathered just by walking over them (gear still takes a press). */
+const ITEM_MAGNET = 34;
+const AUTO_LOOT = new Set(["material", "consumable", "scroll", "key", "artifact"]);
 /** Marks for each achievement earned. */
 const ACHIEVEMENT_MARKS = 2;
 /** Floor Bosses' chance to carry a legendary scroll. */
@@ -54,6 +57,8 @@ interface DropData {
   ownerKey: string;
   rightsUntil: number;
   expireAt: number;
+  /** Put down on purpose: only picked up again on purpose. */
+  manual?: boolean;
 }
 
 /**
@@ -261,6 +266,17 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       buf: 0, bufAim: 0, bufAge: 0, dodgeDx: 0, dodgeDy: 1, kbx: 0, kby: 0, hurtDur: 0, parryOk: 0, cd1: 0, cd2: 0, sk1: 255, sk2: 255,
       staminaDelay: 0, exhausted: false, weaponRarity: 0, weaponLook: 0, armorLook: 0, helmLook: 0, mastered: false, party: "", potions: 0, sit: 0,
     });
+    // Back from a while away: rested experience.
+    let restedNews = 0;
+    if (ch.data.away) {
+      const gain = restedGain(ch.data.level, (Date.now() - ch.data.away.at) / 3_600_000, ch.data.away.town);
+      if (gain > 0) {
+        const before = ch.data.rested ?? 0;
+        ch.data.rested = Math.min(restedCap(ch.data.level), before + gain);
+        restedNews = ch.data.rested - before;
+      }
+      ch.data.away = undefined;
+    }
     ch.applyTo(p);
     p.hp = Math.max(1, Math.min(p.hpMax, ch.data.pos?.room === this.kind && ch.data.pos.hp ? ch.data.pos.hp : p.hpMax));
     p.stamina = p.staminaMax;
@@ -273,6 +289,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     if (auth.admin) this.admins.add(client.sessionId);
     client.send("inv", ch.view({ key: auth.key, admin: !!auth.admin }));
     client.send("settings", ch.data.settings ?? null);
+    if (restedNews > 0) this.notify(client, `You come back rested: kills pay double experience for the next ${ch.data.rested} XP.`, "good");
     if (ch.skillbookNews) {
       const n = ch.skillbookNews;
       ch.skillbookNews = undefined;
@@ -315,6 +332,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     const pd = this.sim.players.get(sid);
     if (ch && pd) {
       ch.data.pos = { room: this.kind, x: pd.p.x, y: pd.p.y, hp: pd.p.act === Act.Dead ? pd.p.hpMax : pd.p.hp };
+      ch.data.away = { at: Date.now(), town: isWorldRoom(this.kind) && !!this.map.zoneAt(pd.p.x, pd.p.y)?.safe };
       this.onPlayerLeft(sid, ch);
     }
     const entry = key ? online.get(key) : undefined;
@@ -679,7 +697,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         me.ch.addItem(it);
         return this.notify(client, "You can't part with that.", "error");
       }
-      this.spawnDrop(me.p.x, me.p.y + 10, { item: it }, this.keys.get(client.sessionId)!, 0);
+      this.spawnDrop(me.p.x, me.p.y + 10, { item: it, manual: true }, this.keys.get(client.sessionId)!, 0);
     });
     this.onMessage("chat", (client, msg: { text?: string; channel?: string }) => this.chat(client, msg));
     this.onMessage("sit", (client, msg: { seat?: number }) => this.sit(client, msg));
@@ -852,7 +870,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
   // ---------------------------------------------------------------------------
   // Loot
 
-  spawnDrop(x: number, y: number, content: { item?: Item; gold?: number; bag?: { items: Item[]; gold: number } }, ownerKey: string, rightsMs = OWNER_RIGHTS_MS) {
+  spawnDrop(x: number, y: number, content: { item?: Item; gold?: number; bag?: { items: Item[]; gold: number }; manual?: boolean }, ownerKey: string, rightsMs = OWNER_RIGHTS_MS) {
     const id = this.sim.id("d");
     const d = new Drop();
     d.kind = content.bag ? DropKind.Bag : content.gold !== undefined ? DropKind.Gold : DropKind.Item;
@@ -871,7 +889,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     this.state.drops.set(id, d);
     this.revealNear(d, d.x, d.y);
     this.drops.set(id, {
-      id, d, item: content.item, gold: content.gold, bag: content.bag, ownerKey,
+      id, d, item: content.item, gold: content.gold, bag: content.bag, ownerKey, manual: content.manual,
       rightsUntil: content.bag ? Infinity : this.sim.now + rightsMs,
       expireAt: this.sim.now + (content.bag ? BAG_LIFE_MS : DROP_LIFE_MS),
     });
@@ -921,6 +939,10 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         this.removeDrop(dd.id);
         continue;
       }
+      if (dd.item && !dd.manual && AUTO_LOOT.has(itemBase(dd.item.key)?.kind ?? "")) {
+        this.autoLoot(dd);
+        continue;
+      }
       if (dd.gold === undefined) continue;
       // Gold is picked up just by walking over it.
       for (const [sid, pd] of this.sim.players) {
@@ -934,6 +956,20 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         this.removeDrop(dd.id);
         break;
       }
+    }
+  }
+
+  /** Walking over a material, tonic, scroll or keepsake picks it up (if there's room). */
+  private autoLoot(dd: DropData) {
+    for (const [sid, pd] of this.sim.players) {
+      if (pd.p.act === Act.Dead || Math.hypot(pd.p.x - dd.d.x, pd.p.y - dd.d.y) > ITEM_MAGNET) continue;
+      if (!this.canLoot(dd, this.keys.get(sid)!)) continue;
+      const ch = this.chars.get(sid)!;
+      if (!ch.addItem(dd.item!)) continue;
+      this.clients.getById(sid)?.send("looted", { key: dd.item!.key, rarity: dd.item!.rarity, qty: dd.item!.qty });
+      if (itemBase(dd.item!.key)?.kind === "scroll") this.save(sid);
+      this.removeDrop(dd.id);
+      return;
     }
   }
 
@@ -974,10 +1010,21 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       const pd = this.sim.players.get(sid);
       if (!ch || !pd || credited.has(sid)) return;
       credited.add(sid);
-      const xp = Math.round(killXp(baseXp, e.level, ch.data.level) * share * (1 + (ch.meal()?.xpPct ?? 0)));
+      let xp = Math.round(killXp(baseXp, e.level, ch.data.level) * share * (1 + (ch.meal()?.xpPct ?? 0)));
+      // Rested: double, until the pool runs dry.
+      const rested = Math.min(ch.data.rested ?? 0, xp);
+      if (rested > 0) {
+        xp += rested;
+        ch.data.rested = (ch.data.rested ?? 0) - rested;
+      }
       const levels = ch.addXp(xp);
       if (share === 1) ch.data.stats.kills++;
-      this.clients.getById(sid)?.send("xp", { amount: xp, x: e.x, y: e.y, party: party || undefined });
+      // Hunter's Lore.
+      const hunts = (ch.data.hunts ??= {});
+      const rank = huntRank(hunts[def.key]);
+      hunts[def.key] = (hunts[def.key] ?? 0) + 1;
+      if (huntRank(hunts[def.key]) > rank) this.clients.getById(sid)?.send("hunt", { key: def.key, rank: rank + 1, kills: hunts[def.key] });
+      this.clients.getById(sid)?.send("xp", { amount: xp, x: e.x, y: e.y, party: party || undefined, rested: rested || undefined });
       if (levels) {
         if (pd.p.act !== Act.Dead) pd.p.hp = ch.derived.hpMax;
         this.emitNear("levelup", { p: sid, level: ch.data.level, x: pd.p.x, y: pd.p.y }, pd.p.x, pd.p.y);

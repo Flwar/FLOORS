@@ -4,6 +4,18 @@ import { Mod } from "./sim/player.ts";
 export const MAX_LEVEL = 32;
 /** XP needed to go from `level` to `level + 1`. */
 export const xpToNext = (level: number) => Math.round(85 * Math.pow(level, 1.55));
+
+/**
+ * Rested: time away fills a pool of bonus experience, and kills pay double until it's spent.
+ * Logging out in a town fills it four times as fast as out in the wild; it holds at most a
+ * level and a half's worth.
+ */
+const RESTED_PER_HOUR = { town: 0.08, wild: 0.02 };
+export function restedGain(level: number, hours: number, town: boolean) {
+  if (level >= MAX_LEVEL || hours < 0.25) return 0;
+  return Math.round(xpToNext(level) * hours * (town ? RESTED_PER_HOUR.town : RESTED_PER_HOUR.wild));
+}
+export const restedCap = (level: number) => (level >= MAX_LEVEL ? 0 : Math.round(xpToNext(level) * 1.5));
 export const baseHp = (level: number) => 100 + (level - 1) * 10;
 export const baseStamina = (level: number) => 100 + (level - 1) * 3;
 

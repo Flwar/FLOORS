@@ -40,3 +40,4 @@ export * from "./social.ts";
 export * from "./tower.ts";
 export * from "./relics.ts";
 export * from "./meals.ts";
+export * from "./hunts.ts";

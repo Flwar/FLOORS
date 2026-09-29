@@ -138,6 +138,7 @@ export const ITEMS: ItemBase[] = [
   { key: "mat_pelt", name: "Wolf Pelt", kind: "material", stack: 20, value: 4, tier: 1, desc: "Thick grey fur. The tanner pays for these." },
   { key: "mat_scrap", name: "Iron Scrap", kind: "material", stack: 20, value: 5, tier: 1, desc: "Bent metal. The blacksmith can use it." },
   { key: "mat_cloth", name: "Cultist Cloth", kind: "material", stack: 20, value: 6, tier: 1, desc: "Stitched with sigils that hum faintly." },
+  { key: "mat_essence", name: "Arcane Essence", kind: "material", stack: 50, value: 12, tier: 1, desc: "What's left of an item's magic when a smith breaks it down. Smiths temper gear with it." },
   { key: "mat_shard", name: "Ancient Shard", kind: "material", stack: 20, value: 14, tier: 2, desc: "A splinter of the floating world's stone." },
   { key: "mat_ember", name: "Ember Core", kind: "material", stack: 10, value: 40, tier: 3, desc: "Still burning. Master smiths prize these." },
   // Consumables.
@@ -240,6 +241,33 @@ export function upgradeCost(it: Item): { gold: number; mats: { key: string; qty:
   if (n >= 3) mats.push({ key: "mat_shard", qty: n - 2 });
   if (n >= 5) mats.push({ key: "mat_ember", qty: 1 });
   return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
+}
+
+/**
+ * Salvage at the smith: an item you don't want breaks down into its floor's upgrade material,
+ * and anything better than common leaves Arcane Essence behind. Bound items can't be broken.
+ */
+export function salvageYield(it: Item): { key: string; qty: number }[] | undefined {
+  const b = itemBase(it.key);
+  if (!b || !isEquipment(b) || b.bound) return undefined;
+  const mat = upgradeCost({ ...it, plus: 0 })?.mats[0].key ?? "mat_scrap";
+  const out = [{ key: mat, qty: 1 + it.rarity + Math.floor(it.plus / 2) }];
+  const essence = [0, 1, 2, 4, 7][it.rarity] + (it.plus >= 3 ? 1 : 0);
+  if (essence) out.push({ key: "mat_essence", qty: essence });
+  return out;
+}
+
+/** Arcane Essence needed to temper an item up to each rarity (Uncommon, Rare, Epic). */
+const TEMPER_ESSENCE = [0, 3, 8, 20];
+/**
+ * Temper at the smith: raise an item one rarity, up to Epic (Legendaries are only ever found),
+ * keeping its upgrades and its weapon mastery. Items born at a fixed rarity can't be tempered.
+ */
+export function temperCost(it: Item): { gold: number; essence: number } | undefined {
+  const b = itemBase(it.key);
+  if (!b || !isEquipment(b) || b.rarity !== undefined || it.rarity >= 3) return undefined;
+  const n = it.rarity + 1;
+  return { gold: Math.round(60 * n * n * (1 + b.tier * 0.5)), essence: TEMPER_ESSENCE[n] };
 }
 
 export function sellPrice(it: Item) {

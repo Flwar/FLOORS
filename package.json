@@ -39,7 +39,8 @@
     "aggro": "tsx tools/aggro.ts",
     "leash": "tsx tools/leash.ts",
     "relics": "tsx tools/relics.ts",
-    "questflow": "tsx tools/questflow.ts"
+    "questflow": "tsx tools/questflow.ts",
+    "progress": "tsx tools/progress.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

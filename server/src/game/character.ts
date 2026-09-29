@@ -33,6 +33,12 @@ export interface CharacterData {
   relicAt?: number;
   /** The inn meal you last ate, and when it wears off (Date.now() time). */
   meal?: { id: string; until: number };
+  /** Hunter's Lore: kills of each kind of enemy. */
+  hunts?: Record<string, number>;
+  /** Rested: bonus experience still to be paid out (kills pay double until it's spent). */
+  rested?: number;
+  /** When (and whether in a town) you last left, to fill up rested experience. */
+  away?: { at: number; town: boolean };
   name: string;
   hue: number;
   level: number;
@@ -535,6 +541,8 @@ export class Character {
       achievements: d.achievements,
       relicAt: d.relicAt && d.relicAt > Date.now() ? d.relicAt : undefined,
       meal: this.meal() ? d.meal : undefined,
+      hunts: d.hunts ?? {},
+      rested: d.rested || undefined,
       derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax, effects: [...this.derived.effects] },
       ...extra,
     };

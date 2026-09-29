@@ -35,8 +35,15 @@ const REST_DELAY_MS = 8000;
 /** Share of its health a resting enemy recovers per second. */
 const REST_RATE = 0.04;
 
+/** Below this share of its health an enemy calls for help, once a fight… */
+const HELP_AT = 0.5;
+/** …and allies this close (and in sight) answer. */
+const HELP_RANGE = 260;
+
 /** Frenzied elites stay enraged (Affix.Frenzied). */
 const FRENZIED = 2;
+/** Shielded elites' ward returns (Affix.Shielded). */
+const SHIELDED = 7;
 
 /** Server-side enemy brains. One `update` per enemy per 60 Hz tick. */
 export class EnemyAI {
@@ -50,6 +57,11 @@ export class EnemyAI {
     if (ed.enrageUntil && now > ed.enrageUntil) {
       ed.enrageUntil = 0;
       if (!ed.def.boss && ed.affix !== FRENZIED) e.flags &= ~EFlag.Enraged;
+    }
+    if (ed.affix === SHIELDED && ed.shield !== undefined && ed.shield <= 0 && now >= (ed.shieldAt ?? 0) && e.act !== EAct.Dead) {
+      ed.shield = Math.round(e.hpMax * 0.2);
+      e.flags |= EFlag.Shielded;
+      sim.emit("fx", { k: "shieldup", x: e.x, y: e.y, t: ed.id }, e.x, e.y);
     }
     if (ed.slowUntil && now > ed.slowUntil) {
       ed.slowUntil = 0;
@@ -177,6 +189,24 @@ export class EnemyAI {
     }
   }
 
+  /** A cry for help: idle allies within earshot (and sight) come for whoever hurt it. */
+  private callForHelp(ed: EnemyData, pd: PlayerData) {
+    const e = ed.e;
+    let came = 0;
+    for (const other of this.sim.enemies.values()) {
+      const o = other.e;
+      if (other === ed || other.target || o.act === EAct.Dead || o.act === EAct.Leash || other.def.boss) continue;
+      if (other.def.behavior === "dummy" || other.def.behavior === "sparring") continue;
+      if (Math.hypot(o.x - e.x, o.y - e.y) > HELP_RANGE || !this.sim.grid.lineClear(e.x, e.y, o.x, o.y, 1)) continue;
+      if (!this.validTarget(other, pd)) continue;
+      other.target = pd.sid;
+      other.threat.set(pd.sid, Math.max(other.threat.get(pd.sid) ?? 0, 10));
+      o.flags |= EFlag.Aggro;
+      came++;
+    }
+    if (came) this.sim.emit("fx", { k: "rally", x: e.x, y: e.y, t: ed.id }, e.x, e.y);
+  }
+
   /** Nearby idle allies join the fight. */
   private alertPack(ed: EnemyData, sid: string) {
     for (const other of this.sim.enemies.values()) {
@@ -240,6 +270,11 @@ export class EnemyAI {
       return;
     }
     ed.restAt = 0;
+    // Badly hurt, it cries out: idle allies within earshot join the fight.
+    if (!ed.calledHelp && e.hp < e.hpMax * HELP_AT && !def.boss && def.behavior !== "sparring") {
+      ed.calledHelp = true;
+      this.callForHelp(ed, pd);
+    }
 
     const p = pd.p;
     const dx = p.x - e.x;
@@ -631,6 +666,11 @@ export class EnemyAI {
   /** Whole again: the fight is forgotten. */
   private recover(ed: EnemyData) {
     const e = ed.e;
+    ed.calledHelp = false;
+    if (ed.affix === SHIELDED) {
+      ed.shield = undefined;
+      e.flags |= EFlag.Shielded;
+    }
     e.hp = e.hpMax;
     e.posture = 0;
     ed.phase = 0;

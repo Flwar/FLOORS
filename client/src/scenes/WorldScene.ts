@@ -3,7 +3,7 @@ import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from
 import {
   AFFIXES, Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
   isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, skillEntry, skillMove, streetPoint, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
-  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, mealById } from "@floors/shared";
+  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, mealById, RARITY_NAMES, HUNT_BONUS, HUNT_TITLES } from "@floors/shared";
 import type { Enemy, Hazard, Player, Projectile, WorldState } from "../../../server/src/state.ts";
 import { ambience } from "../audio/ambience.ts";
 import { Minimap } from "../ui/minimap.ts";
@@ -452,6 +452,10 @@ export class WorldScene extends Phaser.Scene {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 16 * s, y - 20 * s - Math.random() * 10, 0x8ff0e0, 1, 2, -18, 600, 2.2);
       }
+      if (e.flags & EFlag.Shielded && e.act !== EAct.Dead && Math.random() < delta / 240) {
+        const s = v.def.look.scale;
+        this.fx.ring(x, y - 12 * s, 0xbfe8ff, 16 * s, 19 * s, 420, 2);
+      }
       if (e.flags & EFlag.Cursed && Math.random() < delta / 120) {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 18 * s, y - 8 - Math.random() * 24 * s, Math.random() < 0.6 ? 0x2a1a44 : 0xb77af2, 1, 4, 22, 800, 2.8);
@@ -754,9 +758,9 @@ export class WorldScene extends Phaser.Scene {
         if (p) this.fx.ring(p.x, p.y - 14, Phaser.Display.Color.HexStringToColor(RARITY_COLORS[m.rarity]).color, 8, 60, 700, 4);
       }
     });
-    r.onMessage("xp", (m: { amount: number; x?: number; y?: number; event?: string; party?: boolean }) => {
+    r.onMessage("xp", (m: { amount: number; x?: number; y?: number; event?: string; party?: boolean; rested?: number }) => {
       const p = this.me?.state;
-      if (p) this.fx.text(p.x, p.y - 50, `+${m.amount} XP`, { color: "#b9a8ff", size: 9 }, 900, 26);
+      if (p) this.fx.text(p.x, p.y - 50, `+${m.amount} XP${m.rested ? " (rested)" : ""}`, { color: m.rested ? "#8fc8ff" : "#b9a8ff", size: 9 }, 900, 26);
       if (m.event) ui.toast(`${m.event}: +${m.amount} XP`, "good");
     });
     r.onMessage("levelup", (m: { p: string; level: number; x: number; y: number }) => {
@@ -792,6 +796,18 @@ export class WorldScene extends Phaser.Scene {
     r.onMessage("forged", (m: { key: string; plus: number }) => {
       sfx.parry(true);
       ui.toast(`${itemBase(m.key)?.name} +${m.plus} forged!`, "good");
+    });
+    r.onMessage("hunt", (m: { key: string; rank: number; kills: number }) => {
+      sfx.chime(3);
+      ui.toast(`Hunter's Lore: ${ENEMIES.find((e) => e.key === m.key)?.name ?? m.key}, ${HUNT_TITLES[m.rank]} (${m.kills} slain): +${Math.round(HUNT_BONUS[m.rank] * 100)}% damage against them.`, "good");
+    });
+    r.onMessage("tempered", (m: { key: string; rarity: number }) => {
+      sfx.chime(3);
+      ui.toast(`${itemBase(m.key)?.name} tempered: now ${RARITY_NAMES[m.rarity]}!`, "good");
+    });
+    r.onMessage("salvaged", (m: { key: string }) => {
+      sfx.parry(false);
+      ui.toast(`${itemBase(m.key)?.name} broken down.`);
     });
     r.onMessage("quest", (updates: { id: string; name: string; text: string; done?: boolean; accepted?: boolean; pitch?: string; thanks?: string }[]) => {
       for (const u of updates) {
@@ -1257,6 +1273,23 @@ export class WorldScene extends Phaser.Scene {
           sfx.chime(2);
           break;
         }
+        case "thorns":
+          this.fx.streak(m.x2 ?? m.x, (m.y2 ?? m.y) - 14, m.x, m.y - 14, 0x6fd08a, 200, 3);
+          this.fx.burst(m.x, m.y - 14, 0x6fd08a, 6, 50, 1.8, 300);
+          break;
+        case "shieldbreak":
+          this.fx.ring(m.x, m.y - 14, 0xbfe8ff, 10, 46, 420, 4);
+          this.fx.burst(m.x, m.y - 14, 0xdff4ff, 14, 90, 2.4, 500);
+          sfx.parry(false);
+          break;
+        case "shieldup":
+          this.fx.ring(m.x, m.y - 14, 0xbfe8ff, 40, 16, 420, 3);
+          break;
+        case "rally":
+          // A cry for help: its allies nearby are coming.
+          this.fx.text(m.x, m.y - 46, "!", { color: "#ff7a5a", size: 16, bold: true }, 900);
+          this.fx.ring(m.x, m.y - 12, 0xff7a5a, 10, 90, 500, 3);
+          break;
         case "gatestone":
           // A Floor Boss trophy opens the way: a pillar of gold light, and you're gone.
           this.fx.ring(m.x, m.y - 10, 0xffe08a, 8, 60, 700, 5);
