@@ -1,5 +1,7 @@
 import {
   Act,
+  Affix,
+  AFFIXES,
   actionLength,
   aimToRad,
   angleDiff,
@@ -76,6 +78,11 @@ export interface PlayerData {
   /** Empower (Wolf's Howl, Drakeblood): extra damage until this time. */
   empowerUntil: number;
   empower: number;
+  /** A perfect dodge readies a counter: the next blow before this time strikes harder. */
+  counterUntil: number;
+  /** The dodge (its record time) a perfect evade came from, and the last one rewarded. */
+  perfectDodge?: number;
+  perfectRewarded?: number;
   invulnUntil: number;
   deadAt: number;
   atkMul: number;
@@ -142,6 +149,10 @@ export interface EnemyData {
   burnBy?: string;
   /** Cursed: deals less damage and takes more until this time. */
   curseUntil?: number;
+  /** Elite affix (Affix.*). */
+  affix: number;
+  /** Packleader: has it called its pack yet? */
+  packCalled?: boolean;
   /** The level it spawned at; engaging a stronger player can raise it (see levelToTarget). */
   baseLevel: number;
   hpScale?: number;
@@ -189,6 +200,12 @@ export type Emit = (type: string, data: Record<string, unknown>, x: number, y: n
 const SAFE_RESPAWN_MS = 2500;
 /** Cursed enemies' blows land this much as hard. */
 const CURSE_DAMAGE = 0.7;
+/** A dodge that evades a blow within this many ticks of starting is perfect. */
+const PERFECT_DODGE_TICKS = 4;
+/** How long the counter from a perfect dodge waits for your next blow. */
+const COUNTER_MS = 1500;
+/** Share of elites that carry an affix. */
+const AFFIX_CHANCE = 0.75;
 export const RESPAWN_DELAY_MS = 9000;
 
 /**
@@ -263,6 +280,7 @@ export class Sim {
       lifestealUntil: 0,
       empowerUntil: 0,
       empower: 0,
+      counterUntil: 0,
       invulnUntil: this.now + SAFE_RESPAWN_MS,
       deadAt: 0,
       atkMul: 1,
@@ -599,13 +617,27 @@ export class Sim {
     }
     if (attacker && attacker.act === Act.Light && pd?.ch?.hasPerk("momentum")) dmg *= 1 + Math.min(0.25, attacker.combo * 0.05);
     if (ed.markUntil && this.now < ed.markUntil) dmg *= 1.3;
-    if (e.flags & EFlag.Cursed) dmg *= 1.1;
+    if (e.flags & EFlag.Cursed) dmg *= dv?.effects.has("setVoid") ? 1.18 : 1.1;
+    if (pd && this.now < pd.counterUntil) {
+      // The counter after a perfect dodge.
+      dmg *= 1.5;
+      crit = Math.max(crit, 1);
+      pd.counterUntil = 0;
+      this.emit("fx", { k: "counter", x: e.x, y: e.y }, e.x, e.y);
+    }
+    if (ed.affix === Affix.Warded && e.hp > e.hpMax / 2) dmg *= 0.65;
     if (pd && this.now < pd.empowerUntil) dmg *= 1 + pd.empower;
     if (pd?.ch) {
       if (def.boss && pd.ch.hasPerk("wyrmsbane")) dmg *= 1.15;
       if (pd.p.hp < pd.p.hpMax * 0.35 && pd.ch.hasPerk("lastStand")) dmg *= 1.2;
     }
-    if (pd && (m?.special === "burn" || (pd.ch?.hasPerk("emberblood") && Math.random() < 0.15))) this.ignite(ed, pd, base);
+    if (pd && (m?.special === "burn" || (pd.ch?.hasPerk("emberblood") && Math.random() < 0.15) || (dv?.effects.has("setDragon") && Math.random() < 0.2))) this.ignite(ed, pd, base);
+    if (dv?.effects.has("setFrost") && Math.random() < 0.25) this.chill(ed);
+    if (dv?.effects.has("setVoid") && Math.random() < 0.25) this.curse(ed);
+    if (pd && dv?.effects.has("setStorm") && Math.random() < 0.125) {
+      // Stormglass: lightning follows the blow down.
+      this.spawnHazard({ kind: HazardKind.Lightning, team: 0, x: e.x, y: e.y, radius: 34, delay: 180, damage: base * 0.6 * pd.atkMul, poise: 20, knockback: 60, heavy: false, sid: pd.sid, life: 300 });
+    }
     if (m?.special === "chill" || (pd?.ch?.hasPerk("frostblood") && Math.random() < 0.2)) this.chill(ed);
     if (m?.special === "curse" || m?.curse || (pd?.ch?.hasPerk("umbralTouch") && Math.random() < 0.2) || (dv?.effects.has("moonstone") && Math.random() < 0.125)) this.curse(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
@@ -632,6 +664,7 @@ export class Sim {
     }
     this.emit("hit", { t: ed.id, d: amount, c: crit, r: HitResult.Hit, x: e.x, y: e.y, a: pd?.sid, hs: m?.hitstop ?? 50, im: m?.impact ?? 0.1 }, e.x, e.y);
     if (pd) this.onDamageDealt?.(pd, ed, dealt);
+    if (ed.affix === Affix.Packleader && !ed.packCalled && e.hp > 0 && e.hp < e.hpMax / 2) this.callPack(ed, pd);
     if (crit === 2 && pd && dv?.effects.has("emberbrand")) {
       // Emberbrand: ripostes erupt in flame around the target.
       this.spawnHazard({ kind: HazardKind.Meteor, team: 0, x: e.x, y: e.y, radius: 54, delay: 60, damage: 16, poise: 20, knockback: 90, heavy: false, sid: pd.sid, life: 300 });
@@ -726,6 +759,9 @@ export class Sim {
     e.flags &= ~(EFlag.Riposte | EFlag.Hidden);
     ed.removeAt = this.now + 1600;
     this.emit("death", { t: ed.id, x: e.x, y: e.y, boss: ed.def.boss ? 1 : 0 }, e.x, e.y);
+    if (ed.affix === Affix.Volatile) {
+      this.spawnHazard({ kind: HazardKind.Meteor, team: 1, x: e.x, y: e.y, radius: 78, delay: 1100, damage: 24 * this.enemyDamageMul(ed), poise: 0, knockback: 220, heavy: true, life: 300 });
+    }
     for (const mid of ed.minions) {
       const m = this.enemies.get(mid);
       if (m && m.e.act !== EAct.Dead) this.killEnemy(m);
@@ -778,7 +814,11 @@ export class Sim {
     }
     if (rec.act === Act.Dodge) {
       const d = dodgeDef(sim);
-      if (elapsed >= d.iStart * TICK_MS - TIMING_TOLERANCE_MS && elapsed < d.iEnd * TICK_MS + TIMING_TOLERANCE_MS) return HitResult.Evade;
+      if (elapsed >= d.iStart * TICK_MS - TIMING_TOLERANCE_MS && elapsed < d.iEnd * TICK_MS + TIMING_TOLERANCE_MS) {
+        // Dodged at the last moment: a perfect dodge.
+        if (elapsed <= PERFECT_DODGE_TICKS * TICK_MS + TIMING_TOLERANCE_MS) pd.perfectDodge = rec.r;
+        return HitResult.Evade;
+      }
       return HitResult.Hit;
     }
     if (rec.act === Act.Skill) {
@@ -801,6 +841,15 @@ export class Sim {
     const x = p.x;
     const y = p.y;
     if (result === HitResult.Evade) {
+      const perfect = pd.perfectDodge;
+      pd.perfectDodge = undefined;
+      if (perfect !== undefined && perfect !== pd.perfectRewarded) {
+        // A perfect dodge: stamina back, and the next blow is a counter.
+        pd.perfectRewarded = perfect;
+        pd.counterUntil = this.now + COUNTER_MS;
+        p.stamina = Math.min(p.staminaMax, p.stamina + 20);
+        this.emit("fx", { k: "perfectdodge", x, y, p: pd.sid }, x, y);
+      }
       this.emit("evade", { p: pd.sid, x, y }, x, y);
       return;
     }
@@ -857,6 +906,10 @@ export class Sim {
     if (src && pd.ch) amount = Math.max(1, Math.round(amount * levelGapTaken(src.e.level - pd.ch.data.level)));
     if (result === HitResult.Armor) amount = Math.round(amount * 0.75);
     p.hp = Math.max(0, p.hp - amount);
+    if (src?.affix === Affix.Vampiric && src.e.act !== EAct.Dead && src.e.hp < src.e.hpMax) {
+      src.e.hp = Math.min(src.e.hpMax, src.e.hp + Math.round(amount * 2));
+      this.emit("fx", { k: "vampiric", x: src.e.x, y: src.e.y, x2: x, y2: y }, src.e.x, src.e.y);
+    }
     if (p.hp <= 0 && pd.ch?.hasPerk("unbroken") && this.now >= pd.ch.unbrokenReadyAt) {
       // Unbroken: a lethal blow leaves you standing at 1, once every two minutes.
       p.hp = 1;
@@ -1083,6 +1136,29 @@ export class Sim {
     ed.e.flags |= EFlag.Chilled;
   }
 
+  /** Packleader: two of its kind answer when it is badly hurt. */
+  private callPack(ed: EnemyData, pd?: PlayerData) {
+    ed.packCalled = true;
+    const e = ed.e;
+    // Two answer the call, wherever there is room beside the leader.
+    let called = 0;
+    for (let tries = 0; tries < 12 && called < 2; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 36 + Math.random() * 40;
+      const spot = { x: e.x + Math.cos(a) * r, y: e.y + Math.sin(a) * r * 0.7 };
+      const tx = Math.floor(spot.x / 32);
+      const ty = Math.floor(spot.y / 32);
+      if (this.map.isSolidTile(tx, ty)) continue;
+      called++;
+      const m = this.spawnEnemy(ed.def.key, spot.x, spot.y, { level: e.level, master: ed.id });
+      m.homeX = ed.homeX;
+      m.homeY = ed.homeY;
+      if (pd) m.target = pd.sid;
+      ed.minions.add(m.id);
+    }
+    this.emit("fx", { k: "summon", x: e.x, y: e.y }, e.x, e.y);
+  }
+
   /** Curse an enemy: its blows land 30% softer and it takes 10% more damage, for a few seconds. */
   curse(ed: EnemyData, ms = 5000) {
     const was = (ed.e.flags & EFlag.Cursed) !== 0;
@@ -1213,7 +1289,7 @@ export class Sim {
   // ---------------------------------------------------------------------------
   // Enemies
 
-  spawnEnemy(defKey: string | number, x: number, y: number, opts: { level?: number; elite?: boolean; spawner?: string; master?: string; hpScale?: number } = {}): EnemyData {
+  spawnEnemy(defKey: string | number, x: number, y: number, opts: { level?: number; elite?: boolean; spawner?: string; master?: string; hpScale?: number; affix?: number } = {}): EnemyData {
     const idx = typeof defKey === "number" ? defKey : ENEMIES.findIndex((d) => d.key === defKey);
     const def = ENEMIES[idx];
     const id = this.id("e");
@@ -1227,13 +1303,17 @@ export class Sim {
     e.hpMax = Math.min(65535, hpMax);
     e.hp = e.hpMax;
     e.flags = opts.elite ? EFlag.Elite : 0;
+    // Most elites carry an affix (never bosses, dummies or summoned pack members).
+    const affix = opts.affix ?? (opts.elite && !def.boss && def.behavior !== "dummy" && def.behavior !== "sparring" && !opts.master && Math.random() < AFFIX_CHANCE ? 1 + Math.floor(Math.random() * (AFFIXES.length - 1)) : 0);
+    e.affix = affix;
+    if (affix === Affix.Frenzied) e.flags |= EFlag.Enraged;
     e.act = EAct.Spawn;
     e.actStart = this.now;
     const ed: EnemyData = {
       id, e, def, spawner: opts.spawner, homeX: x, homeY: y, cooldowns: def.attacks.map(() => 0), attackSeq: 0, attacks: [],
       poiseDmg: 0, poiseAt: 0, flinches: 0, flinchAt: 0, hyperUntil: 0, stateUntil: this.now + 500, kbx: 0, kby: 0, pathAt: 0,
       orbit: Math.random() * Math.PI * 2, thinkAt: 0, contrib: new Map(), phase: 0, enrageUntil: 0, slowUntil: 0, minions: new Set(),
-      master: opts.master, removeAt: 0, specialFired: 0, baseLevel: e.level, hpScale: opts.hpScale,
+      master: opts.master, removeAt: 0, specialFired: 0, baseLevel: e.level, hpScale: opts.hpScale, affix,
     };
     this.enemies.set(id, ed);
     this.state.enemies.set(id, e);

@@ -17,6 +17,9 @@ const MELEE_TOKENS = 2;
 const TURN_RATE = 7; // rad/s outside attacks
 
 /** Server-side enemy brains. One `update` per enemy per 60 Hz tick. */
+/** Frenzied elites stay enraged (Affix.Frenzied). */
+const FRENZIED = 2;
+
 export class EnemyAI {
   constructor(private sim: Sim) {}
 
@@ -27,7 +30,7 @@ export class EnemyAI {
 
     if (ed.enrageUntil && now > ed.enrageUntil) {
       ed.enrageUntil = 0;
-      if (!ed.def.boss) e.flags &= ~EFlag.Enraged;
+      if (!ed.def.boss && ed.affix !== FRENZIED) e.flags &= ~EFlag.Enraged;
     }
     if (ed.slowUntil && now > ed.slowUntil) {
       ed.slowUntil = 0;

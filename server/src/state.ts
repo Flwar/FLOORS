@@ -81,6 +81,8 @@ export const Enemy = schema(
     /** Boss posture 0–255. */
     posture: t.uint8(),
     level: t.uint8(),
+    /** Elite affix (see AFFIXES), 0 for none. */
+    affix: t.uint8(),
   },
   "Enemy",
 );

@@ -1,7 +1,7 @@
 import {
   ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, itemMasteryLevel, MAX_LEVEL, questDef, QUESTS, RARITY_COLORS,
   RARITY_NAMES, roomLabel, scrollSkill, SCROLL_SOURCES, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
-  masteryProgress, weaponMasteryDamage,
+  masteryProgress, weaponMasteryDamage, gearSetOf,
 } from "@floors/shared";
 import type { Room } from "@colyseus/sdk";
 import { sfx } from "../audio/sfx.ts";
@@ -422,6 +422,14 @@ export class GameUI {
       lines.push(`<div class="tt-effect">${esc(sk.desc)}</div>`);
       lines.push(this.inv?.skills.includes(sk.id) ? `<div class="tt-dim">You already know this skill.</div>` : `<div class="tt-up">Click to read it and learn ${esc(sk.name)}.</div>`);
     } else lines.push(b.effect ? `<div class="tt-effect">${esc(b.desc)}</div>` : `<div class="tt-desc">${esc(b.desc)}</div>`);
+    const set = gearSetOf(it.key);
+    if (set) {
+      const eq = this.inv?.equipment;
+      const worn = [eq?.weapon?.key, eq?.armor?.key, eq?.helm?.key].filter((k) => k && set.pieces.includes(k)).length;
+      lines.push(`<div class="tt-set"><div class="tt-setname">${esc(set.name)} set <span class="tt-dim">(${worn}/3 worn)</span></div>
+        <div class="${worn >= 2 ? "tt-up" : "tt-dim"}">2 pieces: +${set.two.hp} health, +${set.two.defense} defense</div>
+        <div class="${worn >= 3 ? "tt-up" : "tt-dim"}">3 pieces: ${esc(set.three.desc)}</div></div>`);
+    }
     if (b.bound) lines.push(`<div class="tt-dim">Bound — never lost on death, can't be traded.</div>`);
     const price = sellPrice(it);
     lines.push(`<div class="tt-foot">${price ? `<span class="tt-price"><img src="${goldIcon()}" alt="">${price}</span>` : "<span></span>"}<span class="tt-keys">${gear ? "Drag to equip" : sk ? "Click to read" : b.kind === "consumable" ? `Drink with ${esc(keyLabel(settings.value.bindings.use[0]))}` : ""}</span></div>`);

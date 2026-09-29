@@ -17,7 +17,12 @@ export type ItemEffect =
   | "secondWindCharm" // perfect parries restore health
   | "emberbrand" // ripostes explode in flame
   | "dawnbreaker" // perfect parries release a radiant wave
-  | "moonstone"; // blows sometimes curse
+  | "moonstone" // blows sometimes curse
+  // Full gear sets (see sets.ts).
+  | "setStorm"
+  | "setDragon"
+  | "setFrost"
+  | "setVoid";
 
 export interface ItemBase {
   key: string;

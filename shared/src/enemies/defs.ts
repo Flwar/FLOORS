@@ -495,5 +495,19 @@ export const EFlag = {
   Cursed: 512,
 } as const;
 
+/**
+ * Elite affixes: most elites carry one trait that changes how they fight.
+ * Synced as a number on the enemy (0 = none); the names and colours are for the client.
+ */
+export const Affix = { None: 0, Vampiric: 1, Frenzied: 2, Warded: 3, Volatile: 4, Packleader: 5 } as const;
+export const AFFIXES: { name: string; color: string; desc: string }[] = [
+  { name: "", color: "#f2c46b", desc: "" },
+  { name: "Vampiric", color: "#ff5a4a", desc: "Heals itself with every blow it lands." },
+  { name: "Frenzied", color: "#ff9a3a", desc: "Always enraged: faster attacks, faster feet." },
+  { name: "Warded", color: "#9fd3ff", desc: "Takes a third less damage until it is below half health." },
+  { name: "Volatile", color: "#ffd24a", desc: "Explodes a moment after it dies. Step away." },
+  { name: "Packleader", color: "#b8e07a", desc: "Calls two of its kind when badly hurt." },
+];
+
 /** Tick timeline of an enemy attack. */
 export const attackLength = (a: EnemyAttack) => a.windup + a.active + a.recovery;

@@ -497,10 +497,10 @@ export class WorldRoom extends GameRoom {
       if (msg.marks) me.ch.data.marks = (me.ch.data.marks ?? 0) + msg.marks;
       me.ch.dirty = true;
     });
-    this.onDev("dev:spawn", (client, msg: { key: string; elite?: boolean; level?: number }) => {
+    this.onDev("dev:spawn", (client, msg: { key: string; elite?: boolean; level?: number; affix?: number }) => {
       const me = this.player(client);
       if (!me) return;
-      const ed = this.sim.spawnEnemy(msg.key, me.p.x + 90, me.p.y, { elite: msg.elite, level: msg.level ?? 3 });
+      const ed = this.sim.spawnEnemy(msg.key, me.p.x + 90, me.p.y, { elite: msg.elite, level: msg.level ?? 3, affix: msg.affix });
       ed.homeX = ed.e.x;
       ed.homeY = ed.e.y;
     });
@@ -520,6 +520,17 @@ export class WorldRoom extends GameRoom {
         if (ed.e.act === 5 || ed.def.behavior === "dummy" || ed.def.behavior === "sparring") continue;
         if (Math.hypot(ed.e.x - me.p.x, ed.e.y - me.p.y) > (Number(radius) || 600)) continue;
         this.sim.damageEnemy(ed, me.pd, 99999, 0, 0, 0);
+      }
+    });
+    // Tests: bring nearby enemies down to a share of their health with one small blow.
+    this.onDev("dev:hitnear", (client, m: { frac: number; radius?: number }) => {
+      const me = this.player(client);
+      if (!me) return;
+      for (const ed of [...this.sim.enemies.values()]) {
+        if (ed.e.act === 5 || ed.def.behavior === "dummy" || ed.def.behavior === "sparring") continue;
+        if (Math.hypot(ed.e.x - me.p.x, ed.e.y - me.p.y) > (Number(m?.radius) || 300)) continue;
+        ed.e.hp = Math.max(2, Math.round(ed.e.hpMax * (Number(m?.frac) || 0.4)));
+        this.sim.damageEnemy(ed, me.pd, 1, 0, 0, 0);
       }
     });
     this.onDev("dev:floor", (client, n: number) => {

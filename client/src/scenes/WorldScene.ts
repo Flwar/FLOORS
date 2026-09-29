@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from "@colyseus/sdk";
 import {
-  Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
+  AFFIXES, Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
   isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, skillEntry, skillMove, streetPoint, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
   WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone,
 } from "@floors/shared";
@@ -434,6 +434,13 @@ export class WorldScene extends Phaser.Scene {
       if (e.flags & EFlag.Chilled && Math.random() < delta / 110) {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 18 * s, y - 6 - Math.random() * 22 * s, Math.random() < 0.5 ? 0xdff4ff : 0x8fd3ff, 1, 3, 10, 700, 2.4);
+      }
+      if (e.affix && e.act !== EAct.Dead && Math.random() < delta / 140) {
+        // An elite's affix shows as a faint aura in its colour.
+        const s = v.def.look.scale;
+        const col = Phaser.Display.Color.HexStringToColor(AFFIXES[e.affix]?.color ?? "#ffffff").color;
+        const a = Math.random() * Math.PI * 2;
+        this.fx.rise(x + Math.cos(a) * 14 * s, y - 4 + Math.sin(a) * 6 * s, col, 1, 3, 26, 700, 2.4);
       }
       if (e.flags & EFlag.Cursed && Math.random() < delta / 120) {
         const s = v.def.look.scale;
@@ -1190,6 +1197,25 @@ export class WorldScene extends Phaser.Scene {
           this.fx.burst(m.x, m.y - 20, 0xffb347, 18, 110, 2.4, 600);
           this.fx.rise(m.x, m.y - 10, 0xffd27a, 8);
           sfx.chime(2);
+          break;
+        case "perfectdodge":
+          // A perfect dodge: an afterimage where the blow fell, and a counter waiting.
+          this.fx.ring(m.x, m.y - 16, 0x9fe0ff, 8, 44, 380, 4);
+          this.fx.burst(m.x, m.y - 16, 0xdff4ff, 16, 100, 2.4, 500);
+          if (m.p === this.room.sessionId) {
+            this.fx.text(m.x, m.y - 52, "PERFECT DODGE", { color: "#bfe6ff", size: 10, bold: true }, 800, 22);
+            this.cameras.main.flash(120, 160, 210, 255, false);
+            sfx.chime(3);
+          }
+          break;
+        case "counter":
+          this.fx.star(m.x, m.y - 24, 0xffffff, 18, 360);
+          this.fx.ring(m.x, m.y - 20, 0x9fe0ff, 6, 40, 320, 4);
+          this.fx.text(m.x, m.y - 60, "COUNTER", { color: "#9fe0ff", size: 9, bold: true }, 700, 18);
+          break;
+        case "vampiric":
+          this.fx.streak(m.x2 ?? m.x, (m.y2 ?? m.y) - 16, m.x, m.y - 16, 0xff5a4a, 260, 4);
+          this.fx.burst(m.x, m.y - 16, 0xff5a4a, 8, 60, 2.2, 400);
           break;
         case "lever":
           this.fx.burst(m.x, m.y - 14, 0xe8c867, 8, 60, 2, 300);

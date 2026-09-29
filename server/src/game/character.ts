@@ -1,6 +1,6 @@
 import {
   baseHp, baseStamina, combatBonus, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemMasteryLevel, itemStats, knownIndices, makeItem, masteryProgress,
-  MAX_LEVEL, Mod, NO_SKILL, scrollSkill, skillEntry, skillMods, WEAPON_ARTS, WEAPONS, xpToNext,
+  MAX_LEVEL, Mod, NO_SKILL, scrollSkill, setsWorn, skillEntry, skillMods, WEAPON_ARTS, WEAPONS, xpToNext,
   type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type SkillEntry, type WeaponKey,
 } from "@floors/shared";
 
@@ -272,6 +272,14 @@ export class Character {
     if (effects.has("wideParry")) mods |= Mod.WideParry;
     if (effects.has("lightDodge")) mods |= Mod.LightDodge;
     if (effects.has("longDodge")) mods |= Mod.LongDodge;
+    // Gear sets: two pieces of one set add health and defense; all three add its power.
+    for (const { set, count } of setsWorn([d.equipment.weapon?.key, d.equipment.armor?.key, d.equipment.helm?.key])) {
+      if (count >= 2) {
+        hp += set.two.hp;
+        defense += set.two.defense;
+      }
+      if (count >= 3) effects.add(set.three.effect);
+    }
     if (this.hasPerk("ironSkin")) defense += 12;
     if (this.hasPerk("scaleguard")) defense += 20;
     if (this.hasPerk("glacialHide")) defense += 25;
@@ -499,7 +507,7 @@ export class Character {
       floor: d.floor,
       stats: d.stats,
       achievements: d.achievements,
-      derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax },
+      derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax, effects: [...this.derived.effects] },
       ...extra,
     };
   }

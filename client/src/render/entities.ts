@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import {
-  Act, aimToRad, attackTicks, EAct, EFlag, EMOTE_MS, EMOTES, ENEMIES, getMove, Sit, TICK_MS, weaponArt, WEAPONS, windupTicks, type Emote, type EnemyDef, type PlayerSim,
+  Act, AFFIXES, aimToRad, attackTicks, EAct, EFlag, EMOTE_MS, EMOTES, ENEMIES, getMove, Sit, TICK_MS, weaponArt, WEAPONS, windupTicks, type Emote, type EnemyDef, type PlayerSim,
 } from "@floors/shared";
 import type { Enemy, Player } from "../../../server/src/state.ts";
 import { paintDummy, RES, shade, type CharLook, type WeaponArt } from "../art/characters.ts";
@@ -349,7 +349,7 @@ export class EnemyView {
     }
     if (this.def.boss || e.flags & EFlag.Elite) {
       this.label = scene.add
-        .text(0, 0, (e.flags & EFlag.Elite ? "Elite " : "") + this.def.name, { fontFamily: "Georgia, serif", fontSize: "18px", color: this.def.boss ? "#ffd98a" : "#f2c46b", stroke: "#1d1a17", strokeThickness: 4 })
+        .text(0, 0, (e.flags & EFlag.Elite ? (e.affix ? `${AFFIXES[e.affix]?.name ?? "Elite"} ` : "Elite ") : "") + this.def.name, { fontFamily: "Georgia, serif", fontSize: "18px", color: this.def.boss ? "#ffd98a" : e.affix ? AFFIXES[e.affix]?.color ?? "#f2c46b" : "#f2c46b", stroke: "#1d1a17", strokeThickness: 4 })
         .setOrigin(0.5, 1)
         .setScale(0.5);
     }

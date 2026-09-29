@@ -18,6 +18,7 @@ export * from "./enemies/defs.ts";
 export * from "./combat/common.ts";
 export * from "./items/items.ts";
 export * from "./items/loot.ts";
+export * from "./items/sets.ts";
 export * from "./progression.ts";
 export * from "./quests.ts";
 export * from "./achievements.ts";

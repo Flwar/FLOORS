@@ -963,7 +963,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     const e = ed.e;
     const total = [...ed.contrib.values()].reduce((a, b) => a + b, 0);
     if (!total) return;
-    const baseXp = enemyXp(def) * (e.flags & EFlag.Elite ? 2.5 : 1);
+    const baseXp = enemyXp(def) * (e.flags & EFlag.Elite ? 2.5 : 1) * (e.affix ? 1.3 : 1);
     const credited = new Set<string>();
     const credit = (sid: string, share: number, party: boolean) => {
       const ch = this.chars.get(sid);
