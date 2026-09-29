@@ -631,8 +631,66 @@ export class SkillFx {
       }
       case "voidrift":
       case "whirlpool":
+      case "steamvent":
         // Played from the server's event, where the rift (or the whirlpool) actually opens.
         break;
+      // --- Clockwork arts -----------------------------------------------------------
+      case "gearsaw":
+      case "springblades":
+      case "steamhammer":
+      case "gyro": {
+        const r = m.shape?.kind === "circle" ? m.shape.radius : m.shape?.kind === "arc" ? m.shape.range : 80;
+        const full = m.shape?.kind === "circle";
+        if (full) {
+          fx.ring(x, y - 6, 0xfff0c0, 10, r, 420, 6);
+          fx.ring(x, y - 6, c, 10, r * 1.15, 600, 3);
+        } else fx.trail(x, cy, a - 2, a + 2, r * 0.3, r, c, 360);
+        for (let i = 0; i < 10; i++) {
+          const aa = full ? (i / 10) * Math.PI * 2 : a - 1.8 + (i / 9) * 3.6;
+          this.sparkAt(x + Math.cos(aa) * r * 0.8, cy + Math.sin(aa) * r * 0.6, 0.9);
+        }
+        if (m.vfx === "steamhammer") this.steamAt(x, y, 1.4);
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(m.vfx === "steamhammer" ? 380 : 220, m.vfx === "steamhammer" ? 0.014 : 0.008);
+        break;
+      }
+      case "piston":
+      case "overdrive":
+      case "railshot":
+      case "titanfist": {
+        const e = ahead(shapeLen);
+        const big = m.vfx === "titanfist" || m.vfx === "overdrive";
+        fx.streak(x, cy, e.x, e.y, c, 280, big ? 22 : 12);
+        fx.streak(x, cy, e.x, e.y, 0xffffff, 180, big ? 8 : 4);
+        for (let i = 1; i <= 7; i++) this.sparkAt(x + (e.x - x) * (i / 7), cy + (e.y - cy) * (i / 7), big ? 1.1 : 0.7);
+        if (big) this.steamAt(e.x, e.y, 1.2);
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(big ? 420 : 220, big ? 0.016 : 0.009);
+        break;
+      }
+      case "ticktock": {
+        const e = ahead(m.lunge || 220);
+        fx.streak(x, cy, e.x, e.y, c, 260, 10);
+        this.sparkAt(x, cy, 1);
+        this.sparkAt(e.x, e.y, 1);
+        break;
+      }
+      case "sparks":
+      case "shrapnel":
+        this.sparkAt(ahead(16).x, ahead(16).y, 0.9);
+        sfx.hit(false, x, y, true, "metal");
+        break;
+      case "aetherburst": {
+        const off = m.shape?.kind === "circle" ? m.shape.offset : 150;
+        const r = m.shape?.kind === "circle" ? m.shape.radius : 86;
+        const e = { x: x + Math.cos(a) * off, y: y + Math.sin(a) * off * 0.8 };
+        fx.ring(e.x, e.y, 0xffffff, 8, r, 400, 6);
+        fx.ring(e.x, e.y, c, 10, r * 1.2, 560, 3);
+        for (let i = 0; i < 10; i++) fx.bolt(e.x, e.y - 10, e.x + Math.cos((i / 10) * 6.28) * r, e.y - 10 + Math.sin((i / 10) * 6.28) * r * 0.6, c, 220, 3, 8);
+        sfx.boom(true, e.x, e.y);
+        if (mine) shake(260, 0.01);
+        break;
+      }
       // --- Tide arts ----------------------------------------------------------------
       case "tidebreak":
       case "barbs":
@@ -721,6 +779,9 @@ export class SkillFx {
       case "rush":
         if (Math.random() < 0.7) this.fx.dust(x, y, 3, a + Math.PI);
         break;
+      case "ticktock":
+        if (Math.random() < 0.8) this.fx.rise(x, y - 10, Math.random() < 0.5 ? c : 0xffffff, 2, 8, 10, 300, 2.4);
+        break;
       case "eelstep":
       case "riptidedash":
         if (Math.random() < 0.8) this.fx.rise(x, y - 10, Math.random() < 0.5 ? c : 0xffffff, 2, 10, 14, 360, 3);
@@ -750,6 +811,20 @@ export class SkillFx {
     fx.star(x, y - 6 * size, 0xf0e8ff, 4 * size, 360);
   }
 
+  /** A burst of sparks off hot metal. */
+  sparkAt(x: number, y: number, size: number) {
+    const fx = this.fx;
+    fx.sparks(x, y, -Math.PI / 2, Math.random() < 0.5 ? 0xffd070 : 0xff9a3a, Math.ceil(5 * size), 160 * size, Math.PI * 1.6);
+    fx.star(x, y, 0xfff0c0, 4 * size, 260);
+  }
+
+  /** A puff of steam. */
+  steamAt(x: number, y: number, size: number) {
+    const fx = this.fx;
+    fx.rise(x, y, 0xf0f0f0, Math.ceil(6 * size), 14 * size, 40 * size, 900, 5 * size);
+    fx.rise(x, y, 0xd8d8d8, Math.ceil(4 * size), 10 * size, 28 * size, 700, 4 * size);
+  }
+
   /** A splash of seawater: droplets thrown up, and foam. */
   splashAt(x: number, y: number, size: number) {
     const fx = this.fx;
@@ -776,6 +851,35 @@ export class SkillFx {
         fx.burst(x, y - 6, 0xdff4ff, 16, 110, 2.6, 560);
         this.frostAt(x, y - 6, 0.9);
         sfx.hit(true, x, y, true, "metal");
+        return true;
+      case "sparkburst":
+        this.sparkAt(x, y - 6, 1);
+        sfx.hit(false, x, y, true, "metal");
+        return true;
+      case "sundered":
+        // Armour cracks: a ring of sparks and a flash of white-hot metal.
+        fx.ring(x, y - 24, 0xffb040, 4, 18, 380, 3);
+        this.sparkAt(x, y - 18, 0.8);
+        sfx.hit(true, x, y, true, "metal");
+        return true;
+      case "steamvent":
+        fx.ring(x, y, 0xffffff, 8, r, 800, 5);
+        for (let i = 0; i < 8; i++) this.steamAt(x + (Math.random() - 0.5) * r * 1.4, y + (Math.random() - 0.5) * r * 0.9, 1);
+        sfx.boom(false, x, y);
+        return true;
+      case "breaker":
+        fx.bolt(x, y - 40, x, y - 4, 0x9fd3ff, 260, 4, 10);
+        this.sparkAt(x, y - 20, 1.1);
+        sfx.hit(true, x, y, true, "metal");
+        return true;
+      case "breakerdrop":
+        fx.burst(x, y - 20, 0x5a5a5a, 10, 60, 3, 500);
+        this.steamAt(x, y - 10, 0.8);
+        return true;
+      case "overload":
+        fx.ring(x, y, 0x9fd3ff, 20, r, 900, 6);
+        for (let i = 0; i < 12; i++) fx.bolt(x, y, x + Math.cos((i / 12) * 6.28) * r, y + Math.sin((i / 12) * 6.28) * r * 0.6, 0x9fd3ff, 400, 4, 12);
+        sfx.boom(true, x, y);
         return true;
       case "splash":
         fx.burst(x, y - 6, 0x8ff0e0, 16, 110, 2.6, 520);

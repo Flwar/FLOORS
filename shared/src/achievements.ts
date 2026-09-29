@@ -35,6 +35,8 @@ const UMBRAL_CHESTS = ["chest:moonwell-chest", "chest:marsh-chest", "chest:crate
 const UMBRAL_WAYSTONES = ["ws:ws-duskhollow", "ws:ws-gloaming", "ws:ws-marsh", "ws:ws-moon", "ws:ws-spires"];
 const TIDE_CHESTS = ["chest:grotto-chest", "chest:wreck-chest", "chest:kelp-chest"];
 const TIDE_WAYSTONES = ["ws:ws-saltmere", "ws:ws-tidepools", "ws:ws-coral", "ws:ws-wrecks", "ws:ws-cliffs"];
+const BRASS_CHESTS = ["chest:vault-chest", "chest:scrap-chest", "chest:orchard-chest"];
+const BRASS_WAYSTONES = ["ws:ws-gearhaven", "ws:ws-foundry", "ws:ws-vents", "ws:ws-orchard", "ws:ws-rails"];
 const FROST_WAYSTONES = ["ws:ws-rimeholt", "ws:ws-snowfields", "ws:ws-lake", "ws:ws-pinewood", "ws:ws-peak"];
 const has = (c: AchievementContext, list: string[]) => list.every((k) => c.discovered.includes(k));
 
@@ -94,6 +96,15 @@ const DEFS: Def[] = [
   { id: "captain", name: "Mutiny", desc: "Defeat Captain Blackbrine.", test: (c) => c.bossKills.includes("blackbrine") },
   { id: "tide-turns", name: "The Tide Turns", desc: "Defeat Thalassa, the Leviathan Queen.", test: (c) => c.bossKills.includes("thalassa") },
   { id: "legend", name: "Legend of the Tower", desc: "Reach level 28.", test: (c) => c.level >= 28 },
+  // Floor 7
+  { id: "clockwork", name: "Clockwork", desc: "Set foot on Floor 7.", test: (c) => c.discovered.includes("zone:clockwork-heights") },
+  { id: "tinkers-vault", name: "The Tinker's Question", desc: "Find the Tinker's Vault on Floor 7.", test: (c) => c.discovered.includes("zone:tinkers-vault") },
+  { id: "brass-treasure", name: "Spare Parts", desc: "Open every chest on Floor 7.", test: (c) => has(c, BRASS_CHESTS) },
+  { id: "brass-roads", name: "On the Rails", desc: "Attune every waystone on Floor 7.", test: (c) => has(c, BRASS_WAYSTONES) },
+  { id: "gearwyrm", name: "Heart of Brass", desc: "Defeat the Gearwyrm.", test: (c) => c.bossKills.includes("gearwyrm") },
+  { id: "forgemaster", name: "Hammer and Anvil", desc: "Defeat Forgemaster Vulk.", test: (c) => c.bossKills.includes("vulk") },
+  { id: "engine-stops", name: "The Engine Stops", desc: "Defeat the Archon Engine.", test: (c) => c.bossKills.includes("archon") },
+  { id: "mythic", name: "Myth of the Tower", desc: "Reach level 32.", test: (c) => c.level >= 32 },
   { id: "master-of-arms", name: "Master of Arms", desc: "Reach mastery 10 with a weapon.", test: (c) => c.maxMastery >= 10 },
   { id: "seasoned", name: "Seasoned", desc: "Reach level 8.", test: (c) => c.level >= 8 },
   { id: "hoarder", name: "Deep Pockets", desc: "Carry 1,000 gold.", test: (c) => c.gold >= 1000 },

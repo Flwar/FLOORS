@@ -153,6 +153,10 @@ async function trySkill(w: WeaponDef, i: number, sk: MoveDef, dist: number) {
       const soaked = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Soaked) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && (x.m.k === "soaked" || x.m.k === "splash"));
       check(`${w.name}: ${sk.name} soaks the target`, soaked, soaked ? "soaked" : "not soaked");
     }
+    if (sk.sunder || sk.special === "sunder" || sk.special === "steamvent") {
+      const sundered = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Sundered) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && (x.m.k === "sundered" || x.m.k === "sparkburst"));
+      check(`${w.name}: ${sk.name} sunders the target`, sundered, sundered ? "sundered" : "not sundered");
+    }
     if (sk.special === "empower") check(`${w.name}: ${sk.name} empowers`, fx.includes("empower"), fx.join(",") || "no fx");
     if (sk.special === "bloodlust") {
       await idle();

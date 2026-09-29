@@ -53,7 +53,7 @@ export interface EnemyLook {
   horns?: boolean;
   glow?: string;
   /** Dragons: what they breathe (fire by default). */
-  element?: "fire" | "frost" | "shadow" | "tide";
+  element?: "fire" | "frost" | "shadow" | "tide" | "steam";
 }
 
 export interface EnemyDef {
@@ -495,6 +495,8 @@ export const EFlag = {
   Cursed: 512,
   /** Soaked (tide skills): 15% slower, lightning strikes it 35% harder, chill lasts twice as long. */
   Soaked: 1024,
+  /** Sundered (clockwork skills, Siegebreaker): its armour counts for nothing, and it staggers half again as fast. */
+  Sundered: 2048,
 } as const;
 
 /**

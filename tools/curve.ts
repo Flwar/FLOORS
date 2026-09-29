@@ -22,7 +22,9 @@ function kit(L: number) {
   if (L <= 22) return { power: 230, rarity: 0.25, plus: 4, mastery: 10, def: 146, hp: 108 };
   if (L <= 24) return { power: 240, rarity: 0.3, plus: 5, mastery: 10, def: 160, hp: 120 };
   if (L <= 26) return { power: 252, rarity: 0.3, plus: 5, mastery: 10, def: 176, hp: 132 };
-  return { power: 262, rarity: 0.35, plus: 5, mastery: 10, def: 190, hp: 144 };
+  if (L <= 28) return { power: 262, rarity: 0.35, plus: 5, mastery: 10, def: 190, hp: 144 };
+  if (L <= 30) return { power: 276, rarity: 0.35, plus: 5, mastery: 10, def: 206, hp: 156 };
+  return { power: 288, rarity: 0.4, plus: 5, mastery: 10, def: 222, hp: 168 };
 }
 
 /** Sustained light-chain damage per second, before multipliers. */
@@ -56,6 +58,8 @@ const rows: [string, number][] = [
   ["nightwing", 23], ["maelgrim", 23], ["nyxara", 24],
   ["brinehound", 24], ["drowned", 24], ["siren", 25], ["merrowguard", 26], ["coralgolem", 26], ["seadrake", 26],
   ["scylla", 27], ["blackbrine", 27], ["thalassa", 28],
+  ["clockhound", 28], ["tinkerer", 29], ["cogsoldier", 29], ["sentry", 29], ["steamgolem", 30], ["brassdrake", 30],
+  ["gearwyrm", 31], ["vulk", 31], ["archon", 32],
 ];
 console.log("enemy          lvl    hp | sword ttk  gs ttk | you die in | kit");
 for (const [key, L] of rows) {

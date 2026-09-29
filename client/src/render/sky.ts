@@ -13,7 +13,7 @@ export class Sky {
   constructor(private scene: Phaser.Scene, tint: SkyKind = "day") {
     const COLORS: Record<SkyKind, [number, number]> = {
       day: [0x8fc2e6, 0xd8ecf6], dusk: [0x2a3350, 0x0e1320], gold: [0xf7dca0, 0xa9c6e8], storm: [0x5a6a86, 0x2a3350],
-      ember: [0x6a2414, 0x1a0806], frost: [0xb8d4ea, 0xeef6fb], void: [0x1a0f2e, 0x05030c], sea: [0x6fc8e8, 0xd8f4f0],
+      ember: [0x6a2414, 0x1a0806], frost: [0xb8d4ea, 0xeef6fb], void: [0x1a0f2e, 0x05030c], sea: [0x6fc8e8, 0xd8f4f0], smog: [0xd8a868, 0x5a3a24],
     };
     const colors = COLORS[tint];
     this.bg = scene.add.graphics().setScrollFactor(0).setDepth(-100);
@@ -30,7 +30,16 @@ export class Sky {
       if (tint === "ember") img.setTint(0x7a3a2a);
       if (tint === "void") img.setTint(0x4a3a6a).setAlpha(alpha * 0.6);
       if (tint === "sea") img.setTint(0xeaffff);
+      if (tint === "smog") img.setTint(0xb08a60);
       this.layers.push({ img, speed, parallax });
+    }
+    if (tint === "smog") {
+      // Sparks from the foundries drifting up past the isles.
+      paintEmbers(scene);
+      for (const [parallax, rise, alpha] of [[0.2, 16, 0.5], [0.45, 30, 0.35]] as const) {
+        const img = scene.add.tileSprite(0, 0, w * 2, h * 2, "skyEmbers").setOrigin(0).setScrollFactor(0).setDepth(-88).setAlpha(alpha).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd070);
+        this.layers.push({ img, speed: 4, parallax, rise });
+      }
     }
     if (tint === "ember") {
       // Embers rising out of the depths below the isles.
@@ -74,6 +83,7 @@ export class Sky {
       if (tint === "frost") img.setTint(0xdfeaf4);
       if (tint === "void") img.setTint(0x3a2a5a);
       if (tint === "sea") img.setTint(0xa8e0d0);
+      if (tint === "smog") img.setTint(0x7a5a3a);
       img.setPosition(300 + i * 900, 200 + ((i * 373) % 700));
       this.islands.push(img);
     }

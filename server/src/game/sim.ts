@@ -151,6 +151,8 @@ export interface EnemyData {
   curseUntil?: number;
   /** Soaked: slower, and lightning and frost bite harder, until this time. */
   soakUntil?: number;
+  /** Sundered: its armour counts for nothing, until this time. */
+  sunderUntil?: number;
   /** Elite affix (Affix.*). */
   affix: number;
   /** Packleader: has it called its pack yet? */
@@ -194,6 +196,8 @@ interface HazardData {
   curse?: boolean;
   /** Soaks what it hits (Whirlpool). */
   soak?: boolean;
+  /** Sunders what it hits (Steam Vent). */
+  sunder?: boolean;
   /** Glyphs are safe spots, not damage. */
   safe?: boolean;
   lifeUntil: number;
@@ -374,7 +378,7 @@ export class Sim {
       pd.hitSeq = p.actSeq;
       pd.hitSet.clear();
     }
-    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift" || m.special === "whirlpool") return; // detonates as hazards
+    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift" || m.special === "whirlpool" || m.special === "steamvent") return; // detonates as hazards
     const shape = m.shape!;
     const rad = aimToRad(p.actAim);
     const reach = shapeReach(shape) + 40;
@@ -401,7 +405,7 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "tide" ? ProjKind.TideWave : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "tide" ? ProjKind.TideWave : pj.look === "spark" ? ProjKind.Spark : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
         pierce: pj.look === "wave" || (pj.look === "tide" && pj.count === 1),
         team: 0,
         owner: pd.sid,
@@ -495,6 +499,21 @@ export class Sim {
           this.spawnHazard({ kind: HazardKind.Tide, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, soak: true, life: 250 });
         }
         this.emit("fx", { k: "whirlpool", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
+        break;
+      }
+      case "steamvent": {
+        // Steam Vent: blasts five times where you aim, scalding and sundering what it catches.
+        const shape = m.shape as Extract<Shape, { kind: "circle" }>;
+        let cx = p.x + Math.cos(rad) * shape.offset;
+        let cy = p.y + Math.sin(rad) * shape.offset;
+        if (!this.wallClear(p.x, p.y, cx, cy)) {
+          cx = p.x + Math.cos(rad) * shape.offset * 0.4;
+          cy = p.y + Math.sin(rad) * shape.offset * 0.4;
+        }
+        for (let i = 0; i < 5; i++) {
+          this.spawnHazard({ kind: HazardKind.Steam, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, sunder: true, life: 250 });
+        }
+        this.emit("fx", { k: "steamvent", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
         break;
       }
       case "frost":
@@ -639,6 +658,10 @@ export class Sim {
     if (attacker && attacker.act === Act.Light && pd?.ch?.hasPerk("momentum")) dmg *= 1 + Math.min(0.25, attacker.combo * 0.05);
     if (ed.markUntil && this.now < ed.markUntil) dmg *= 1.3;
     if (e.flags & EFlag.Cursed) dmg *= dv?.effects.has("setVoid") ? 1.18 : 1.1;
+    if (e.flags & EFlag.Sundered) {
+      poise *= 1.5;
+      if (dv?.effects.has("setBrass")) dmg *= 1.1;
+    }
     if (e.flags & EFlag.Soaked) {
       if (m?.vfx === "lightning" || m?.vfx === "storm") dmg *= SOAK_SHOCK;
       if (dv?.effects.has("setTide")) dmg *= 1.1;
@@ -669,13 +692,15 @@ export class Sim {
       // Stormcaller: lightning finds the soaked.
       this.spawnHazard({ kind: HazardKind.Lightning, team: 0, x: e.x, y: e.y, radius: 32, delay: 160, damage: base * 0.5 * pd.atkMul, poise: 20, knockback: 50, heavy: false, sid: pd.sid, life: 300 });
     }
+    const heavyBlow = attacker && (attacker.act === Act.Heavy || attacker.act === Act.Skill);
+    if (m?.special === "sunder" || m?.sunder || (m && heavyBlow && pd?.ch?.hasPerk("siegebreaker")) || (dv?.effects.has("tinkercog") && Math.random() < 1 / 6) || (dv?.effects.has("setBrass") && Math.random() < 0.3)) this.sunder(ed);
     if (m?.special === "soak" || m?.soak || (dv?.effects.has("tideshell") && Math.random() < 1 / 6) || (dv?.effects.has("setTide") && Math.random() < 0.3)) this.soak(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
     if (m?.special === "mark" && pd) {
       ed.markUntil = this.now + 6000;
       e.flags |= EFlag.Marked;
     }
-    dmg *= 1 - def.armor;
+    dmg *= 1 - (e.flags & EFlag.Sundered ? 0 : def.armor);
     const amount = Math.max(1, Math.round(dmg));
     // Credit (kill share, weapon mastery) counts only health actually removed, never overkill.
     const dealt = Math.min(amount, e.hp);
@@ -1133,7 +1158,7 @@ export class Sim {
     this.state.projectiles.delete(id);
   }
 
-  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean; soak?: boolean }) {
+  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean; soak?: boolean; sunder?: boolean }) {
     const id = this.id("h");
     const hz = new Hazard();
     hz.kind = o.kind;
@@ -1145,7 +1170,7 @@ export class Sim {
     hz.delay = o.delay;
     this.state.hazards.set(id, hz);
     this.onSpawn?.(hz, o.x, o.y);
-    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, soak: o.soak, lifeUntil: this.now + o.delay + (o.life ?? 600) });
+    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, soak: o.soak, sunder: o.sunder, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
   }
 
@@ -1163,6 +1188,14 @@ export class Sim {
       if (ed.def.behavior === "dummy" || ed.def.behavior === "sparring") e.hp = e.hpMax;
       else this.killEnemy(ed, pd);
     }
+  }
+
+  /** Sunder an enemy: its armour counts for nothing and it staggers half again as fast, for a few seconds. */
+  sunder(ed: EnemyData, ms = 5000) {
+    const was = (ed.e.flags & EFlag.Sundered) !== 0;
+    ed.sunderUntil = Math.max(ed.sunderUntil ?? 0, this.now + ms);
+    ed.e.flags |= EFlag.Sundered;
+    if (!was) this.emit("fx", { k: "sundered", x: ed.e.x, y: ed.e.y, t: ed.id }, ed.e.x, ed.e.y);
   }
 
   /** Soak an enemy: slower, and lightning and frost bite it harder, for a few seconds. */
@@ -1235,6 +1268,10 @@ export class Sim {
         ed.soakUntil = undefined;
         ed.e.flags &= ~EFlag.Soaked;
       }
+      if (ed.sunderUntil && (this.now > ed.sunderUntil || ed.e.act === EAct.Dead)) {
+        ed.sunderUntil = undefined;
+        ed.e.flags &= ~EFlag.Sundered;
+      }
       if (ed.burnUntil) {
         if (this.now > ed.burnUntil || ed.e.act === EAct.Dead) {
           ed.burnUntil = undefined;
@@ -1292,6 +1329,10 @@ export class Sim {
           this.chill(ed);
           this.emit("fx", { k: "iceburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
         }
+        if (pj.special === "sunder" && ed.e.act !== EAct.Dead) {
+          this.sunder(ed);
+          this.emit("fx", { k: "sparkburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
+        }
         if (pj.special === "soak" && ed.e.act !== EAct.Dead) {
           this.soak(ed);
           this.emit("fx", { k: "splash", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
@@ -1321,6 +1362,7 @@ export class Sim {
           const shock = hz.hz.kind === HazardKind.Lightning && e.flags & EFlag.Soaked ? SOAK_SHOCK : 1;
           this.damageEnemy(ed, pd, (hz.damage * shock) / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
           if (hz.soak && ed.e.act !== EAct.Dead) this.soak(ed);
+          if (hz.sunder && ed.e.act !== EAct.Dead) this.sunder(ed);
           if (hz.burn && pd && ed.e.act !== EAct.Dead) this.ignite(ed, pd, hz.damage / (pd.atkMul || 1));
           if (hz.frost && ed.e.act !== EAct.Dead) this.chill(ed);
           if (hz.curse && ed.e.act !== EAct.Dead) this.curse(ed);

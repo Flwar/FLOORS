@@ -443,6 +443,10 @@ export class WorldScene extends Phaser.Scene {
         const a = Math.random() * Math.PI * 2;
         this.fx.rise(x + Math.cos(a) * 14 * s, y - 4 + Math.sin(a) * 6 * s, col, 1, 3, 26, 700, 2.4);
       }
+      if (e.flags & EFlag.Sundered && Math.random() < delta / 130) {
+        const s = v.def.look.scale;
+        this.fx.sparks(x + (Math.random() - 0.5) * 16 * s, y - 14 * s, -Math.PI / 2, Math.random() < 0.5 ? 0xffd070 : 0xff9a3a, 1, 90, 1.2);
+      }
       if (e.flags & EFlag.Soaked && Math.random() < delta / 110) {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 16 * s, y - 20 * s - Math.random() * 10, 0x8ff0e0, 1, 2, -18, 600, 2.2);
@@ -458,12 +462,13 @@ export class WorldScene extends Phaser.Scene {
         const frost = v.def.look.element === "frost";
         const dark = v.def.look.element === "shadow";
         const sea = v.def.look.element === "tide";
-        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : sea ? [0xffffff, 0x8ff0e0, 0x1fa8c0] : [0xffe08a, 0xff7a2a, 0xd8402c];
+        const steam = v.def.look.element === "steam";
+        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : sea ? [0xffffff, 0x8ff0e0, 0x1fa8c0] : steam ? [0xffffff, 0xe8e0d0, 0xb8b0a8] : [0xffe08a, 0xff7a2a, 0xd8402c];
         for (let i = 0; i < Math.ceil(delta / 12); i++) {
           const spread = (Math.random() - 0.5) * 0.9;
           this.fx.sparks(f.x, f.y, f.a + spread, Math.random() < 0.4 ? palette[0] : Math.random() < 0.5 ? palette[1] : palette[2], 2, 180 + 120 * s, 0.25);
         }
-        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : sea ? 0xdffaf4 : 0xff9a3a, 4, 50, 3.4, 420);
+        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : sea ? 0xdffaf4 : steam ? 0xf0f0f0 : 0xff9a3a, 4, 50, 3.4, 420);
         if (Math.random() < delta / 200) sfx.boom(false, f.x, f.y);
       }
       this.enemyTelegraph(id, e, v, x, y, view);
@@ -1350,7 +1355,7 @@ export class WorldScene extends Phaser.Scene {
         case HazardKind.Glyph: {
           const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.2;
           // Aurelion's glyphs are golden; under the Void Queen's eclipse they are pools of moonlight.
-          const gc = this.map.theme === "shadow" ? 0xe8f0ff : this.map.theme === "tide" ? 0xf4ecd0 : 0xffe08a;
+          const gc = this.map.theme === "shadow" ? 0xe8f0ff : this.map.theme === "tide" ? 0xf4ecd0 : this.map.theme === "brass" ? 0x9fd3ff : 0xffe08a;
           g.fillStyle(gc, 0.2 * pulse + 0.1);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.lineStyle(3, gc, 0.9);
@@ -1366,7 +1371,7 @@ export class WorldScene extends Phaser.Scene {
           break;
         default: {
           if (t > h.delay + 250) return;
-          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : h.kind === HazardKind.Tide ? 0x3fb8c8 : 0xd8402c;
+          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : h.kind === HazardKind.Tide ? 0x3fb8c8 : h.kind === HazardKind.Steam ? 0xe8e0d0 : 0xd8402c;
           g.fillStyle(color, 0.08 + 0.2 * k);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.fillStyle(color, 0.35);
@@ -1386,6 +1391,11 @@ export class WorldScene extends Phaser.Scene {
             this.fx.burst(h.x, h.y - 6, 0xdff4ff, 22, 150, 2.8, 650);
             this.fx.ring(h.x, h.y, 0x8fd3ff, 6, h.radius, 380, 3);
             sfx.hit(true, h.x, h.y, true, "metal");
+          } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Steam) {
+            // A blast of scalding steam.
+            for (let i = 0; i < 3; i++) this.skillFx.steamAt(h.x + (Math.random() - 0.5) * h.radius, h.y + (Math.random() - 0.5) * h.radius * 0.6, 1);
+            this.fx.ring(h.x, h.y, 0xffffff, 6, h.radius, 380, 3);
+            sfx.boom(false, h.x, h.y);
           } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Tide) {
             // The sea bursts up out of the ground.
             this.fx.burst(h.x, h.y - 6, 0x8ff0e0, 20, 140, 3, 650);
@@ -1426,6 +1436,14 @@ export class WorldScene extends Phaser.Scene {
         g2.fillStyle(0xeaf6ff, 1);
         g2.fillTriangle(x + Math.cos(pr.angle) * pr.radius * 1.6, y + Math.sin(pr.angle) * pr.radius * 1.6, x + Math.cos(pr.angle + 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle + 2.4) * pr.radius * 0.8, x + Math.cos(pr.angle - 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle - 2.4) * pr.radius * 0.8);
         if (Math.random() < 0.5) this.fx.rise(tx, ty, 0xdff4ff, 1, 3, 8, 300, 2);
+        return;
+      }
+      if (pr.kind === ProjKind.Spark) {
+        // A crackling bolt of aether, or a shard of hot shrapnel.
+        const hot = pr.radius <= 7;
+        this.fx.streak(tx, ty, x, y, hot ? 0xff9a3a : 0x9fd3ff, 60, hot ? 3 : 5);
+        this.fx.streak(tx, ty, x, y, 0xffffff, 40, hot ? 1.5 : 2);
+        if (Math.random() < 0.4) this.fx.sparks(x, y, pr.angle + Math.PI, hot ? 0xffd070 : 0xdff4ff, 1, 80);
         return;
       }
       if (pr.kind === ProjKind.TideWave) {
@@ -1648,9 +1666,9 @@ export class WorldScene extends Phaser.Scene {
       this.hud.zone(zone);
       const mood = zone.music ?? (this.map.theme === "cave" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
-      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow", tide: "sea", saltmere: "town", cathedral: "sea" };
+      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow", tide: "sea", saltmere: "town", cathedral: "sea", brass: "brass", gearhaven: "town", engine: "brass" };
       const theme = this.map.theme;
-      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "tide" ? "sea" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
+      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "tide" ? "sea" : theme === "brass" ? "brass" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
       sfx.setRoom(this.map.theme === "cave" || zone.dark === true || zone.indoor ? "cave" : zone.safe ? "town" : "open");
     }
     // Boss bar for the nearest engaged boss.

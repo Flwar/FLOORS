@@ -285,9 +285,11 @@ export class Character {
     if (this.hasPerk("glacialHide")) defense += 25;
     if (this.hasPerk("deepLungs")) stamina += 15;
     if (this.hasPerk("tidalGrace")) stamina += 20;
+    if (this.hasPerk("clockworkHeart")) stamina += 25;
     let hpMax = baseHp(d.level) + hp;
     if (this.hasPerk("wardensGrace")) hpMax = Math.round(hpMax * 1.1);
     if (this.hasPerk("glacialHide")) hpMax = Math.round(hpMax * 1.08);
+    if (this.hasPerk("clockworkHeart")) hpMax = Math.round(hpMax * 1.08);
     this.derived = {
       atkMul: (power / 100) * (1 + (d.level - 1) * 0.04),
       defense,

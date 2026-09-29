@@ -611,6 +611,119 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
     g.arc(32, 32, 17, 0, Math.PI * 2);
     fillInk(g, "#0c0814", 2);
   },
+  // --- Clockwork arts -------------------------------------------------------------------
+  gearsaw: (g, c) => {
+    cog(g, 32, 34, 18, c);
+    GLYPH.sunder(g, "#ffffff");
+  },
+  piston: (g, c) => {
+    g.beginPath();
+    g.roundRect(8, 26, 30, 12, 3);
+    fillInk(g, "#8a8a8a", 3);
+    g.beginPath();
+    g.moveTo(38, 32);
+    g.lineTo(58, 32);
+    ink(g, c, 7);
+  },
+  steamhammer: (g, c) => {
+    GLYPH.quake(g, c);
+    cog(g, 46, 16, 8, "#ffffff");
+  },
+  overdrive: (g, c) => {
+    GLYPH.fissure(g, c);
+    cog(g, 16, 16, 8, "#ffffff");
+  },
+  springblades: (g, c) => {
+    GLYPH.cuts(g, c);
+    spring(g, 32, 32, c);
+  },
+  ticktock: (g, c) => {
+    g.beginPath();
+    g.arc(32, 32, 22, 0, Math.PI * 2);
+    fillInk(g, "#f4ecd8", 3);
+    g.beginPath();
+    g.moveTo(32, 32);
+    g.lineTo(32, 16);
+    g.moveTo(32, 32);
+    g.lineTo(44, 38);
+    ink(g, c, 3);
+  },
+  railshot: (g, c) => {
+    GLYPH.pierce(g, c);
+    cog(g, 16, 48, 7, "#ffffff");
+  },
+  gyro: (g, c) => {
+    GLYPH.whirlspear(g, c);
+    cog(g, 32, 32, 7, "#ffffff");
+  },
+  sparks: (g, c) => {
+    for (const a of [-0.5, 0, 0.5]) {
+      g.beginPath();
+      g.moveTo(10, 32);
+      g.lineTo(10 + Math.cos(a) * 20, 32 + Math.sin(a) * 20 - 5);
+      g.lineTo(10 + Math.cos(a) * 30, 32 + Math.sin(a) * 30 + 3);
+      g.lineTo(10 + Math.cos(a) * 46, 32 + Math.sin(a) * 46);
+      ink(g, c, 2.5);
+    }
+  },
+  aetherburst: (g, c) => {
+    g.beginPath();
+    g.arc(32, 32, 10, 0, Math.PI * 2);
+    fillInk(g, "#ffffff", 3);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      g.beginPath();
+      g.moveTo(32 + Math.cos(a) * 14, 32 + Math.sin(a) * 14);
+      g.lineTo(32 + Math.cos(a) * 26, 32 + Math.sin(a) * 26);
+      ink(g, c, 2.5);
+    }
+  },
+  shrapnel: (g, c) => {
+    g.beginPath();
+    g.arc(24, 38, 11, 0, Math.PI * 2);
+    fillInk(g, "#3a3a3a", 3);
+    for (const [x, y] of [[44, 18], [50, 30], [40, 10], [54, 44]] as const) {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + 5, y + 3);
+      g.lineTo(x + 1, y + 7);
+      g.closePath();
+      fillInk(g, c, 2);
+    }
+  },
+  overclock: (g, c) => {
+    cog(g, 32, 32, 20, c);
+    g.beginPath();
+    g.moveTo(32, 32);
+    g.lineTo(46, 18);
+    ink(g, "#ff5a4a", 3);
+  },
+  steamvent: (g, c) => {
+    g.beginPath();
+    g.ellipse(32, 48, 18, 7, 0, 0, Math.PI * 2);
+    fillInk(g, "#3a3a3a", 3);
+    for (const [x, h] of [[24, 26], [32, 34], [40, 24]] as const) {
+      g.beginPath();
+      g.moveTo(x, 46);
+      g.quadraticCurveTo(x - 6, 46 - h / 2, x, 46 - h);
+      ink(g, c, 3);
+    }
+  },
+  titanfist: (g, c) => {
+    g.beginPath();
+    g.roundRect(14, 18, 30, 28, 6);
+    fillInk(g, c, 3);
+    for (const x of [20, 28, 36]) {
+      g.beginPath();
+      g.moveTo(x, 18);
+      g.lineTo(x, 30);
+      ink(g, "#5a3a10", 2);
+    }
+    g.beginPath();
+    g.moveTo(44, 32);
+    g.lineTo(58, 32);
+    ink(g, "#ffffff", 4);
+  },
   // --- Tide arts ------------------------------------------------------------------------
   tidebreak: (g, c) => {
     GLYPH.sunder(g, c);
@@ -1277,6 +1390,31 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
   },
 };
 
+/** A gear. */
+function cog(g: G, x: number, y: number, r: number, color: string) {
+  g.beginPath();
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
+    const rr = i % 2 ? r : r * 1.25;
+    g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  g.closePath();
+  fillInk(g, color, 2.5);
+  g.beginPath();
+  g.arc(x, y, r * 0.35, 0, Math.PI * 2);
+  fillInk(g, "#1d1a17", 1.5);
+}
+
+/** A coiled spring. */
+function spring(g: G, x: number, y: number, color: string) {
+  g.beginPath();
+  for (let i = 0; i <= 24; i++) {
+    const t = i / 24;
+    g.lineTo(x - 12 + t * 24, y + Math.sin(t * Math.PI * 6) * 6);
+  }
+  ink(g, color, 2.5);
+}
+
 /** A curling wave. */
 function wavelet(g: G, x: number, y: number, color: string, s = 1) {
   g.beginPath();
@@ -1347,7 +1485,7 @@ export function drawSkillIcon(g: G, vfx: string, color: number) {
 const PASSIVE_COLOR: Record<string, number> = {
   fleetfoot: 0x8fe0c0, deepLungs: 0x9fd3ff, secondWind: 0x9fe08a, ironSkin: 0xc9d3dd, wardensGrace: 0xffe08a, riposteMaster: 0xffc27a, keenEye: 0xdfe8ff,
   executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b, frostblood: 0x8fd3ff, glacialHide: 0xdfeaf4,
-  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a, stormcaller: 0x9fd3ff, tidalGrace: 0x8ff0e0,
+  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a, stormcaller: 0x9fd3ff, tidalGrace: 0x8ff0e0, siegebreaker: 0xff9a3a, clockworkHeart: 0xffd070,
 };
 
 /** A passive skill's icon (shield and star in its colour). */

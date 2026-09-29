@@ -174,6 +174,89 @@ export function itemIcon(key: string, rarity = 0): string {
       }
       break;
     }
+    // --- Floor 7: the Clockwork Heights ----------------------------------------------
+    case "mat_brassgear":
+    case "key_engine": {
+      const big = key === "key_engine";
+      const r = big ? 20 : 15;
+      g.fillStyle = outline;
+      g.beginPath();
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        const rr = i % 2 ? r + 2 : r + 7;
+        g.lineTo(32 + Math.cos(a) * rr, 32 + Math.sin(a) * rr);
+      }
+      g.closePath();
+      g.fill();
+      const gg = g.createRadialGradient(26, 26, 2, 32, 32, r + 4);
+      gg.addColorStop(0, "#fff0c0");
+      gg.addColorStop(1, big ? "#c87a28" : "#a07028");
+      g.fillStyle = gg;
+      g.beginPath();
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        const rr = i % 2 ? r : r + 4.5;
+        g.lineTo(32 + Math.cos(a) * rr, 32 + Math.sin(a) * rr);
+      }
+      g.closePath();
+      g.fill();
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 32, r * 0.35, 0, Math.PI * 2);
+      g.fill();
+      if (big) {
+        g.fillStyle = "#ffb040";
+        g.beginPath();
+        g.arc(32, 32, r * 0.2, 0, Math.PI * 2);
+        g.fill();
+      }
+      break;
+    }
+    case "mat_spring": {
+      g.strokeStyle = outline;
+      g.lineWidth = 7;
+      g.lineCap = "round";
+      g.beginPath();
+      for (let i = 0; i <= 40; i++) {
+        const t = i / 40;
+        const a = t * Math.PI * 8;
+        const rr = 4 + t * 18;
+        g.lineTo(32 + Math.cos(a) * rr, 32 + Math.sin(a) * rr);
+      }
+      g.stroke();
+      g.strokeStyle = "#6a8ab8";
+      g.lineWidth = 3.5;
+      g.stroke();
+      break;
+    }
+    case "mat_aethercore":
+    case "art_archoncore": {
+      const halo = g.createRadialGradient(32, 32, 4, 32, 32, 30);
+      halo.addColorStop(0, key === "art_archoncore" ? "rgba(255,176,64,0.9)" : "rgba(159,211,255,0.9)");
+      halo.addColorStop(1, "rgba(80,120,200,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 32, 17, 0, Math.PI * 2);
+      g.fill();
+      const cg = g.createRadialGradient(28, 28, 2, 32, 32, 15);
+      cg.addColorStop(0, "#ffffff");
+      cg.addColorStop(0.5, key === "art_archoncore" ? "#ffb040" : "#9fd3ff");
+      cg.addColorStop(1, key === "art_archoncore" ? "#8a3a10" : "#2a5a8a");
+      g.fillStyle = cg;
+      g.beginPath();
+      g.arc(32, 32, 14.5, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "#c8a048";
+      g.lineWidth = 3;
+      for (const a of [0, Math.PI / 2]) {
+        g.beginPath();
+        g.ellipse(32, 32, 18, 6, a, 0, Math.PI * 2);
+        g.stroke();
+      }
+      break;
+    }
     // --- Floor 6: the Drowned Isles --------------------------------------------------
     case "mat_coral": {
       // A branch of living coral.

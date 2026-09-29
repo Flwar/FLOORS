@@ -4,7 +4,7 @@ import type { ArmorStyle, WeaponArtKey } from "@floors/shared";
 /** Textures are painted at RES× their world size and displayed at 1/RES scale. */
 export const RES = 2;
 
-export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood" | "eclipsecrown" | "shadowveil" | "coralcrown" | "divers";
+export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood" | "eclipsecrown" | "shadowveil" | "coralcrown" | "divers" | "brassvisor" | "goggles";
 
 export interface CharLook {
   key: string;
@@ -117,6 +117,7 @@ export const ARMOR_BULK: Record<ArmorStyle, number> = {
   rimeplate: 1.15, furmantle: 1.08, frostweave: 1.04,
   eclipse: 1.15, shadowsilk: 1.03, voidweave: 1.04,
   tideplate: 1.15, sharkskin: 1.04, seasilk: 1.04,
+  brassplate: 1.16, tinkercoat: 1.05, aetherweave: 1.04,
 };
 
 function outfit(look: CharLook): Outfit {
@@ -194,6 +195,13 @@ function outfit(look: CharLook): Outfit {
       return { finish: "leather", base: "#6a7a86", trim: "#8ff0e0", belt: "#2a3a42", sleeve: "#5a6a76", hand: "#3a4a52", leg: "#4a5a64", boot: "#2a343a", straps: true, cape: "#3a5a6a", capeTrim: "#8ff0e0" };
     case "seasilk":
       return { finish: "robe", base: "#1e6a8a", trim: "#f0d890", belt: "#8ff0e0", sleeve: "#1e6a8a", hand: look.skin, leg: "#185a74", boot: "#0e3448", rune: "#8ff0e0" };
+    // Floor 7: the Brassbound set — riveted brass plate, a tinker's coat, copper-threaded robes.
+    case "brassplate":
+      return { finish: "plate", base: "#c8a048", trim: "#5a3a10", belt: "#3a2a1a", sleeve: "#b08a3a", hand: "#8a6a2a", leg: "#b8943e", boot: "#4a3a2a", pauldron: "#e0b858", tabard: "#6a3a2a", rune: "#ffb040" };
+    case "tinkercoat":
+      return { finish: "leather", base: "#7a4a2a", trim: "#e0b858", belt: "#3a2a1a", sleeve: "#6a3e22", hand: "#5a3a24", leg: "#4a3a2c", boot: "#2e2218", straps: true, cape: "#5a3a22", capeTrim: "#e0b858" };
+    case "aetherweave":
+      return { finish: "robe", base: "#2a3a4a", trim: "#e0a050", belt: "#c87a3a", sleeve: "#2a3a4a", hand: look.skin, leg: "#1e2a36", boot: "#141c24", rune: "#9fd3ff" };
     default:
       return { finish: "cloth", base: look.cloth, trim: look.trim, belt: look.trim, sleeve: look.cloth, hand: look.skin, leg: shade(look.cloth, -55), boot: "#4a3526" };
   }
@@ -1151,6 +1159,58 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
       }
       break;
     }
+    case "brassvisor": {
+      // Brass with a slotted visor and a little gauge over the brow.
+      drawDome(g, cx, cy, "#f0c860", "#8a6420");
+      g.fillStyle = "#5a3a10";
+      g.fillRect(cx - 12, cy - 2.4, 24, 2.4);
+      if (view !== "back") {
+        g.fillStyle = OUTLINE;
+        g.fillRect(view === "side" ? cx + 1 : cx - 9, cy - 1, view === "side" ? 11 : 18, 4);
+        glow(g, "#ffb040", 4);
+        g.fillStyle = "#ffb040";
+        for (const ex of view === "side" ? [cx + 7] : [cx - 4, cx + 4]) g.fillRect(ex - 1.5, cy + 0.2, 3, 1.6);
+        noGlow(g);
+        const gx = view === "side" ? cx + 3 : cx;
+        g.fillStyle = OUTLINE;
+        blob(g, gx, cy - 8, 3.6, 3.6);
+        g.fill();
+        g.fillStyle = "#f4ecd8";
+        blob(g, gx, cy - 8, 2.4, 2.4);
+        g.fill();
+        g.strokeStyle = "#b8463b";
+        g.lineWidth = 1;
+        line(g, gx, cy - 8, gx + 1.6, cy - 9.4);
+      }
+      break;
+    }
+    case "goggles": {
+      // A leather cap and brass goggles with too many lenses.
+      g.fillStyle = OUTLINE;
+      blob(g, cx, cy - 3, 13.6, 11);
+      g.fill();
+      g.fillStyle = "#6a4a2a";
+      blob(g, cx, cy - 3.6, 12, 9.4);
+      g.fill();
+      if (view !== "back") {
+        const gy = cy - 5;
+        for (const gx of view === "side" ? [cx + 6] : [cx - 5, cx + 5]) {
+          g.fillStyle = OUTLINE;
+          blob(g, gx, gy, 4.6, 4.6);
+          g.fill();
+          g.fillStyle = "#c8a048";
+          blob(g, gx, gy, 3.6, 3.6);
+          g.fill();
+          g.fillStyle = "#9fd3ff";
+          blob(g, gx, gy, 2.4, 2.4);
+          g.fill();
+          g.fillStyle = "rgba(255,255,255,0.8)";
+          blob(g, gx - 0.8, gy - 0.8, 0.8, 0.8);
+          g.fill();
+        }
+      }
+      break;
+    }
     case "furhood": {
       // White fur, with a wolf's head worn as a crown.
       g.fillStyle = OUTLINE;
@@ -1827,6 +1887,12 @@ export function weaponTrail(kind: WeaponArt): number {
     case "sp_tide":
     case "st_tide":
       return 0x8ff0e0;
+    case "sword_brass":
+    case "gs_brass":
+    case "dg_brass":
+    case "sp_brass":
+    case "st_brass":
+      return 0xffd070;
     case "gs_moon":
       return 0xd8d0ff;
     case "gs_gilded":
@@ -1924,6 +1990,11 @@ const WEAPON_SIZE: Record<WeaponArt, [number, number, number]> = {
   dg_tide: [42, 16, 7],
   sp_tide: [116, 30, 22],
   st_tide: [86, 36, 10],
+  sword_brass: [66, 22, 9],
+  gs_brass: [100, 36, 14],
+  dg_brass: [40, 16, 7],
+  sp_brass: [116, 28, 22],
+  st_brass: [86, 36, 10],
 };
 
 export function weaponSize(kind: WeaponArt) {
@@ -2717,6 +2788,79 @@ export function drawWeapon(g: CanvasRenderingContext2D, kind: WeaponArt, rarity 
       sg.addColorStop(1, "#e8a030");
       g.fillStyle = sg;
       blob(g, ox, cy, 7, 7);
+      g.fill();
+      break;
+    }
+    // --- Floor 7: the Brassbound set ----------------------------------------------
+    case "sword_brass":
+    case "gs_brass":
+    case "dg_brass": {
+      const big = kind === "gs_brass";
+      const small = kind === "dg_brass";
+      straightBlade(g, w, h, grip, {
+        width: big ? 12.4 : small ? 4.6 : 7.4, hi: "#fff0c0", mid: "#d8a848", lo: "#6a4418", guard: "#5a3a10", guardW: big ? 30 : small ? 12 : 20,
+        grip: "#3a2a1a", edge: "#fff8e0", edgeGlow: "#ffb040", pommel: "#ffd070",
+      });
+      // Rivets down the blade, and a little gear at the guard.
+      g.fillStyle = rarity >= 3 ? accent : "#5a3a10";
+      const x0 = grip + 12;
+      const x1 = w - (big ? 18 : 12);
+      for (let x = x0; x < x1; x += big ? 10 : 7) {
+        blob(g, x, cy, big ? 1.4 : 0.9, big ? 1.4 : 0.9);
+        g.fill();
+      }
+      break;
+    }
+    case "sp_brass": {
+      shaft(g, 0, w - 26, cy, "#8a8a8a", 3.4);
+      g.fillStyle = "#c8a048";
+      for (const x of [grip, grip + 30, w - 32]) g.fillRect(x, cy - 3.5, 3.2, 7);
+      // A brass rail-head: a long flat point on a sliding collar.
+      const head = (inset: number) => {
+        g.beginPath();
+        g.moveTo(w - 30 + inset, cy - 4.5 + inset);
+        g.lineTo(w - 2 - inset, cy);
+        g.lineTo(w - 30 + inset, cy + 4.5 - inset);
+        g.closePath();
+      };
+      g.fillStyle = OUTLINE;
+      head(-1.5);
+      g.fill();
+      const hg = g.createLinearGradient(0, cy - 5, 0, cy + 5);
+      hg.addColorStop(0, "#fff0c0");
+      hg.addColorStop(1, "#a07028");
+      g.fillStyle = hg;
+      head(0.4);
+      g.fill();
+      g.fillStyle = rarity >= 3 ? accent : "#5a3a10";
+      g.fillRect(w - 32, cy - 5, 4, 10);
+      break;
+    }
+    case "st_brass": {
+      shaft(g, 0, w - 20, cy, "#b87a3a", 3.8);
+      g.fillStyle = "#5a3a10";
+      for (const x of [6, grip + 12, w - 34]) g.fillRect(x, cy - 3, 2.6, 6);
+      // Copper coils around an aether core.
+      g.strokeStyle = "#c87a3a";
+      g.lineWidth = 2;
+      for (let x = w - 30; x < w - 20; x += 3) {
+        g.beginPath();
+        g.moveTo(x, cy - 5);
+        g.lineTo(x + 2, cy + 5);
+        g.stroke();
+      }
+      const ox = w - 12;
+      glow(g, "#9fd3ff", 12);
+      g.fillStyle = OUTLINE;
+      blob(g, ox, cy, 9, 9);
+      g.fill();
+      noGlow(g);
+      const og = g.createRadialGradient(ox - 2, cy - 2, 1, ox, cy, 8);
+      og.addColorStop(0, "#ffffff");
+      og.addColorStop(0.5, rarity >= 3 ? accent : "#9fd3ff");
+      og.addColorStop(1, "#2a5a8a");
+      g.fillStyle = og;
+      blob(g, ox, cy, 7.6, 7.6);
       g.fill();
       break;
     }

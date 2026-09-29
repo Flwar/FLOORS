@@ -52,4 +52,13 @@ export const RUMOURS: Record<number, string[]> = {
     "Marisol at the Pearlforge says a leviathan scale turns a blade like nothing else. She won't say how she knows.",
     "When the Leviathan Queen calls the Deluge, get to the high ground. It's the only place the sea won't reach.",
   ],
+  7: [
+    "A sundered machine is just a man in a tin can. Crack the armour first, then hit it with everything.",
+    "The clockhounds run in packs of three and they never tire. Parry the pounce; they rattle when they miss.",
+    "Behind the rocks at the north end of the Steam Vents there's a rusted catwalk. The old tinker worked out there, once.",
+    "The Gearwyrm roosts on the Sky Rails. Its heart is the Master Cog — the only thing that turns the Engine's door.",
+    "In the Engine there's a room with four breakers. They won't hold long. Throw them all, and throw them fast.",
+    "Ada at the Gearworks says an aether core is a tiny sun in a jar. She doesn't say what happens if you drop it.",
+    "When the Archon overloads, get to a grounding pylon. Everything else in that room is going to burn.",
+  ],
 };

@@ -246,8 +246,46 @@ export const FLOOR6_EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 7: the runaway line, the boiler storm, and the wandering merchant. */
+export const FLOOR7_EVENTS: EventDef[] = [
+  {
+    id: "runaway",
+    name: "The Runaway Line",
+    announce: "The Foundry's line has jammed open — clockhounds are pouring out of the yards!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 80, y: 92 }, { x: 102, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "clockhound", level: 29 }, { key: "clockhound", level: 29 }, { key: "clockhound", level: 29 }, { key: "clockhound", level: 29 },
+      { key: "clockhound", level: 30, elite: true, hpScale: 1.8 }, { key: "tinkerer", level: 29 },
+    ],
+    reward: { xp: 3400, gold: 640, loot: true },
+    lootPool: ["mat_spring", "mat_aethercore", "helm_goggles", "armor_tinker", "daggers_brass", "spear_brass"],
+  },
+  {
+    id: "boilerstorm",
+    name: "The Boiler Storm",
+    announce: "The Steam Vents are overpressured — golems and soldiers march out of the fog!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 34, y: 96 }),
+    enemies: [
+      { key: "steamgolem", level: 30 }, { key: "steamgolem", level: 30 }, { key: "cogsoldier", level: 30 }, { key: "sentry", level: 30 },
+      { key: "cogsoldier", level: 31, elite: true },
+    ],
+    reward: { xp: 3800, gold: 700, loot: true },
+    lootPool: ["mat_brassgear", "mat_aethercore", "armor_aether", "staff_brass", "sword_brass", "greatsword_brass"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has parked her ticking cart in Gearhaven — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 133, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
 /** Each floor's world events. */
-export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS, 6: FLOOR6_EVENTS };
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS, 6: FLOOR6_EVENTS, 7: FLOOR7_EVENTS };
 
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {

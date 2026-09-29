@@ -29,6 +29,7 @@
     "floor4": "tsx tools/floor4.ts",
     "floor5": "tsx tools/floor5.ts",
     "floor6": "tsx tools/floor6.ts",
+    "floor7": "tsx tools/floor7.ts",
     "mechanics": "tsx tools/mechanics.ts",
     "party": "tsx tools/party.ts",
     "worldfloor": "tsx tools/worldfloor.ts",

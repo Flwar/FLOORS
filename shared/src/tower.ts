@@ -11,6 +11,8 @@ import { buildFloor5 } from "./world/floor5.ts";
 import { buildSanctum } from "./world/sanctum.ts";
 import { buildFloor6 } from "./world/floor6.ts";
 import { buildCathedral } from "./world/cathedral.ts";
+import { buildFloor7 } from "./world/floor7.ts";
+import { buildEngine } from "./world/engine.ts";
 
 /**
  * The tower: every floor, its boss dungeon, and how they connect. Rooms, travel, level caps,
@@ -18,8 +20,8 @@ import { buildCathedral } from "./world/cathedral.ts";
  * (map, dungeon, enemies, items, quests) plus one entry here.
  */
 
-export type Theme = "meadow" | "cave" | "gilded" | "storm" | "ember" | "frost" | "shadow" | "tide";
-export type Sky = "day" | "dusk" | "gold" | "storm" | "ember" | "frost" | "void" | "sea";
+export type Theme = "meadow" | "cave" | "gilded" | "storm" | "ember" | "frost" | "shadow" | "tide" | "brass";
+export type Sky = "day" | "dusk" | "gold" | "storm" | "ember" | "frost" | "void" | "sea" | "smog";
 
 export interface FloorDef {
   n: number;
@@ -104,6 +106,14 @@ export const TOWER: FloorDef[] = [
     uncharted: { title: "The Cathedral floods too often to map", text: "Follow the pale runner up, and keep ahead of the tide." },
     mapSeller: "Pell the Chandler sells one at the Chandlery in Saltmere, for 180 gold.",
     build: buildFloor6, buildDungeon: buildCathedral,
+  },
+  {
+    n: 7, room: "floor7", dungeon: "engine", title: "The Clockwork Heights", town: "Gearhaven", dungeonName: "The Great Engine", levels: [28, 32], levelCap: 32,
+    up: "sealed-stair8", down: "descent7", door: "engine-door", boss: "archon", arrival: "clockwork-heights",
+    theme: "brass", dungeonTheme: "brass", sky: "smog", dungeonSky: "smog", music: "gearhaven", dungeonMusic: "engine",
+    uncharted: { title: "The Engine redraws itself", text: "Its halls move as you walk them. Follow the pale runner up, toward the heat." },
+    mapSeller: "Fennick the Merchant sells one at the Emporium in Gearhaven, for 210 gold.",
+    build: buildFloor7, buildDungeon: buildEngine,
   },
 ];
 

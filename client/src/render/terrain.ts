@@ -32,6 +32,8 @@ const SNOW: Palette = { grass: "#e4ecf2", grassDark: "#c6d4e0", grassLight: "#f7
 const DUSK: Palette = { grass: "#3b4468", grassDark: "#2f3656", grassLight: "#4c5782" };
 /** Floor 6: sea-grass over pale sand. */
 const SEAGRASS: Palette = { grass: "#7fbf8f", grassDark: "#68a878", grassLight: "#9ad4a6" };
+/** Floor 7: dry, dusty grass between the iron. */
+const DUST: Palette = { grass: "#b4a06a", grassDark: "#9c8a58", grassLight: "#c8b67e" };
 let PATH = "#cfae72";
 const COBBLE = "#9b968b";
 const WATER = "#3f86c0";
@@ -86,11 +88,13 @@ export class Terrain {
     this.frost = map.theme === "frost";
     this.shadow = map.theme === "shadow";
     this.tide = map.theme === "tide";
+    this.brass = map.theme === "brass";
     if (this.ember) STONE = "#6a625c";
     if (this.frost) STONE = "#a3b2c0";
     if (this.shadow) STONE = "#5c586e";
     if (this.tide) STONE = "#b8c4bc";
-    PATH = this.ember ? "#8a7866" : this.frost ? "#c3ced8" : this.shadow ? "#6c6882" : this.tide ? "#e6d7a8" : "#cfae72";
+    if (this.brass) STONE = "#9a9086";
+    PATH = this.ember ? "#8a7866" : this.frost ? "#c3ced8" : this.shadow ? "#6c6882" : this.tide ? "#e6d7a8" : this.brass ? "#b89a70" : "#cfae72";
     paintSprites(scene, map);
     scene.events.once("shutdown", () => {
       for (const [k, c] of [...this.chunks]) this.unload(k, c);
@@ -158,6 +162,8 @@ export class Terrain {
   private shadow = false;
   /** Floor 6: sea-grass over sand, clear turquoise water, palms, coral. */
   private tide = false;
+  /** Floor 7: dusty grass, hot springs, brass trees, great cogs, riveted iron. */
+  private brass = false;
 
   private palette(tx: number, ty: number): Palette {
     if (this.gilded) return GILDED;
@@ -165,6 +171,7 @@ export class Terrain {
     if (this.frost) return SNOW;
     if (this.shadow) return DUSK;
     if (this.tide) return SEAGRASS;
+    if (this.brass) return DUST;
     const f = this.forestRect;
     if (f && tx >= f.x0 && tx < f.x1 && ty >= f.y0 && ty < f.y1) {
       const edge = Math.min(tx - f.x0, ty - f.y0, f.x1 - tx, f.y1 - ty);
@@ -191,7 +198,7 @@ export class Terrain {
         switch (id) {
           case Tile.Tree: {
             const forest = this.palette(tx, ty) === FOREST;
-            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.tide ? 18 : this.shadow ? 15 : this.frost ? 12 : this.ember ? 9 : this.gilded ? 6 : forest ? 3 : 0);
+            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.brass ? 21 : this.tide ? 18 : this.shadow ? 15 : this.frost ? 12 : this.ember ? 9 : this.gilded ? 6 : forest ? 3 : 0);
             add(tx * TILE + TILE / 2 + (hash(tx, ty, 4) - 0.5) * 8, bottom - 3, `tree${variant}`, 0.5, 0.94, 0.9 + hash(tx, ty, 5) * 0.35);
             tall.push(decor[decor.length - 1] as Phaser.GameObjects.Image);
             break;
@@ -200,7 +207,7 @@ export class Terrain {
             add(tx * TILE, bottom, m.get(tx, ty + 1) !== Tile.Wall ? "wallFront" : "wallTop", 0, 1);
             break;
           case Tile.RuinWall:
-            add(tx * TILE, bottom, `ruin${(this.shadow ? 3 : 0) + Math.floor(hash(tx, ty, 6) * 3)}`, 0, 1);
+            add(tx * TILE, bottom, `ruin${(this.brass ? 6 : this.shadow ? 3 : 0) + Math.floor(hash(tx, ty, 6) * 3)}`, 0, 1);
             break;
           case Tile.Palisade:
             add(tx * TILE, bottom, "palisade", 0, 1);
@@ -209,7 +216,7 @@ export class Terrain {
             add(tx * TILE, bottom, m.get(tx - 1, ty) === Tile.Fence || m.get(tx + 1, ty) === Tile.Fence ? "fenceH" : "fenceV", 0, 1);
             break;
           case Tile.Crystal:
-            add(tx * TILE + TILE / 2, bottom, `crystal${(this.tide ? 4 : this.shadow ? 2 : 0) + Math.floor(hash(tx, ty, 7) * 2)}`, 0.5, 1);
+            add(tx * TILE + TILE / 2, bottom, `crystal${(this.brass ? 6 : this.tide ? 4 : this.shadow ? 2 : 0) + Math.floor(hash(tx, ty, 7) * 2)}`, 0.5, 1);
             break;
           case Tile.Gate:
             add(tx * TILE, bottom, "portcullis", 0, 1);
@@ -322,7 +329,7 @@ export class Terrain {
         case Tile.CaveFloor:
         case Tile.Rock:
         case Tile.Crystal:
-          color = this.ember ? "#3a3230" : this.frost ? "#7d8c9c" : this.shadow ? "#2c2838" : this.tide ? "#6a7a78" : ROCK;
+          color = this.ember ? "#3a3230" : this.frost ? "#7d8c9c" : this.shadow ? "#2c2838" : this.tide ? "#6a7a78" : this.brass ? "#4e4640" : ROCK;
           break;
         case Tile.Cliff:
           color = "#8a6e52";
@@ -411,7 +418,7 @@ export class Terrain {
         }
         if (hash(tx, ty, 27) < 0.3) {
           // Moss on old flagstones; soot and a live cinder in the Ember Reaches.
-          g.fillStyle = this.ember ? (hash(tx, ty, 31) < 0.25 ? "rgba(255,120,40,0.45)" : "rgba(30,22,18,0.45)") : this.frost ? "rgba(255,255,255,0.7)" : this.shadow ? "rgba(150,110,220,0.3)" : this.tide ? "rgba(90,170,150,0.45)" : "rgba(90,140,70,0.55)";
+          g.fillStyle = this.ember ? (hash(tx, ty, 31) < 0.25 ? "rgba(255,120,40,0.45)" : "rgba(30,22,18,0.45)") : this.frost ? "rgba(255,255,255,0.7)" : this.shadow ? "rgba(150,110,220,0.3)" : this.tide ? "rgba(90,170,150,0.45)" : this.brass ? "rgba(60,40,20,0.35)" : "rgba(90,140,70,0.55)";
           g.beginPath();
           g.arc(x + hash(tx, ty, 28) * T, y + hash(tx, ty, 29) * T, 5 + hash(tx, ty, 30) * 6, 0, Math.PI * 2);
           g.fill();
@@ -608,11 +615,11 @@ export class Terrain {
       if (paved) {
         disc(tx, ty, 0.95, "#1d1a17");
         disc(tx, ty, 0.88, "#c9c0ad");
-      } else disc(tx, ty, 0.82, this.ember ? "#2a1410" : this.frost ? "#f4f8fb" : this.shadow ? "#4e4870" : this.tide ? "#f4e8c0" : "#d9ecf0");
+      } else disc(tx, ty, 0.82, this.ember ? "#2a1410" : this.frost ? "#f4f8fb" : this.shadow ? "#4e4870" : this.tide ? "#f4e8c0" : this.brass ? "#e0d4b8" : "#d9ecf0");
     });
-    const water = this.ember ? "#e0501a" : this.frost ? "#9cc9e6" : this.shadow ? "#0d0a18" : this.tide ? "#1fa8c0" : WATER;
+    const water = this.ember ? "#e0501a" : this.frost ? "#9cc9e6" : this.shadow ? "#0d0a18" : this.tide ? "#1fa8c0" : this.brass ? "#5aa8a4" : WATER;
     range((tx, ty) => {
-      if (is(tx, ty, Tile.Water)) disc(tx, ty, 0.72, this.ember ? "#ffb347" : this.frost ? "#cfe6f4" : this.shadow ? "#231d3a" : this.tide ? "#7fe0e0" : shade(WATER, 28));
+      if (is(tx, ty, Tile.Water)) disc(tx, ty, 0.72, this.ember ? "#ffb347" : this.frost ? "#cfe6f4" : this.shadow ? "#231d3a" : this.tide ? "#7fe0e0" : this.brass ? "#9ad4cc" : shade(WATER, 28));
     });
     range((tx, ty) => {
       if (!is(tx, ty, Tile.Water)) return;
@@ -705,8 +712,8 @@ export class Terrain {
       }
       if (southOpen) {
         const fg = g.createLinearGradient(0, y + T * 0.35, 0, y + T);
-        fg.addColorStop(0, this.ember ? "#4a3a32" : this.frost ? "#a8bccc" : this.shadow ? "#3a3450" : this.tide ? "#d8c89a" : "#9a7a5a");
-        fg.addColorStop(1, this.ember ? "#2a1e18" : this.frost ? "#6a7e90" : this.shadow ? "#16121f" : this.tide ? "#8a7a5a" : "#6b5440");
+        fg.addColorStop(0, this.ember ? "#4a3a32" : this.frost ? "#a8bccc" : this.shadow ? "#3a3450" : this.tide ? "#d8c89a" : this.brass ? "#7a6a58" : "#9a7a5a");
+        fg.addColorStop(1, this.ember ? "#2a1e18" : this.frost ? "#6a7e90" : this.shadow ? "#16121f" : this.tide ? "#8a7a5a" : this.brass ? "#3a3028" : "#6b5440");
         g.fillStyle = fg;
         g.fillRect(x, y + T * 0.35, T, T * 0.65);
         g.fillStyle = "rgba(0,0,0,0.18)";
@@ -721,7 +728,7 @@ export class Terrain {
     range((tx, ty) => {
       if (!is(tx, ty, Tile.Rock, Tile.Crystal)) return;
       for (let i = 0; i < 3; i++) {
-        g.fillStyle = this.ember ? (hash(tx, ty, 60 + i) < 0.5 ? "#2e2826" : "#4a403c") : this.frost ? (hash(tx, ty, 60 + i) < 0.5 ? "#8e9cac" : "#dfe8f0") : this.shadow ? (hash(tx, ty, 60 + i) < 0.5 ? "#221e2e" : "#3a3450") : this.tide ? (hash(tx, ty, 60 + i) < 0.5 ? "#5a6a68" : "#8a9a96") : hash(tx, ty, 60 + i) < 0.5 ? "#50545d" : "#666a74";
+        g.fillStyle = this.ember ? (hash(tx, ty, 60 + i) < 0.5 ? "#2e2826" : "#4a403c") : this.frost ? (hash(tx, ty, 60 + i) < 0.5 ? "#8e9cac" : "#dfe8f0") : this.shadow ? (hash(tx, ty, 60 + i) < 0.5 ? "#221e2e" : "#3a3450") : this.tide ? (hash(tx, ty, 60 + i) < 0.5 ? "#5a6a68" : "#8a9a96") : this.brass ? (hash(tx, ty, 60 + i) < 0.5 ? "#3e3630" : "#5e544a") : hash(tx, ty, 60 + i) < 0.5 ? "#50545d" : "#666a74";
         g.beginPath();
         g.arc(px(tx) + hash(tx, ty, 63 + i) * T, py(ty) + hash(tx, ty, 66 + i) * T, 6 + hash(tx, ty, 69 + i) * 10, 0, Math.PI * 2);
         g.fill();
@@ -770,7 +777,7 @@ export class Terrain {
           g.stroke();
         }
         if (t === Tile.Flowers) {
-          const colors = this.ember ? ["#ff7a2a", "#ffb347", "#ff5a1a"] : this.frost ? ["#dff4ff", "#bfe6ff", "#ffffff"] : this.shadow ? ["#d8b8ff", "#9fe0ff", "#f0e8ff", "#b77af2"] : this.tide ? ["#ff9a8a", "#ffd0a0", "#8ff0e0", "#ffffff"] : ["#f6d860", "#f59bb7", "#ffffff", "#b99af5", "#ff9a6b"];
+          const colors = this.ember ? ["#ff7a2a", "#ffb347", "#ff5a1a"] : this.frost ? ["#dff4ff", "#bfe6ff", "#ffffff"] : this.shadow ? ["#d8b8ff", "#9fe0ff", "#f0e8ff", "#b77af2"] : this.tide ? ["#ff9a8a", "#ffd0a0", "#8ff0e0", "#ffffff"] : this.brass ? ["#ffd070", "#ff9a3a", "#e8e0d0"] : ["#f6d860", "#f59bb7", "#ffffff", "#b99af5", "#ff9a6b"];
           for (let i = 0; i < 7; i++) {
             const fx = x + 6 + hash(tx, ty, 60 + i) * (T - 12);
             const fy = y + 6 + hash(tx, ty, 70 + i) * (T - 12);
@@ -1040,6 +1047,55 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
     });
   }
 
+  // Floor 7: brass trees — a riveted trunk, and a crown of thin gear-leaves.
+  for (let v = 0; v < 3; v++) {
+    make(`tree${21 + v}`, 120, 160, (g) => {
+      const cx = 60;
+      const h = 160;
+      const shadow = g.createRadialGradient(cx, h - 10, 4, cx, h - 10, 36);
+      shadow.addColorStop(0, "rgba(40,24,8,0.35)");
+      shadow.addColorStop(1, "rgba(40,24,8,0)");
+      g.fillStyle = shadow;
+      g.beginPath();
+      g.ellipse(cx, h - 10, 36, 11, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#1d1a17";
+      g.fillRect(cx - 8, h - 62, 16, 54);
+      const tg = g.createLinearGradient(cx - 6, 0, cx + 6, 0);
+      tg.addColorStop(0, "#e8c070");
+      tg.addColorStop(1, "#8a6420");
+      g.fillStyle = tg;
+      g.fillRect(cx - 5, h - 62, 10, 52);
+      g.fillStyle = "#5a3a10";
+      for (let y = h - 56; y < h - 12; y += 9) {
+        g.beginPath();
+        g.arc(cx, y, 1.6, 0, Math.PI * 2);
+        g.fill();
+      }
+      const gear = (x: number, y: number, r: number, col: string) => {
+        g.fillStyle = "#1d1a17";
+        g.beginPath();
+        g.arc(x, y, r + 3.5, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = col;
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          g.fillRect(x + Math.cos(a) * r - 2.5, y + Math.sin(a) * r - 2.5, 5, 5);
+        }
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "rgba(0,0,0,0.25)";
+        g.beginPath();
+        g.arc(x, y, r * 0.35, 0, Math.PI * 2);
+        g.fill();
+      };
+      const cols = [["#d8a840", "#f0c860", "#b88a30"], ["#c89838", "#e8c070", "#a87a28"], ["#e0b048", "#f8d878", "#c09038"]][v];
+      const leaves: [number, number, number][] = [[cx, h - 96, 22], [cx - 24, h - 82, 16], [cx + 25, h - 84, 17], [cx - 12, h - 118, 15], [cx + 14, h - 116, 14]];
+      leaves.forEach(([x, y, r], i) => gear(x, y, r, cols[i % 3]));
+    });
+  }
+
   const block = (key: string, top: [string, string], face: [string, string], moss: boolean, seed: number) =>
     make(key, T, T + 36, (g) => {
       g.fillStyle = "#1d1a17";
@@ -1138,6 +1194,10 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
   block("ruin3", ["#4a4458", "#34303e"], ["#2a2632", "#15121a"], false, 4);
   block("ruin4", ["#46405a", "#302b3c"], ["#26222e", "#121016"], false, 5);
   block("ruin5", ["#524a64", "#3a3448"], ["#2e2a38", "#17141c"], false, 6);
+  // Floor 7: riveted iron.
+  block("ruin6", ["#8a8278", "#6a6258"], ["#5a4a3a", "#3a2e24"], false, 7);
+  block("ruin7", ["#96806a", "#6e5c48"], ["#5e4c38", "#3c3024"], false, 8);
+  block("ruin8", ["#7e786e", "#5e5850"], ["#4e463a", "#302a22"], false, 9);
 
   make("portcullis", T, T + 44, (g) => {
     g.fillStyle = "#1d1a17";
@@ -1215,6 +1275,51 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
     g.fillStyle = "#9a7348";
     g.fillRect(T / 2 - 4, T - 20, 8, 42);
   });
+  // Floor 7's "crystals" are great cogs, half sunk in the ground.
+  for (let v = 6; v < 8; v++) {
+    make(`crystal${v}`, T, 80, (g) => {
+      const cx = T / 2;
+      const cy = 46;
+      const r = v === 6 ? 24 : 20;
+      g.fillStyle = "#1d1a17";
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + v;
+        g.save();
+        g.translate(cx + Math.cos(a) * (r + 4), cy + Math.sin(a) * (r + 4));
+        g.rotate(a);
+        g.fillRect(-5, -6, 10, 12);
+        g.restore();
+      }
+      g.beginPath();
+      g.arc(cx, cy, r + 2, 0, Math.PI * 2);
+      g.fill();
+      const gg = g.createRadialGradient(cx - 6, cy - 8, 2, cx, cy, r);
+      gg.addColorStop(0, "#f8d878");
+      gg.addColorStop(1, "#a07028");
+      g.fillStyle = gg;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + v;
+        g.save();
+        g.translate(cx + Math.cos(a) * (r + 3), cy + Math.sin(a) * (r + 3));
+        g.rotate(a);
+        g.fillRect(-3.5, -4.5, 7, 9);
+        g.restore();
+      }
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#1d1a17";
+      g.beginPath();
+      g.arc(cx, cy, r * 0.38, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#6a4a18";
+      g.beginPath();
+      g.arc(cx, cy, r * 0.28, 0, Math.PI * 2);
+      g.fill();
+      // Sunk in the ground: the bottom is buried.
+      g.clearRect(0, 70, T, 10);
+    });
+  }
   for (let v = 0; v < 6; v++) {
     make(`crystal${v}`, T, 80, (g) => {
       const moon = v === 2 || v === 3;
@@ -1278,6 +1383,11 @@ function paintBuilding(scene: Phaser.Scene, bd: Building) {
     forge6: ["#4a5a5a", "#6a7e7e"],
     vault6: ["#3a4a5a", "#56687a"],
     inn6: ["#8a3a2a", "#b0503a"],
+    hall7: ["#6a4a2a", "#8a6a3a"],
+    quarter7: ["#5a3a4a", "#7a5064"],
+    forge7: ["#4a4a4a", "#6a6a6a"],
+    vault7: ["#3a4a5a", "#56687a"],
+    inn7: ["#7a4a2a", "#9a6a3a"],
   };
   const [roofD, roofL] = palettes[bd.id] ?? ["#8a4a32", "#b0633f"];
   g.fillStyle = "#1d1a17";

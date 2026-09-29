@@ -24,7 +24,9 @@ export type ItemEffect =
   | "setFrost"
   | "setVoid"
   | "setTide"
-  | "tideshell"; // blows sometimes soak
+  | "tideshell" // blows sometimes soak
+  | "setBrass"
+  | "tinkercog"; // blows sometimes sunder
 
 export interface ItemBase {
   key: string;
@@ -192,6 +194,13 @@ export function upgradeCost(it: Item): { gold: number; mats: { key: string; qty:
   const b = itemBase(it.key);
   if (!b || !isEquipment(b)) return undefined;
   const n = it.plus + 1;
+  // Floor 7's own gear (tier 9) is worked with clockwork materials.
+  if (b.tier >= 9) {
+    const mats = [{ key: "mat_brassgear", qty: 2 * n }];
+    if (n >= 3) mats.push({ key: "mat_spring", qty: n - 1 });
+    if (n >= 5) mats.push({ key: "mat_aethercore", qty: 1 });
+    return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
+  }
   // Floor 6's own gear (tier 8) is worked with sea materials.
   if (b.tier >= 8) {
     const mats = [{ key: "mat_coral", qty: 2 * n }];

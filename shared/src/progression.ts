@@ -1,7 +1,7 @@
 import { WEAPONS, type WeaponKey } from "./combat/weapons.ts";
 import { Mod } from "./sim/player.ts";
 
-export const MAX_LEVEL = 28;
+export const MAX_LEVEL = 32;
 /** XP needed to go from `level` to `level + 1`. */
 export const xpToNext = (level: number) => Math.round(85 * Math.pow(level, 1.55));
 export const baseHp = (level: number) => 100 + (level - 1) * 10;
@@ -85,6 +85,13 @@ export const PERK_CHOICES: { level: number; options: [PerkDef, PerkDef] }[] = [
     options: [
       { id: "stormcaller", name: "Stormcaller", desc: "Your blows on soaked enemies have a 25% chance to call lightning down on them." },
       { id: "tidalGrace", name: "Tidal Grace", desc: "+20 maximum stamina, and every perfect dodge restores 10% of your health." },
+    ],
+  },
+  {
+    level: 29,
+    options: [
+      { id: "siegebreaker", name: "Siegebreaker", desc: "Your heavy attacks and skills sunder armour: the struck enemy's armour counts for nothing for 5 seconds." },
+      { id: "clockworkHeart", name: "Clockwork Heart", desc: "+25 maximum stamina and +8% maximum health." },
     ],
   },
 ];
