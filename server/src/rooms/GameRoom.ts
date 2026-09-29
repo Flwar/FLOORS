@@ -21,9 +21,9 @@ const GOLD_MAGNET = 30;
 /** Marks for each achievement earned. */
 const ACHIEVEMENT_MARKS = 2;
 /** Floor Bosses' chance to carry a legendary scroll. */
-const LEGENDARY_CHANCE: Record<string, number> = { aurelion: 0.03, vaelra: 0.05, ignivar: 0.1, hrimthar: 0.12, nyxara: 0.14 };
+const LEGENDARY_CHANCE: Record<string, number> = { aurelion: 0.03, vaelra: 0.05, ignivar: 0.1, hrimthar: 0.12, nyxara: 0.14, thalassa: 0.15 };
 /** Beating these for the first time always yields a legendary scroll. */
-const FIRST_KILL_LEGENDARY = new Set(["ignivar", "hrimthar", "nyxara"]);
+const FIRST_KILL_LEGENDARY = new Set(["ignivar", "hrimthar", "nyxara", "thalassa"]);
 const OWNER_RIGHTS_MS = 60_000;
 const DROP_LIFE_MS = 180_000;
 const BAG_LIFE_MS = 600_000;

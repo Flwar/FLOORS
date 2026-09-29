@@ -611,6 +611,89 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
     g.arc(32, 32, 17, 0, Math.PI * 2);
     fillInk(g, "#0c0814", 2);
   },
+  // --- Tide arts ------------------------------------------------------------------------
+  tidebreak: (g, c) => {
+    GLYPH.sunder(g, c);
+    wavelet(g, 18, 50, c);
+  },
+  undertow: (g, c) => {
+    GLYPH.pierce(g, c);
+    wavelet(g, 14, 50, c);
+  },
+  tsunami: (g, c) => {
+    wavelet(g, 10, 30, c, 1.8);
+    wavelet(g, 14, 48, "#ffffff", 1.2);
+  },
+  riptide: (g, c) => {
+    GLYPH.fissure(g, c);
+    wavelet(g, 30, 16, c);
+  },
+  barbs: (g, c) => {
+    GLYPH.cuts(g, c);
+    drop(g, 32, 34, 7, c);
+  },
+  eelstep: (g, c) => {
+    GLYPH.phantom(g, c);
+    drop(g, 48, 44, 7, c);
+  },
+  tridentstorm: (g, c) => {
+    for (const dy of [-10, 0, 10]) {
+      g.beginPath();
+      g.moveTo(10, 32 + dy * 0.3);
+      g.lineTo(54, 32 + dy);
+      ink(g, dy ? c : "#ffffff", 3);
+    }
+  },
+  maelspin: (g, c) => {
+    GLYPH.whirlspear(g, c);
+    drop(g, 50, 16, 6, "#ffffff");
+  },
+  bubbles: (g, c) => {
+    for (const [x, y, r] of [[18, 44, 7], [30, 28, 9], [46, 40, 8], [42, 18, 5]] as const) {
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      fillInk(g, "rgba(255,255,255,0.25)", 2.5);
+      g.beginPath();
+      g.arc(x, y, r, 0, Math.PI * 2);
+      ink(g, c, 2);
+    }
+  },
+  geyser: (g, c) => {
+    g.beginPath();
+    g.moveTo(24, 56);
+    g.quadraticCurveTo(26, 30, 22, 10);
+    g.lineTo(42, 10);
+    g.quadraticCurveTo(38, 30, 40, 56);
+    g.closePath();
+    const gr = g.createLinearGradient(0, 10, 0, 56);
+    gr.addColorStop(0, "#ffffff");
+    gr.addColorStop(1, c);
+    fillInk(g, gr, 3);
+  },
+  tidalwave: (g, c) => {
+    wavelet(g, 8, 40, c, 2);
+  },
+  riptidedash: (g, c) => {
+    GLYPH.phantom(g, c);
+    wavelet(g, 30, 50, c);
+  },
+  whirlpool: (g, c) => {
+    for (let i = 0; i < 3; i++) {
+      g.beginPath();
+      g.ellipse(32, 36, 24 - i * 7, 14 - i * 4, 0, i, i + Math.PI * 1.5);
+      ink(g, i === 1 ? "#ffffff" : c, 2.5);
+    }
+  },
+  leviathan: (g, c) => {
+    g.beginPath();
+    g.moveTo(8, 50);
+    g.bezierCurveTo(20, 10, 36, 60, 50, 22);
+    ink(g, c, 7);
+    g.beginPath();
+    g.arc(52, 20, 6, 0, Math.PI * 2);
+    fillInk(g, c, 2.5);
+    wavelet(g, 8, 56, "#ffffff", 1.4);
+  },
   absolutezero: (g, c) => {
     flake(g, 32, 32, 24, c);
     flake(g, 32, 32, 12, "#ffffff");
@@ -1194,6 +1277,24 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
   },
 };
 
+/** A curling wave. */
+function wavelet(g: G, x: number, y: number, color: string, s = 1) {
+  g.beginPath();
+  g.moveTo(x, y);
+  g.bezierCurveTo(x + 10 * s, y - 18 * s, x + 24 * s, y - 18 * s, x + 26 * s, y - 6 * s);
+  g.bezierCurveTo(x + 20 * s, y - 12 * s, x + 14 * s, y - 4 * s, x + 22 * s, y);
+  ink(g, color, 3);
+}
+
+/** A drop of water. */
+function drop(g: G, x: number, y: number, r: number, color: string) {
+  g.beginPath();
+  g.moveTo(x, y - r * 1.8);
+  g.quadraticCurveTo(x + r, y - r * 0.2, x, y + r);
+  g.quadraticCurveTo(x - r, y - r * 0.2, x, y - r * 1.8);
+  fillInk(g, color, 2.5);
+}
+
 /** A crescent moon, opening to the right. */
 function moonMark(g: G, x: number, y: number, r: number, color: string) {
   g.beginPath();
@@ -1246,7 +1347,7 @@ export function drawSkillIcon(g: G, vfx: string, color: number) {
 const PASSIVE_COLOR: Record<string, number> = {
   fleetfoot: 0x8fe0c0, deepLungs: 0x9fd3ff, secondWind: 0x9fe08a, ironSkin: 0xc9d3dd, wardensGrace: 0xffe08a, riposteMaster: 0xffc27a, keenEye: 0xdfe8ff,
   executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b, frostblood: 0x8fd3ff, glacialHide: 0xdfeaf4,
-  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a,
+  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a, stormcaller: 0x9fd3ff, tidalGrace: 0x8ff0e0,
 };
 
 /** A passive skill's icon (shield and star in its colour). */

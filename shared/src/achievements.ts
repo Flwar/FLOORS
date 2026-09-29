@@ -33,6 +33,8 @@ const EMBER_WAYSTONES = ["ws:ws-emberhold", "ws:ws-slopes", "ws:ws-canyon", "ws:
 const FROST_CHESTS = ["chest:cache-chest", "chest:lake-chest", "chest:pine-chest"];
 const UMBRAL_CHESTS = ["chest:moonwell-chest", "chest:marsh-chest", "chest:crater-chest"];
 const UMBRAL_WAYSTONES = ["ws:ws-duskhollow", "ws:ws-gloaming", "ws:ws-marsh", "ws:ws-moon", "ws:ws-spires"];
+const TIDE_CHESTS = ["chest:grotto-chest", "chest:wreck-chest", "chest:kelp-chest"];
+const TIDE_WAYSTONES = ["ws:ws-saltmere", "ws:ws-tidepools", "ws:ws-coral", "ws:ws-wrecks", "ws:ws-cliffs"];
 const FROST_WAYSTONES = ["ws:ws-rimeholt", "ws:ws-snowfields", "ws:ws-lake", "ws:ws-pinewood", "ws:ws-peak"];
 const has = (c: AchievementContext, list: string[]) => list.every((k) => c.discovered.includes(k));
 
@@ -83,6 +85,15 @@ const DEFS: Def[] = [
   { id: "hollow-knight", name: "Hollowed Out", desc: "Defeat Maelgrim, the Hollow Knight.", test: (c) => c.bossKills.includes("maelgrim") },
   { id: "dawn-returns", name: "The Dawn Returns", desc: "Defeat Nyxara, Queen of the Void.", test: (c) => c.bossKills.includes("nyxara") },
   { id: "champion", name: "Champion of the Tower", desc: "Reach level 24.", test: (c) => c.level >= 24 },
+  // Floor 6
+  { id: "drowned", name: "Sea Legs", desc: "Set foot on Floor 6.", test: (c) => c.discovered.includes("zone:drowned-isles") },
+  { id: "grotto", name: "The Pearl That Breathes", desc: "Find the Pearl Grotto on Floor 6.", test: (c) => c.discovered.includes("zone:pearl-grotto") },
+  { id: "tide-treasure", name: "Sunken Treasure", desc: "Open every chest on Floor 6.", test: (c) => has(c, TIDE_CHESTS) },
+  { id: "tide-roads", name: "Island Hopper", desc: "Attune every waystone on Floor 6.", test: (c) => has(c, TIDE_WAYSTONES) },
+  { id: "deep-serpent", name: "Serpent Slayer", desc: "Defeat Scylla, the Deep Serpent.", test: (c) => c.bossKills.includes("scylla") },
+  { id: "captain", name: "Mutiny", desc: "Defeat Captain Blackbrine.", test: (c) => c.bossKills.includes("blackbrine") },
+  { id: "tide-turns", name: "The Tide Turns", desc: "Defeat Thalassa, the Leviathan Queen.", test: (c) => c.bossKills.includes("thalassa") },
+  { id: "legend", name: "Legend of the Tower", desc: "Reach level 28.", test: (c) => c.level >= 28 },
   { id: "master-of-arms", name: "Master of Arms", desc: "Reach mastery 10 with a weapon.", test: (c) => c.maxMastery >= 10 },
   { id: "seasoned", name: "Seasoned", desc: "Reach level 8.", test: (c) => c.level >= 8 },
   { id: "hoarder", name: "Deep Pockets", desc: "Carry 1,000 gold.", test: (c) => c.gold >= 1000 },

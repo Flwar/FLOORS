@@ -53,7 +53,7 @@ export interface EnemyLook {
   horns?: boolean;
   glow?: string;
   /** Dragons: what they breathe (fire by default). */
-  element?: "fire" | "frost" | "shadow";
+  element?: "fire" | "frost" | "shadow" | "tide";
 }
 
 export interface EnemyDef {
@@ -493,6 +493,8 @@ export const EFlag = {
   Burning: 256,
   /** Cursed (void skills, Umbral Touch): deals 30% less damage, takes 10% more. */
   Cursed: 512,
+  /** Soaked (tide skills): 15% slower, lightning strikes it 35% harder, chill lasts twice as long. */
+  Soaked: 1024,
 } as const;
 
 /**

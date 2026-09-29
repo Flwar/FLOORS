@@ -219,3 +219,12 @@ button.small { padding: 2px 8px; font-size: 11px; min-height: 0; }
 .trade-gold { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: #f2c94c; }
 .trade-gold img { width: 22px; }
 .trade-gold input { width: 90px; font: inherit; color: var(--ink); background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(232, 197, 90, 0.35); border-radius: 6px; padding: 4px 6px; }
+
+/* The minimap: a round chart window in the top-left corner. */
+#minimap { position: fixed; top: 12px; left: 12px; width: 168px; height: 168px; z-index: 5; pointer-events: none; border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 3px #1d1a17, 0 0 0 6px #c9a24a, 0 0 0 8px #1d1a17; }
+#minimap.hidden { display: none; }
+#minimap canvas { width: 168px; height: 168px; border-radius: 50%; display: block; }
+#minimap .mm-n { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font: bold 12px Georgia, serif; color: #ffe1a0;
+  background: #1d1a17; border: 2px solid #c9a24a; border-radius: 50%; width: 20px; height: 20px; line-height: 17px; text-align: center; }
+@media (max-width: 700px) { #minimap { width: 112px; height: 112px; } #minimap canvas { width: 112px; height: 112px; } }

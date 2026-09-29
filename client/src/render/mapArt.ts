@@ -22,6 +22,42 @@ const PAINT: Record<number, [number, number, number]> = {
   [Tile.Cliff]: [170, 146, 110], [Tile.Crystal]: [150, 206, 222], [Tile.Gate]: [150, 138, 118], [Tile.Crop]: [206, 184, 110], [Tile.Prop]: [196, 186, 162],
 };
 
+/** How each floor's ground reads on a chart: its grass and its water. */
+const THEME_PAINT: Record<string, { grass: [number, number, number]; water: [number, number, number]; tree: [number, number, number] }> = {
+  gilded: { grass: [196, 204, 120], water: [124, 172, 200], tree: [170, 150, 70] },
+  storm: { grass: [150, 160, 150], water: [100, 130, 170], tree: [110, 130, 110] },
+  ember: { grass: [124, 114, 104], water: [226, 96, 40], tree: [70, 60, 56] },
+  frost: { grass: [230, 238, 244], water: [168, 206, 232], tree: [70, 110, 96] },
+  shadow: { grass: [84, 92, 140], water: [26, 22, 48], tree: [60, 44, 96] },
+  tide: { grass: [150, 206, 164], water: [44, 176, 204], tree: [70, 150, 90] },
+};
+
+/** The floor's outdoor land, one pixel per tile, in the floor's own colours (the minimap). */
+export function landImage(m: WorldMap): HTMLCanvasElement {
+  const c = offscreen(m.width, m.outdoorHeight);
+  const g = c.getContext("2d")!;
+  const img = g.createImageData(m.width, m.outdoorHeight);
+  const theme = THEME_PAINT[m.theme];
+  for (let y = 0; y < m.outdoorHeight; y++) {
+    for (let x = 0; x < m.width; x++) {
+      const t = m.get(x, y);
+      if (t === Tile.Void) continue;
+      const i = (y * m.width + x) * 4;
+      let col = PAINT[t] ?? [180, 170, 150];
+      if (theme && (t === Tile.Grass || t === Tile.TallGrass || t === Tile.Flowers || t === Tile.Cliff)) col = theme.grass;
+      else if (theme && t === Tile.Water) col = theme.water;
+      else if (theme && t === Tile.Tree) col = theme.tree;
+      const n = (hash(x, y, 7) - 0.5) * 9;
+      img.data[i] = col[0] + n;
+      img.data[i + 1] = col[1] + n;
+      img.data[i + 2] = col[2] + n;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
 function hash(x: number, y: number, s = 0) {
   let h = (x * 374761393 + y * 668265263 + s * 1442695041) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);

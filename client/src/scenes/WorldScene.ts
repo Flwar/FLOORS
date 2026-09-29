@@ -7,6 +7,7 @@ import {
 } from "@floors/shared";
 import type { Enemy, Hazard, Player, Projectile, WorldState } from "../../../server/src/state.ts";
 import { ambience } from "../audio/ambience.ts";
+import { Minimap } from "../ui/minimap.ts";
 import { music } from "../audio/music.ts";
 import { sfx, type Material, type Surface } from "../audio/sfx.ts";
 import { Hud } from "../hud.ts";
@@ -442,6 +443,10 @@ export class WorldScene extends Phaser.Scene {
         const a = Math.random() * Math.PI * 2;
         this.fx.rise(x + Math.cos(a) * 14 * s, y - 4 + Math.sin(a) * 6 * s, col, 1, 3, 26, 700, 2.4);
       }
+      if (e.flags & EFlag.Soaked && Math.random() < delta / 110) {
+        const s = v.def.look.scale;
+        this.fx.rise(x + (Math.random() - 0.5) * 16 * s, y - 20 * s - Math.random() * 10, 0x8ff0e0, 1, 2, -18, 600, 2.2);
+      }
       if (e.flags & EFlag.Cursed && Math.random() < delta / 120) {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 18 * s, y - 8 - Math.random() * 24 * s, Math.random() < 0.6 ? 0x2a1a44 : 0xb77af2, 1, 4, 22, 800, 2.8);
@@ -452,12 +457,13 @@ export class WorldScene extends Phaser.Scene {
         const s = v.def.look.scale;
         const frost = v.def.look.element === "frost";
         const dark = v.def.look.element === "shadow";
-        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : [0xffe08a, 0xff7a2a, 0xd8402c];
+        const sea = v.def.look.element === "tide";
+        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : sea ? [0xffffff, 0x8ff0e0, 0x1fa8c0] : [0xffe08a, 0xff7a2a, 0xd8402c];
         for (let i = 0; i < Math.ceil(delta / 12); i++) {
           const spread = (Math.random() - 0.5) * 0.9;
           this.fx.sparks(f.x, f.y, f.a + spread, Math.random() < 0.4 ? palette[0] : Math.random() < 0.5 ? palette[1] : palette[2], 2, 180 + 120 * s, 0.25);
         }
-        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : 0xff9a3a, 4, 50, 3.4, 420);
+        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : sea ? 0xdffaf4 : 0xff9a3a, 4, 50, 3.4, 420);
         if (Math.random() < delta / 200) sfx.boom(false, f.x, f.y);
       }
       this.enemyTelegraph(id, e, v, x, y, view);
@@ -480,6 +486,7 @@ export class WorldScene extends Phaser.Scene {
     state.players.forEach((p) => occluded.push({ x: this.predict.value(p, "x"), y: this.predict.value(p, "y") - 10 }));
     this.terrain.fadeOccluders(occluded, delta);
     this.sky.update(cam, delta);
+    this.updateMinimap();
     this.objects.merchantActive = state.event === "merchant";
     this.objects.syncDrops(state.drops, this.ui.inv?.key);
     const mx = this.me?.value("x") ?? 0;
@@ -852,6 +859,40 @@ export class WorldScene extends Phaser.Scene {
       });
     }
     drawParchmentMap(c, this.map, { known: new Set(inv?.discovered ?? []), me, party, pins });
+  }
+
+  private minimap?: Minimap;
+  private minimapAt = 0;
+  private minimapFor?: WorldMap;
+
+  /** The minimap: ten times a second, when you have this floor's map and are outdoors. */
+  private updateMinimap() {
+    const now = performance.now();
+    if (now - this.minimapAt < 100) return;
+    this.minimapAt = now;
+    // The scene is reused when you travel: follow it to the new map.
+    if (!this.minimap) this.minimap = new Minimap();
+    if (this.minimapFor !== this.map) {
+      this.minimapFor = this.map;
+      this.minimap.setMap(this.map);
+      this.events.once("shutdown", () => this.minimap?.hide());
+    }
+    const me = this.me;
+    const indoors = !!me && me.value("y") >= this.map.outdoorHeight * TILE;
+    if (!me || indoors || !this.mapAccess().ok) return this.minimap.hide();
+    const inv = this.ui.inv;
+    const party: { x: number; y: number }[] = [];
+    this.room.state.players.forEach((pl, sid) => {
+      if (sid !== this.room.sessionId && this.myPlayer?.party && pl.party === this.myPlayer.party) party.push({ x: pl.x, y: pl.y });
+    });
+    const pins: { x: number; y: number; main: boolean }[] = [];
+    if (inv) {
+      trackedQuests(inv, mapFloor(this.map) || undefined).forEach((t) => {
+        const tg = questTarget(this.map, inv, t, me.value("x"), me.value("y"), false);
+        if (tg) pins.push({ ...streetPoint(this.map, tg.x, tg.y), main: t.quest.main === true });
+      });
+    }
+    this.minimap.draw({ me: { x: me.value("x"), y: me.value("y"), face: aimToRad(me.state.aim) }, party, pins, known: inv?.discovered ?? [] });
   }
 
   /** Whether this map can be opened: Floor 1 needs a bought map; the Undercroft was never charted. */
@@ -1309,7 +1350,7 @@ export class WorldScene extends Phaser.Scene {
         case HazardKind.Glyph: {
           const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.2;
           // Aurelion's glyphs are golden; under the Void Queen's eclipse they are pools of moonlight.
-          const gc = this.map.theme === "shadow" ? 0xe8f0ff : 0xffe08a;
+          const gc = this.map.theme === "shadow" ? 0xe8f0ff : this.map.theme === "tide" ? 0xf4ecd0 : 0xffe08a;
           g.fillStyle(gc, 0.2 * pulse + 0.1);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.lineStyle(3, gc, 0.9);
@@ -1325,7 +1366,7 @@ export class WorldScene extends Phaser.Scene {
           break;
         default: {
           if (t > h.delay + 250) return;
-          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : 0xd8402c;
+          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : h.kind === HazardKind.Tide ? 0x3fb8c8 : 0xd8402c;
           g.fillStyle(color, 0.08 + 0.2 * k);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.fillStyle(color, 0.35);
@@ -1345,6 +1386,12 @@ export class WorldScene extends Phaser.Scene {
             this.fx.burst(h.x, h.y - 6, 0xdff4ff, 22, 150, 2.8, 650);
             this.fx.ring(h.x, h.y, 0x8fd3ff, 6, h.radius, 380, 3);
             sfx.hit(true, h.x, h.y, true, "metal");
+          } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Tide) {
+            // The sea bursts up out of the ground.
+            this.fx.burst(h.x, h.y - 6, 0x8ff0e0, 20, 140, 3, 650);
+            this.fx.ring(h.x, h.y, 0xffffff, 6, h.radius, 380, 3);
+            for (let i = 0; i < 4; i++) this.skillFx.splashAt(h.x + (Math.random() - 0.5) * h.radius, h.y + (Math.random() - 0.5) * h.radius * 0.6, 0.9);
+            sfx.boom(false, h.x, h.y);
           } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Void) {
             // The rift bites: darkness erupts from the ground.
             this.fx.burst(h.x, h.y - 6, 0x0c0814, 20, 120, 4, 700);
@@ -1379,6 +1426,25 @@ export class WorldScene extends Phaser.Scene {
         g2.fillStyle(0xeaf6ff, 1);
         g2.fillTriangle(x + Math.cos(pr.angle) * pr.radius * 1.6, y + Math.sin(pr.angle) * pr.radius * 1.6, x + Math.cos(pr.angle + 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle + 2.4) * pr.radius * 0.8, x + Math.cos(pr.angle - 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle - 2.4) * pr.radius * 0.8);
         if (Math.random() < 0.5) this.fx.rise(tx, ty, 0xdff4ff, 1, 3, 8, 300, 2);
+        return;
+      }
+      if (pr.kind === ProjKind.TideWave) {
+        // A rolling wave (single, wide) or a bubble of seawater (small).
+        const g2 = this.fx.ground;
+        if (pr.radius >= 16) {
+          const bx = x - Math.cos(pr.angle) * 10;
+          const by = y - Math.sin(pr.angle) * 10;
+          this.fx.trail(bx, by, pr.angle - 1.2, pr.angle + 1.2, 12, pr.radius + 12, 0x8ff0e0, 90);
+          this.fx.trail(bx, by, pr.angle - 1.0, pr.angle + 1.0, 8, pr.radius + 4, 0xffffff, 70);
+        } else {
+          g2.fillStyle(0x8ff0e0, 0.35);
+          g2.fillCircle(x, y, pr.radius * 1.4);
+          g2.lineStyle(2, 0xffffff, 0.9);
+          g2.strokeCircle(x, y, pr.radius);
+          g2.fillStyle(0xffffff, 0.8);
+          g2.fillCircle(x - pr.radius * 0.35, y - pr.radius * 0.35, pr.radius * 0.25);
+        }
+        if (Math.random() < 0.5) this.fx.rise(tx, ty, Math.random() < 0.5 ? 0x8ff0e0 : 0xffffff, 1, 5, 10, 320, 2.4);
         return;
       }
       if (pr.kind === ProjKind.VoidOrb) {
@@ -1582,9 +1648,9 @@ export class WorldScene extends Phaser.Scene {
       this.hud.zone(zone);
       const mood = zone.music ?? (this.map.theme === "cave" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
-      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow" };
+      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow", tide: "sea", saltmere: "town", cathedral: "sea" };
       const theme = this.map.theme;
-      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
+      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "tide" ? "sea" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
       sfx.setRoom(this.map.theme === "cave" || zone.dark === true || zone.indoor ? "cave" : zone.safe ? "town" : "open");
     }
     // Boss bar for the nearest engaged boss.

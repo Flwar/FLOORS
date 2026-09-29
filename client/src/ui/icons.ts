@@ -174,6 +174,105 @@ export function itemIcon(key: string, rarity = 0): string {
       }
       break;
     }
+    // --- Floor 6: the Drowned Isles --------------------------------------------------
+    case "mat_coral": {
+      // A branch of living coral.
+      for (const [col, wd] of [[outline, 9], ["#ff8a7a", 5]] as const) {
+        g.strokeStyle = col;
+        g.lineWidth = wd;
+        g.lineCap = "round";
+        g.beginPath();
+        g.moveTo(32, 58); g.lineTo(32, 30);
+        g.moveTo(32, 40); g.lineTo(18, 24); g.lineTo(16, 12);
+        g.moveTo(32, 34); g.lineTo(46, 18); g.lineTo(50, 8);
+        g.moveTo(18, 24); g.lineTo(10, 20);
+        g.moveTo(46, 18); g.lineTo(54, 22);
+        g.stroke();
+      }
+      break;
+    }
+    case "mat_brinepearl": {
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 34, 16, 0, Math.PI * 2);
+      g.fill();
+      const pg = g.createRadialGradient(26, 28, 2, 32, 34, 15);
+      pg.addColorStop(0, "#ffffff");
+      pg.addColorStop(0.6, "#b8c8c4");
+      pg.addColorStop(1, "#5a7a7a");
+      g.fillStyle = pg;
+      g.beginPath();
+      g.arc(32, 34, 13.5, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
+    case "mat_leviathanscale":
+    case "art_tidecrown": {
+      const halo = g.createRadialGradient(32, 32, 4, 32, 32, 30);
+      halo.addColorStop(0, "rgba(143,240,224,0.85)");
+      halo.addColorStop(1, "rgba(31,168,192,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      if (key === "art_tidecrown") {
+        // A crown of coral and pearl.
+        g.fillStyle = outline;
+        g.fillRect(12, 34, 40, 14);
+        g.fillStyle = "#f4ecd8";
+        g.fillRect(14, 36, 36, 10);
+        for (const [x, h, col] of [[18, 20, "#ff8a7a"], [32, 26, "#ff9a6a"], [46, 20, "#ff8a7a"]] as const) {
+          g.strokeStyle = outline;
+          g.lineWidth = 7;
+          g.lineCap = "round";
+          g.beginPath();
+          g.moveTo(x, 36); g.lineTo(x, 36 - h);
+          g.stroke();
+          g.strokeStyle = col;
+          g.lineWidth = 4;
+          g.stroke();
+        }
+        g.fillStyle = "#ffffff";
+        g.beginPath();
+        g.arc(32, 41, 3.5, 0, Math.PI * 2);
+        g.fill();
+      } else {
+        // A shield-sized scale, sea-green and iridescent.
+        g.fillStyle = outline;
+        g.beginPath();
+        g.moveTo(32, 6); g.quadraticCurveTo(56, 20, 50, 44); g.quadraticCurveTo(32, 62, 14, 44); g.quadraticCurveTo(8, 20, 32, 6);
+        g.fill();
+        const sg = g.createLinearGradient(12, 8, 52, 56);
+        sg.addColorStop(0, "#dffaf4");
+        sg.addColorStop(0.5, "#3fb8b0");
+        sg.addColorStop(1, "#1e4a5a");
+        g.fillStyle = sg;
+        g.beginPath();
+        g.moveTo(32, 10); g.quadraticCurveTo(52, 22, 47, 43); g.quadraticCurveTo(32, 58, 17, 43); g.quadraticCurveTo(12, 22, 32, 10);
+        g.fill();
+      }
+      break;
+    }
+    case "key_cathedral": {
+      // An iron key crusted with barnacles.
+      g.strokeStyle = outline;
+      g.lineWidth = 9;
+      g.lineCap = "round";
+      g.beginPath();
+      g.arc(22, 24, 10, 0, Math.PI * 2);
+      g.moveTo(30, 32); g.lineTo(52, 54);
+      g.moveTo(44, 46); g.lineTo(50, 40);
+      g.moveTo(48, 50); g.lineTo(54, 44);
+      g.stroke();
+      g.strokeStyle = "#5a6a6a";
+      g.lineWidth = 5;
+      g.stroke();
+      g.fillStyle = "#e8e0d0";
+      for (const [x, y] of [[16, 18], [28, 26], [40, 42]] as const) {
+        g.beginPath();
+        g.arc(x, y, 2.4, 0, Math.PI * 2);
+        g.fill();
+      }
+      break;
+    }
     // --- Floor 5: the Umbral Wilds ---------------------------------------------------
     case "mat_umbralshard": {
       // A splinter of night: a black shard with a violet edge.

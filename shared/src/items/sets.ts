@@ -43,6 +43,13 @@ export const GEAR_SETS: GearSet[] = [
     two: { hp: 44, defense: 12 },
     three: { effect: "setVoid", desc: "Your blows have a 25% chance to curse enemies, and you deal 8% more damage to the cursed." },
   },
+  {
+    id: "tide",
+    name: "Tidecaller",
+    pieces: ["sword_tide", "greatsword_tide", "daggers_tide", "spear_tide", "staff_tide", "armor_tide", "armor_sharkskin", "armor_seasilk", "helm_coralcrown", "helm_divers"],
+    two: { hp: 52, defense: 14 },
+    three: { effect: "setTide", desc: "Your blows have a 30% chance to soak enemies, and you deal 10% more damage to the soaked." },
+  },
 ];
 
 const BY_PIECE = new Map(GEAR_SETS.flatMap((s) => s.pieces.map((k) => [k, s] as const)));

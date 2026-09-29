@@ -14,7 +14,7 @@ function reach(label: string, m: WorldMap) {
   const W = m.width;
   const H = m.height;
   const gated = m as WorldMap & { gates?: GateDef[] };
-  if (gated.gates) applyGates(gated as WorldMap & { gates: GateDef[] }, 0xffff);
+  if (gated.gates) applyGates(gated as WorldMap & { gates: GateDef[] }, 0xffffffff);
   const seen = new Uint8Array(W * H);
   const queue: number[] = [];
   const seed = (px: number, py: number) => {

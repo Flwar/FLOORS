@@ -8,11 +8,12 @@ import { GlacierRoom } from "./rooms/GlacierRoom.ts";
 import type { InstanceRoom } from "./rooms/InstanceRoom.ts";
 import { RoostRoom } from "./rooms/RoostRoom.ts";
 import { SanctumRoom } from "./rooms/SanctumRoom.ts";
+import { CathedralRoom } from "./rooms/CathedralRoom.ts";
 import { StormspireRoom } from "./rooms/StormspireRoom.ts";
 import { floorRoom, WorldRoom } from "./rooms/WorldRoom.ts";
 
 /** Each floor's boss dungeon: its own encounters and puzzles. */
-const DUNGEONS: Record<string, new (...args: any[]) => InstanceRoom> = { dungeon: DungeonRoom, stormspire: StormspireRoom, roost: RoostRoom, glacier: GlacierRoom, sanctum: SanctumRoom };
+const DUNGEONS: Record<string, new (...args: any[]) => InstanceRoom> = { dungeon: DungeonRoom, stormspire: StormspireRoom, roost: RoostRoom, glacier: GlacierRoom, sanctum: SanctumRoom, cathedral: CathedralRoom };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each room is its own class
 const rooms: Record<string, any> = {};
 for (const f of TOWER) {

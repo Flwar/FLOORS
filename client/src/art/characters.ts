@@ -4,7 +4,7 @@ import type { ArmorStyle, WeaponArtKey } from "@floors/shared";
 /** Textures are painted at RES× their world size and displayed at 1/RES scale. */
 export const RES = 2;
 
-export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood" | "eclipsecrown" | "shadowveil";
+export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood" | "eclipsecrown" | "shadowveil" | "coralcrown" | "divers";
 
 export interface CharLook {
   key: string;
@@ -116,6 +116,7 @@ export const ARMOR_BULK: Record<ArmorStyle, number> = {
   dragonscale: 1.15, drakehide: 1.05, emberweave: 1.04,
   rimeplate: 1.15, furmantle: 1.08, frostweave: 1.04,
   eclipse: 1.15, shadowsilk: 1.03, voidweave: 1.04,
+  tideplate: 1.15, sharkskin: 1.04, seasilk: 1.04,
 };
 
 function outfit(look: CharLook): Outfit {
@@ -186,6 +187,13 @@ function outfit(look: CharLook): Outfit {
       return { finish: "leather", base: "#241e30", trim: "#b77af2", belt: "#15121c", sleeve: "#1e1a28", hand: "#15121c", leg: "#1a1622", boot: "#0e0c12", cape: "#1a1426", capeTrim: "#8a5ad8", straps: true, rune: "#c49aff" };
     case "voidweave":
       return { finish: "robe", base: "#1c1634", trim: "#e0c8ff", belt: "#b77af2", sleeve: "#1c1634", hand: look.skin, leg: "#120e22", boot: "#0a0814", rune: "#e0c8ff" };
+    // Floor 6: the Tidecaller set — sea-green plate crusted with pearl, sharkskin, siren-spun silk.
+    case "tideplate":
+      return { finish: "scale", base: "#3a8a8a", trim: "#f4ecd8", belt: "#1e4a56", sleeve: "#2e7474", hand: "#2a5a5a", leg: "#357e7e", boot: "#1e3e46", pauldron: "#e8f0e8", cape: "#1e5a6a", capeTrim: "#f0d890", rune: "#8ff0e0" };
+    case "sharkskin":
+      return { finish: "leather", base: "#6a7a86", trim: "#8ff0e0", belt: "#2a3a42", sleeve: "#5a6a76", hand: "#3a4a52", leg: "#4a5a64", boot: "#2a343a", straps: true, cape: "#3a5a6a", capeTrim: "#8ff0e0" };
+    case "seasilk":
+      return { finish: "robe", base: "#1e6a8a", trim: "#f0d890", belt: "#8ff0e0", sleeve: "#1e6a8a", hand: look.skin, leg: "#185a74", boot: "#0e3448", rune: "#8ff0e0" };
     default:
       return { finish: "cloth", base: look.cloth, trim: look.trim, belt: look.trim, sleeve: look.cloth, hand: look.skin, leg: shade(look.cloth, -55), boot: "#4a3526" };
   }
@@ -1086,6 +1094,63 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
       }
       break;
     }
+    case "coralcrown": {
+      // Pearl-white steel crowned in living coral.
+      drawDome(g, cx, cy, "#f4f0e4", "#8a9a96");
+      g.fillStyle = "#f0d890";
+      g.fillRect(cx - 12, cy - 2.4, 24, 2.4);
+      if (view !== "back") {
+        const branches: [number, number, number][] = view === "front" ? [[cx - 7, cy - 9, -0.4], [cx, cy - 12, 0], [cx + 7, cy - 9, 0.4]] : [[cx + 2, cy - 11, 0.1], [cx + 8, cy - 8, 0.4]];
+        for (const [bx, by, lean] of branches) {
+          for (const [col, wd] of [[OUTLINE, 5], ["#ff8a7a", 3]] as const) {
+            g.strokeStyle = col;
+            g.lineWidth = wd;
+            g.lineCap = "round";
+            g.beginPath();
+            g.moveTo(bx, by + 3);
+            g.lineTo(bx + lean * 6, by - 6);
+            g.moveTo(bx + lean * 3, by - 2);
+            g.lineTo(bx + lean * 3 + 3, by - 5);
+            g.moveTo(bx + lean * 3, by - 2);
+            g.lineTo(bx + lean * 3 - 3, by - 4);
+            g.stroke();
+          }
+        }
+        g.fillStyle = OUTLINE;
+        g.fillRect(view === "side" ? cx + 2 : cx - 8, cy - 1, view === "side" ? 10 : 16, 3);
+      }
+      break;
+    }
+    case "divers": {
+      // A brass diving helm with a round glass window.
+      g.fillStyle = OUTLINE;
+      blob(g, cx, cy - 1, 15, 15);
+      g.fill();
+      const bg = g.createRadialGradient(cx - 5, cy - 8, 2, cx, cy, 15);
+      bg.addColorStop(0, "#ffe8a0");
+      bg.addColorStop(1, "#a8782a");
+      g.fillStyle = bg;
+      blob(g, cx, cy - 1, 13.4, 13.4);
+      g.fill();
+      if (view !== "back") {
+        const wx = view === "side" ? cx + 6 : cx;
+        g.fillStyle = OUTLINE;
+        blob(g, wx, cy + 1, view === "side" ? 5.5 : 8.4, 8.4);
+        g.fill();
+        g.fillStyle = "#6a8a8a";
+        blob(g, wx, cy + 1, view === "side" ? 4.2 : 7, 7);
+        g.fill();
+        g.fillStyle = "rgba(255,255,255,0.7)";
+        blob(g, wx - 2.4, cy - 2, 2, 1.4);
+        g.fill();
+        g.fillStyle = "#8a5a1a";
+        for (const [dx, dy] of view === "side" ? [[0, -9]] : [[-9, 0], [9, 0], [0, -9]]) {
+          blob(g, wx + dx, cy + 1 + dy, 1.6, 1.6);
+          g.fill();
+        }
+      }
+      break;
+    }
     case "furhood": {
       // White fur, with a wolf's head worn as a crown.
       g.fillStyle = OUTLINE;
@@ -1756,6 +1821,12 @@ export function weaponTrail(kind: WeaponArt): number {
     case "sp_void":
     case "st_void":
       return 0xd8b8ff;
+    case "sword_tide":
+    case "gs_tide":
+    case "dg_tide":
+    case "sp_tide":
+    case "st_tide":
+      return 0x8ff0e0;
     case "gs_moon":
       return 0xd8d0ff;
     case "gs_gilded":
@@ -1848,6 +1919,11 @@ const WEAPON_SIZE: Record<WeaponArt, [number, number, number]> = {
   dg_void: [42, 16, 7],
   sp_void: [114, 28, 22],
   st_void: [86, 36, 10],
+  sword_tide: [66, 20, 9],
+  gs_tide: [100, 34, 14],
+  dg_tide: [42, 16, 7],
+  sp_tide: [116, 30, 22],
+  st_tide: [86, 36, 10],
 };
 
 export function weaponSize(kind: WeaponArt) {
@@ -2641,6 +2717,82 @@ export function drawWeapon(g: CanvasRenderingContext2D, kind: WeaponArt, rarity 
       sg.addColorStop(1, "#e8a030");
       g.fillStyle = sg;
       blob(g, ox, cy, 7, 7);
+      g.fill();
+      break;
+    }
+    // --- Floor 6: the Tidecaller set ----------------------------------------------
+    case "sword_tide":
+    case "gs_tide":
+    case "dg_tide": {
+      const big = kind === "gs_tide";
+      const small = kind === "dg_tide";
+      straightBlade(g, w, h, grip, {
+        width: big ? 12 : small ? 4.6 : 7.4, hi: "#dffaf4", mid: "#4ab8b0", lo: "#1e5a64", guard: "#f0d890", guardW: big ? 28 : small ? 12 : 20,
+        grip: "#1e4a56", edge: "#ffffff", edgeGlow: "#8ff0e0", pommel: "#f4ecd8",
+      });
+      // Ripples along the blade, like light through water.
+      g.strokeStyle = rarity >= 3 ? accent : "rgba(255,255,255,0.8)";
+      g.lineWidth = big ? 1.6 : 1.1;
+      const x0 = grip + 12;
+      const x1 = w - (big ? 16 : 11);
+      g.beginPath();
+      for (let x = x0; x <= x1; x += 2) {
+        const y = cy + Math.sin((x - x0) / (big ? 5 : 3.5)) * (big ? 2.2 : 1.2);
+        if (x === x0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.stroke();
+      break;
+    }
+    case "sp_tide": {
+      shaft(g, 0, w - 30, cy, "#c9b88a", 3.4);
+      g.fillStyle = "#1e4a56";
+      for (const x of [grip, grip + 30, w - 36]) g.fillRect(x, cy - 3, 2.6, 6);
+      // A trident head: three barbed tines of sea-green steel.
+      const tines = [-7, 0, 7];
+      g.fillStyle = OUTLINE;
+      g.fillRect(w - 33, cy - 10, 4, 20);
+      for (const dy of tines) {
+        g.beginPath();
+        g.moveTo(w - 31, cy + dy - 2.4);
+        g.lineTo(w - 2 - (dy ? 6 : 0), cy + dy);
+        g.lineTo(w - 31, cy + dy + 2.4);
+        g.fill();
+      }
+      g.fillStyle = rarity >= 3 ? accent : "#8ff0e0";
+      g.fillRect(w - 32, cy - 9, 2, 18);
+      for (const dy of tines) {
+        g.beginPath();
+        g.moveTo(w - 30, cy + dy - 1.2);
+        g.lineTo(w - 4 - (dy ? 6 : 0), cy + dy);
+        g.lineTo(w - 30, cy + dy + 1.2);
+        g.fill();
+      }
+      break;
+    }
+    case "st_tide": {
+      shaft(g, 0, w - 20, cy, "#b8a47a", 3.8);
+      g.fillStyle = "#1e4a56";
+      for (const x of [6, grip + 12, w - 34]) g.fillRect(x, cy - 3, 2.6, 6);
+      // Driftwood twisting around a brine pearl.
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(w - 28, cy);
+        g.bezierCurveTo(w - 22, cy + sgn * 16, w - 10, cy - sgn * 14, w - 4, cy + sgn * 6);
+        inked(g, "#b8a47a", 2.2);
+      }
+      const ox = w - 14;
+      glow(g, "#8ff0e0", 12);
+      g.fillStyle = OUTLINE;
+      blob(g, ox, cy, 9, 9);
+      g.fill();
+      noGlow(g);
+      const og = g.createRadialGradient(ox - 3, cy - 3, 1, ox, cy, 8);
+      og.addColorStop(0, "#ffffff");
+      og.addColorStop(0.5, rarity >= 3 ? accent : "#bfe8e0");
+      og.addColorStop(1, "#5a8a8a");
+      g.fillStyle = og;
+      blob(g, ox, cy, 7.6, 7.6);
       g.fill();
       break;
     }

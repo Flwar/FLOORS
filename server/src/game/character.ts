@@ -284,6 +284,7 @@ export class Character {
     if (this.hasPerk("scaleguard")) defense += 20;
     if (this.hasPerk("glacialHide")) defense += 25;
     if (this.hasPerk("deepLungs")) stamina += 15;
+    if (this.hasPerk("tidalGrace")) stamina += 20;
     let hpMax = baseHp(d.level) + hp;
     if (this.hasPerk("wardensGrace")) hpMax = Math.round(hpMax * 1.1);
     if (this.hasPerk("glacialHide")) hpMax = Math.round(hpMax * 1.08);

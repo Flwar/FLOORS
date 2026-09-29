@@ -13,7 +13,7 @@ export class Sky {
   constructor(private scene: Phaser.Scene, tint: SkyKind = "day") {
     const COLORS: Record<SkyKind, [number, number]> = {
       day: [0x8fc2e6, 0xd8ecf6], dusk: [0x2a3350, 0x0e1320], gold: [0xf7dca0, 0xa9c6e8], storm: [0x5a6a86, 0x2a3350],
-      ember: [0x6a2414, 0x1a0806], frost: [0xb8d4ea, 0xeef6fb], void: [0x1a0f2e, 0x05030c],
+      ember: [0x6a2414, 0x1a0806], frost: [0xb8d4ea, 0xeef6fb], void: [0x1a0f2e, 0x05030c], sea: [0x6fc8e8, 0xd8f4f0],
     };
     const colors = COLORS[tint];
     this.bg = scene.add.graphics().setScrollFactor(0).setDepth(-100);
@@ -29,6 +29,7 @@ export class Sky {
       // The Ember Reaches: the clouds are smoke, lit from below.
       if (tint === "ember") img.setTint(0x7a3a2a);
       if (tint === "void") img.setTint(0x4a3a6a).setAlpha(alpha * 0.6);
+      if (tint === "sea") img.setTint(0xeaffff);
       this.layers.push({ img, speed, parallax });
     }
     if (tint === "ember") {
@@ -59,11 +60,20 @@ export class Sky {
         this.layers.push({ img: m, speed: 2, parallax, rise });
       }
     }
+    if (tint === "sea") {
+      // Spray drifting up from the sea far below, faint in front of the isles too.
+      paintSpray(scene);
+      for (const [parallax, rise, alpha, depth] of [[0.2, 14, 0.7, -88], [0.5, 24, 0.25, 5e5]] as const) {
+        const img = scene.add.tileSprite(0, 0, w * 2, h * 2, "skySpray").setOrigin(0).setScrollFactor(0).setDepth(depth).setAlpha(alpha);
+        this.layers.push({ img, speed: 6, parallax, rise });
+      }
+    }
     for (let i = 0; i < 5; i++) {
       const img = scene.add.image(0, 0, "farIsland").setScrollFactor(0.08 + i * 0.02).setDepth(-95).setAlpha(0.55 - i * 0.05).setScale(0.35 + (i % 3) * 0.12);
       if (tint === "ember") img.setTint(0x5a2a20);
       if (tint === "frost") img.setTint(0xdfeaf4);
       if (tint === "void") img.setTint(0x3a2a5a);
+      if (tint === "sea") img.setTint(0xa8e0d0);
       img.setPosition(300 + i * 900, 200 + ((i * 373) % 700));
       this.islands.push(img);
     }
@@ -115,6 +125,25 @@ function paintStars(scene: Phaser.Scene) {
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
     g.fill();
+  }
+  tex.refresh();
+}
+
+function paintSpray(scene: Phaser.Scene) {
+  if (scene.textures.exists("skySpray")) return;
+  const tex = scene.textures.createCanvas("skySpray", 512, 512)!;
+  const g = tex.getContext();
+  let seed = 23;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 80; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 512;
+    const r = 1 + rnd() * 2.4;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r * 2.5);
+    gr.addColorStop(0, "rgba(255,255,255,0.9)");
+    gr.addColorStop(1, "rgba(200,240,240,0)");
+    g.fillStyle = gr;
+    g.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
   }
   tex.refresh();
 }

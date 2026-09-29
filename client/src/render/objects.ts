@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { floorOfRoom, itemBase, mapFloorNumber, missionReady, MOON_PHASES, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SG, SG_MOON_BIT, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { floorOfRoom, itemBase, mapFloorNumber, missionReady, MOON_PHASES, CG_VALVE_BIT, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SG, SG_MOON_BIT, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Drop } from "../../../server/src/state.ts";
 import { RES } from "../art/characters.ts";
 import { itemIconCanvas } from "../ui/icons.ts";
@@ -226,10 +226,13 @@ const isConduit = (o: WorldObject) => o.kind === "lever" && (o.name.endsWith("Co
 const isSeal = (o: WorldObject) => o.kind === "lever" && o.name.startsWith("Seal of");
 /** The Sanctum's moon lanterns: each one's phase rides in the gate mask, two bits apiece. */
 const isMoon = (o: WorldObject) => o.kind === "lever" && o.name === "Moon Lantern";
+/** The Cathedral's sluice valves: turned ones ride in the gate mask. */
+const isValve = (o: WorldObject) => o.kind === "lever" && o.name === "Sluice Valve";
 
 function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates: number): string {
   switch (o.kind) {
     case "lever":
+      if (isValve(o)) return (gates >> (CG_VALVE_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
       if (isMoon(o)) return `moon${(gates >> (SG_MOON_BIT + Number(o.id.split("-")[1]) * 2)) & 3}${(gates >> SG.moonsNorth) & 1 ? "lit" : ""}`;
       return isConduit(o) && (gates >> (SS_CONDUIT_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
     case "chest":
@@ -270,6 +273,7 @@ function objLabel(o: WorldObject, state: string, here: number): string {
       return `Rest at ${o.name}`;
     case "lever":
       if (isSeal(o)) return state === "lit" ? `${o.name} (burning)` : `Light the ${o.name}`;
+      if (isValve(o)) return state === "lit" ? "Sluice Valve (shut)" : "Turn the Sluice Valve";
       if (isMoon(o)) return state.endsWith("lit") ? `Moon Lantern (${MOON_PHASES[Number(state[4])]}, aligned)` : `Turn the Moon Lantern (${MOON_PHASES[Number(state[4])]})`;
       if (o.name.startsWith("Rune of")) return state === "lit" ? `${o.name} (ringing)` : `Strike the ${o.name}`;
       return isConduit(o) ? (state === "lit" ? `${o.name} (awake)` : `Wake the ${o.name}`) : `Pull the ${o.name}`;

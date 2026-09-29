@@ -43,4 +43,13 @@ export const RUMOURS: Record<number, string[]> = {
     "Mira at the Moonforge says a void heart weighs nothing and pulls at everything. She keeps hers in a lead box.",
     "When the Queen puts the sun out, find the moonlight. It's the only thing in the Sanctum she can't touch.",
   ],
+  6: [
+    "A soaked thing is slow, and lightning loves it. Frost sticks to it twice as long. Wet them first, then strike.",
+    "Brinehounds come in with the tide. When the Spring Tide's up, stay off the Tidepools, or bring friends.",
+    "There's an old pier behind the rocks on the east side of the Tidepools. Nobody goes out there. Nobody comes back.",
+    "Scylla nests on the Stormbreak Cliffs. She swallowed the Cathedral's key a hundred years ago and never coughed it up.",
+    "In the Cathedral the sea comes in when the bell tolls. Three valves hold it back — and the lowest one drowns first.",
+    "Marisol at the Pearlforge says a leviathan scale turns a blade like nothing else. She won't say how she knows.",
+    "When the Leviathan Queen calls the Deluge, get to the high ground. It's the only place the sea won't reach.",
+  ],
 };

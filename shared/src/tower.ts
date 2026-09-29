@@ -9,6 +9,8 @@ import { buildFloor4 } from "./world/floor4.ts";
 import { buildGlacier } from "./world/glacier.ts";
 import { buildFloor5 } from "./world/floor5.ts";
 import { buildSanctum } from "./world/sanctum.ts";
+import { buildFloor6 } from "./world/floor6.ts";
+import { buildCathedral } from "./world/cathedral.ts";
 
 /**
  * The tower: every floor, its boss dungeon, and how they connect. Rooms, travel, level caps,
@@ -16,8 +18,8 @@ import { buildSanctum } from "./world/sanctum.ts";
  * (map, dungeon, enemies, items, quests) plus one entry here.
  */
 
-export type Theme = "meadow" | "cave" | "gilded" | "storm" | "ember" | "frost" | "shadow";
-export type Sky = "day" | "dusk" | "gold" | "storm" | "ember" | "frost" | "void";
+export type Theme = "meadow" | "cave" | "gilded" | "storm" | "ember" | "frost" | "shadow" | "tide";
+export type Sky = "day" | "dusk" | "gold" | "storm" | "ember" | "frost" | "void" | "sea";
 
 export interface FloorDef {
   n: number;
@@ -94,6 +96,14 @@ export const TOWER: FloorDef[] = [
     uncharted: { title: "The Sanctum is not on any map", text: "Nobody draws a map of the dark. Follow the pale runner toward the throne." },
     mapSeller: "Corvin the Collector sells one at the Nightmarket in Duskhollow, for 150 gold.",
     build: buildFloor5, buildDungeon: buildSanctum,
+  },
+  {
+    n: 6, room: "floor6", dungeon: "cathedral", title: "The Drowned Isles", town: "Saltmere", dungeonName: "The Drowned Cathedral", levels: [24, 28], levelCap: 28,
+    up: "sealed-stair7", down: "descent6", door: "cathedral-door", boss: "thalassa", arrival: "drowned-isles",
+    theme: "tide", dungeonTheme: "tide", sky: "sea", dungeonSky: "sea", music: "saltmere", dungeonMusic: "cathedral",
+    uncharted: { title: "The Cathedral floods too often to map", text: "Follow the pale runner up, and keep ahead of the tide." },
+    mapSeller: "Pell the Chandler sells one at the Chandlery in Saltmere, for 180 gold.",
+    build: buildFloor6, buildDungeon: buildCathedral,
   },
 ];
 

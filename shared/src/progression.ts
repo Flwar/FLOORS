@@ -1,7 +1,7 @@
 import { WEAPONS, type WeaponKey } from "./combat/weapons.ts";
 import { Mod } from "./sim/player.ts";
 
-export const MAX_LEVEL = 24;
+export const MAX_LEVEL = 28;
 /** XP needed to go from `level` to `level + 1`. */
 export const xpToNext = (level: number) => Math.round(85 * Math.pow(level, 1.55));
 export const baseHp = (level: number) => 100 + (level - 1) * 10;
@@ -78,6 +78,13 @@ export const PERK_CHOICES: { level: number; options: [PerkDef, PerkDef] }[] = [
     options: [
       { id: "umbralTouch", name: "Umbral Touch", desc: "Your blows have a 20% chance to curse enemies: they deal 30% less damage and take 10% more." },
       { id: "nightveil", name: "Nightveil", desc: "One blow in ten passes through you like shadow, doing no harm." },
+    ],
+  },
+  {
+    level: 25,
+    options: [
+      { id: "stormcaller", name: "Stormcaller", desc: "Your blows on soaked enemies have a 25% chance to call lightning down on them." },
+      { id: "tidalGrace", name: "Tidal Grace", desc: "+20 maximum stamina, and every perfect dodge restores 10% of your health." },
     ],
   },
 ];

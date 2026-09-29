@@ -21,6 +21,7 @@ const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 const MINOR = [0, 2, 3, 5, 7, 8, 10];
 const DORIAN = [0, 2, 3, 5, 7, 9, 10];
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11];
+const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10];
 
 const TRACKS: Record<string, Track> = {
   town: { bpm: 84, root: 55, scale: MAJOR, chords: [[0, 2, 4], [3, 5, 0], [4, 6, 1], [0, 2, 4], [5, 0, 2], [3, 5, 0], [1, 3, 5], [4, 6, 1]], pad: "triangle", padLevel: 0.05, arp: { pattern: [0, 1, 2, 1, 0, 2, 1, 2], level: 0.035, wave: "sine", octave: 1 }, bass: { level: 0.06, pattern: [0, -1, -1, -1, 0, -1, 2, -1] } },
@@ -50,6 +51,10 @@ const TRACKS: Record<string, Track> = {
   umbral: { bpm: 62, root: 50, scale: [0, 1, 3, 5, 7, 8, 10], chords: [[0, 2, 4], [1, 3, 5], [5, 0, 2], [4, 6, 1]], pad: "sine", padLevel: 0.055, drone: 0.04, arp: { pattern: [0, -1, -1, 4, -1, 1, -1, -1], level: 0.028, wave: "sine", octave: 2 } },
   duskhollow: { bpm: 72, root: 52, scale: DORIAN, chords: [[0, 2, 4], [5, 0, 2], [3, 5, 0], [4, 6, 1]], pad: "triangle", padLevel: 0.045, arp: { pattern: [0, 2, 4, 2, 6, 4, 2, 1], level: 0.03, wave: "triangle", octave: 1 }, bass: { level: 0.045, pattern: [0, -1, -1, -1, 3, -1, -1, -1] } },
   sanctum: { bpm: 90, root: 43, scale: [0, 1, 3, 5, 7, 8, 10], chords: [[0, 2, 4], [1, 3, 5], [6, 1, 3], [0, 2, 4]], pad: "sawtooth", padLevel: 0.022, drone: 0.05, arp: { pattern: [0, 4, 1, 4, 0, 4, 2, 6], level: 0.028, wave: "sine", octave: 2 }, bass: { level: 0.08, pattern: [0, -1, -1, 0, 1, -1, 0, -1] }, drums: { kick: [1, 0, 0, 0, 1, 0, 1, 0], level: 0.16 } },
+  // Floor 6: the Drowned Isles — a lilting sea-shanty lilt; Saltmere a jig; the Cathedral a drowned hymn.
+  tide: { bpm: 92, root: 57, scale: MIXOLYDIAN, chords: [[0, 2, 4], [6, 1, 3], [3, 5, 0], [4, 6, 1]], pad: "triangle", padLevel: 0.045, arp: { pattern: [0, 2, 4, 2, 5, 4, 2, 1], level: 0.03, wave: "sine", octave: 1 }, bass: { level: 0.05, pattern: [0, -1, -1, 4, -1, -1, 3, -1] } },
+  saltmere: { bpm: 116, root: 55, scale: MAJOR, chords: [[0, 2, 4], [4, 6, 1], [0, 2, 4], [3, 5, 0], [4, 6, 1]], pad: "triangle", padLevel: 0.04, arp: { pattern: [0, 2, 4, 2, 0, 4, 2, 4], level: 0.034, wave: "triangle", octave: 1 }, bass: { level: 0.06, pattern: [0, -1, 4, -1, 0, -1, 4, -1] }, drums: { kick: [1, 0, 0, 0, 1, 0, 0, 0], hat: [0, 0, 1, 0, 0, 0, 1, 0], level: 0.1 } },
+  cathedral: { bpm: 76, root: 45, scale: DORIAN, chords: [[0, 2, 4], [5, 0, 2], [3, 5, 0], [4, 6, 1]], pad: "sine", padLevel: 0.06, drone: 0.05, arp: { pattern: [0, -1, 2, -1, 4, -1, 2, -1], level: 0.028, wave: "sine", octave: 2 }, bass: { level: 0.06, pattern: [0, -1, -1, -1, 5, -1, -1, -1] }, drums: { kick: [1, 0, 0, 0, 0, 0, 1, 0], level: 0.12 } },
   victory: { bpm: 100, root: 60, scale: MAJOR, chords: [[0, 2, 4], [3, 5, 0], [4, 6, 1], [0, 2, 4]], pad: "triangle", padLevel: 0.06, arp: { pattern: [0, 2, 4, 7, 4, 2, 0, 4], level: 0.04, wave: "triangle", octave: 1 }, bass: { level: 0.07, pattern: [0, -1, 0, -1, 0, -1, 0, -1] }, drums: { kick: [1, 0, 0, 0, 1, 0, 0, 0], level: 0.15 } },
 };
 

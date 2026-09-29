@@ -4,10 +4,12 @@ import { Tile, WorldMap } from "./map.ts";
 export const UNDERCROFT_W = 90;
 export const UNDERCROFT_H = 140;
 
-/** Gate tiles for each portcullis, by id. Closed = Tile.Gate, open = Tile.StoneFloor. */
+/** Gate tiles for each portcullis, by id. Closed = Tile.Gate, open = Tile.StoneFloor (unless the gate says otherwise: a flooding row is water when closed). */
 export interface GateDef {
   id: number;
   tiles: [number, number][];
+  closedTile?: number;
+  openTile?: number;
 }
 
 export const UNDERCROFT_ROOMS = {
@@ -117,6 +119,6 @@ export function buildUndercroft(): WorldMap & { gates: GateDef[]; traps: { x: nu
 export function applyGates(m: WorldMap & { gates: GateDef[] }, openMask: number) {
   for (const g of m.gates) {
     const open = (openMask & (1 << g.id)) !== 0;
-    for (const [x, y] of g.tiles) m.set(x, y, open ? Tile.StoneFloor : Tile.Gate);
+    for (const [x, y] of g.tiles) m.set(x, y, open ? g.openTile ?? Tile.StoneFloor : g.closedTile ?? Tile.Gate);
   }
 }

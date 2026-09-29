@@ -499,6 +499,7 @@ export class EnemyAI {
   private speed(ed: EnemyData) {
     let s = ed.def.speed;
     if (ed.e.flags & EFlag.Chilled) s *= 0.55;
+    if (ed.e.flags & EFlag.Soaked) s *= 0.85;
     if (ed.e.flags & EFlag.Enraged && !ed.def.boss) s *= 1.15;
     return s;
   }

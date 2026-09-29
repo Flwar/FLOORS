@@ -630,8 +630,66 @@ export class SkillFx {
         break;
       }
       case "voidrift":
-        // Played from the server's event, where the rift actually opens.
+      case "whirlpool":
+        // Played from the server's event, where the rift (or the whirlpool) actually opens.
         break;
+      // --- Tide arts ----------------------------------------------------------------
+      case "tidebreak":
+      case "barbs":
+      case "tsunami":
+      case "maelspin":
+      case "leviathan": {
+        const r = m.shape?.kind === "circle" ? m.shape.radius : m.shape?.kind === "arc" ? m.shape.range : 80;
+        const full = m.shape?.kind === "circle";
+        const big = m.vfx === "leviathan" || m.vfx === "tsunami";
+        if (full) {
+          fx.ring(x, y - 6, 0xffffff, 12, r, 460, big ? 10 : 6);
+          fx.ring(x, y - 6, c, 10, r * 1.2, 640, 3);
+        } else fx.trail(x, cy, a - 1.9, a + 1.9, r * 0.3, r, c, 380);
+        const n = big ? 18 : 10;
+        for (let i = 0; i < n; i++) {
+          const aa = full ? (i / n) * Math.PI * 2 : a - 1.7 + (i / (n - 1)) * 3.4;
+          this.splashAt(x + Math.cos(aa) * r * 0.8, cy + Math.sin(aa) * r * 0.6, big ? 1.2 : 0.8);
+        }
+        sfx.boom(false, x, y);
+        if (mine) shake(big ? 420 : 220, big ? 0.015 : 0.008);
+        break;
+      }
+      case "undertow":
+      case "riptide":
+      case "tridentstorm": {
+        const e = ahead(shapeLen);
+        fx.streak(x, cy, e.x, e.y, c, 300, m.vfx === "riptide" ? 18 : 12);
+        fx.streak(x, cy, e.x, e.y, 0xffffff, 200, 4);
+        for (let i = 1; i <= 7; i++) this.splashAt(x + (e.x - x) * (i / 7), cy + (e.y - cy) * (i / 7), 0.7);
+        sfx.hit(true, x, y, true, "flesh");
+        if (mine) shake(220, 0.009);
+        break;
+      }
+      case "eelstep":
+      case "riptidedash": {
+        const e = ahead(m.lunge || 200);
+        fx.streak(x, cy, e.x, e.y, c, 280, 12);
+        this.splashAt(x, cy, 1);
+        this.splashAt(e.x, e.y, 1);
+        break;
+      }
+      case "bubbles":
+      case "tidalwave":
+        this.splashAt(ahead(16).x, ahead(16).y, 0.7);
+        break;
+      case "geyser": {
+        const off = m.shape?.kind === "circle" ? m.shape.offset : 150;
+        const r = m.shape?.kind === "circle" ? m.shape.radius : 82;
+        const e = { x: x + Math.cos(a) * off, y: y + Math.sin(a) * off * 0.8 };
+        fx.ring(e.x, e.y, 0xffffff, 8, r, 420, 6);
+        fx.streak(e.x, e.y + 10, e.x, e.y - 90, 0xffffff, 420, 18);
+        fx.streak(e.x, e.y + 10, e.x, e.y - 90, c, 560, 30);
+        for (let i = 0; i < 10; i++) this.splashAt(e.x + Math.cos((i / 10) * 6.28) * r * 0.6, e.y + Math.sin((i / 10) * 6.28) * r * 0.4, 1);
+        sfx.boom(true, e.x, e.y);
+        if (mine) shake(260, 0.01);
+        break;
+      }
       case "frost":
       case "blizzard":
       case "meteor":
@@ -663,6 +721,10 @@ export class SkillFx {
       case "rush":
         if (Math.random() < 0.7) this.fx.dust(x, y, 3, a + Math.PI);
         break;
+      case "eelstep":
+      case "riptidedash":
+        if (Math.random() < 0.8) this.fx.rise(x, y - 10, Math.random() < 0.5 ? c : 0xffffff, 2, 10, 14, 360, 3);
+        break;
       case "nightfall":
       case "shadewalk":
         if (Math.random() < 0.8) this.fx.rise(x, y - 14, Math.random() < 0.5 ? c : 0x1a1028, 2, 10, 10, 360, 3.4);
@@ -688,6 +750,13 @@ export class SkillFx {
     fx.star(x, y - 6 * size, 0xf0e8ff, 4 * size, 360);
   }
 
+  /** A splash of seawater: droplets thrown up, and foam. */
+  splashAt(x: number, y: number, size: number) {
+    const fx = this.fx;
+    fx.rise(x, y, Math.random() < 0.5 ? 0x8ff0e0 : 0x3fb8c8, Math.ceil(5 * size), 10 * size, 30 * size, 520, 2.6 * size);
+    fx.rise(x, y, 0xffffff, Math.ceil(3 * size), 6 * size, 22 * size, 420, 2 * size);
+  }
+
   /** A tongue of fire that leaps up and fades. */
   flameAt(x: number, y: number, size: number) {
     const fx = this.fx;
@@ -707,6 +776,29 @@ export class SkillFx {
         fx.burst(x, y - 6, 0xdff4ff, 16, 110, 2.6, 560);
         this.frostAt(x, y - 6, 0.9);
         sfx.hit(true, x, y, true, "metal");
+        return true;
+      case "splash":
+        fx.burst(x, y - 6, 0x8ff0e0, 16, 110, 2.6, 520);
+        this.splashAt(x, y - 6, 0.9);
+        sfx.hit(false, x, y, true, "flesh");
+        return true;
+      case "soaked":
+        fx.ring(x, y - 30, 0x8ff0e0, 4, 16, 400, 3);
+        this.splashAt(x, y - 20, 0.6);
+        return true;
+      case "whirlpool":
+        fx.ring(x, y, 0xffffff, r, 8, 900, 4);
+        fx.ring(x, y, 0x3fb8c8, r * 1.1, 10, 1100, 6);
+        for (let i = 0; i < 12; i++) this.splashAt(x + Math.cos((i / 12) * 6.28) * r, y + Math.sin((i / 12) * 6.28) * r * 0.7, 0.8);
+        sfx.boom(false, x, y);
+        return true;
+      case "tiderise":
+        for (let i = 0; i < 16; i++) this.splashAt(x + (Math.random() - 0.5) * r * 2, y, 0.8);
+        sfx.boom(false, x, y);
+        return true;
+      case "tidedrain":
+        fx.ring(x, y, 0x8ff0e0, 20, r, 900, 4);
+        for (let i = 0; i < 20; i++) this.splashAt(x + (Math.random() - 0.5) * r * 2, y + (Math.random() - 0.5) * r, 0.9);
         return true;
       case "voidburst":
         fx.burst(x, y - 6, 0xb77af2, 16, 110, 2.6, 560);

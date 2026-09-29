@@ -22,7 +22,9 @@ export type ItemEffect =
   | "setStorm"
   | "setDragon"
   | "setFrost"
-  | "setVoid";
+  | "setVoid"
+  | "setTide"
+  | "tideshell"; // blows sometimes soak
 
 export interface ItemBase {
   key: string;
@@ -190,6 +192,13 @@ export function upgradeCost(it: Item): { gold: number; mats: { key: string; qty:
   const b = itemBase(it.key);
   if (!b || !isEquipment(b)) return undefined;
   const n = it.plus + 1;
+  // Floor 6's own gear (tier 8) is worked with sea materials.
+  if (b.tier >= 8) {
+    const mats = [{ key: "mat_coral", qty: 2 * n }];
+    if (n >= 3) mats.push({ key: "mat_brinepearl", qty: n - 1 });
+    if (n >= 5) mats.push({ key: "mat_leviathanscale", qty: 1 });
+    return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
+  }
   // Floor 5's own gear (tier 7) is worked with void materials.
   if (b.tier >= 7) {
     const mats = [{ key: "mat_umbralshard", qty: 2 * n }];

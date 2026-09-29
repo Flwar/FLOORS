@@ -149,6 +149,8 @@ export interface EnemyData {
   burnBy?: string;
   /** Cursed: deals less damage and takes more until this time. */
   curseUntil?: number;
+  /** Soaked: slower, and lightning and frost bite harder, until this time. */
+  soakUntil?: number;
   /** Elite affix (Affix.*). */
   affix: number;
   /** Packleader: has it called its pack yet? */
@@ -190,6 +192,8 @@ interface HazardData {
   burn?: boolean;
   /** Curses what it hits (Void Rift). */
   curse?: boolean;
+  /** Soaks what it hits (Whirlpool). */
+  soak?: boolean;
   /** Glyphs are safe spots, not damage. */
   safe?: boolean;
   lifeUntil: number;
@@ -200,6 +204,8 @@ export type Emit = (type: string, data: Record<string, unknown>, x: number, y: n
 const SAFE_RESPAWN_MS = 2500;
 /** Cursed enemies' blows land this much as hard. */
 const CURSE_DAMAGE = 0.7;
+/** Lightning strikes soaked enemies this much harder. */
+const SOAK_SHOCK = 1.35;
 /** A dodge that evades a blow within this many ticks of starting is perfect. */
 const PERFECT_DODGE_TICKS = 4;
 /** How long the counter from a perfect dodge waits for your next blow. */
@@ -368,7 +374,7 @@ export class Sim {
       pd.hitSeq = p.actSeq;
       pd.hitSet.clear();
     }
-    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift") return; // detonates as hazards
+    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift" || m.special === "whirlpool") return; // detonates as hazards
     const shape = m.shape!;
     const rad = aimToRad(p.actAim);
     const reach = shapeReach(shape) + 40;
@@ -395,8 +401,8 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
-        pierce: pj.look === "wave",
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "tide" ? ProjKind.TideWave : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        pierce: pj.look === "wave" || (pj.look === "tide" && pj.count === 1),
         team: 0,
         owner: pd.sid,
         x: p.x + Math.cos(a) * 14,
@@ -474,6 +480,21 @@ export class Sim {
           this.spawnHazard({ kind: HazardKind.Void, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, curse: true, life: 250 });
         }
         this.emit("fx", { k: "voidrift", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
+        break;
+      }
+      case "whirlpool": {
+        // Whirlpool: churns five times where you aim, dragging in and soaking what it catches.
+        const shape = m.shape as Extract<Shape, { kind: "circle" }>;
+        let cx = p.x + Math.cos(rad) * shape.offset;
+        let cy = p.y + Math.sin(rad) * shape.offset;
+        if (!this.wallClear(p.x, p.y, cx, cy)) {
+          cx = p.x + Math.cos(rad) * shape.offset * 0.4;
+          cy = p.y + Math.sin(rad) * shape.offset * 0.4;
+        }
+        for (let i = 0; i < 5; i++) {
+          this.spawnHazard({ kind: HazardKind.Tide, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, soak: true, life: 250 });
+        }
+        this.emit("fx", { k: "whirlpool", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
         break;
       }
       case "frost":
@@ -618,6 +639,10 @@ export class Sim {
     if (attacker && attacker.act === Act.Light && pd?.ch?.hasPerk("momentum")) dmg *= 1 + Math.min(0.25, attacker.combo * 0.05);
     if (ed.markUntil && this.now < ed.markUntil) dmg *= 1.3;
     if (e.flags & EFlag.Cursed) dmg *= dv?.effects.has("setVoid") ? 1.18 : 1.1;
+    if (e.flags & EFlag.Soaked) {
+      if (m?.vfx === "lightning" || m?.vfx === "storm") dmg *= SOAK_SHOCK;
+      if (dv?.effects.has("setTide")) dmg *= 1.1;
+    }
     if (pd && this.now < pd.counterUntil) {
       // The counter after a perfect dodge.
       dmg *= 1.5;
@@ -640,6 +665,11 @@ export class Sim {
     }
     if (m?.special === "chill" || (pd?.ch?.hasPerk("frostblood") && Math.random() < 0.2)) this.chill(ed);
     if (m?.special === "curse" || m?.curse || (pd?.ch?.hasPerk("umbralTouch") && Math.random() < 0.2) || (dv?.effects.has("moonstone") && Math.random() < 0.125)) this.curse(ed);
+    if (pd && m && e.flags & EFlag.Soaked && pd.ch?.hasPerk("stormcaller") && Math.random() < 0.25) {
+      // Stormcaller: lightning finds the soaked.
+      this.spawnHazard({ kind: HazardKind.Lightning, team: 0, x: e.x, y: e.y, radius: 32, delay: 160, damage: base * 0.5 * pd.atkMul, poise: 20, knockback: 50, heavy: false, sid: pd.sid, life: 300 });
+    }
+    if (m?.special === "soak" || m?.soak || (dv?.effects.has("tideshell") && Math.random() < 1 / 6) || (dv?.effects.has("setTide") && Math.random() < 0.3)) this.soak(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
     if (m?.special === "mark" && pd) {
       ed.markUntil = this.now + 6000;
@@ -848,6 +878,11 @@ export class Sim {
         pd.perfectRewarded = perfect;
         pd.counterUntil = this.now + COUNTER_MS;
         p.stamina = Math.min(p.staminaMax, p.stamina + 20);
+        if (pd.ch?.hasPerk("tidalGrace") && p.hp < p.hpMax) {
+          const heal = Math.min(p.hpMax - p.hp, Math.round(p.hpMax * 0.1));
+          p.hp += heal;
+          this.emit("heal", { p: pd.sid, d: heal, x, y }, x, y);
+        }
         this.emit("fx", { k: "perfectdodge", x, y, p: pd.sid }, x, y);
       }
       this.emit("evade", { p: pd.sid, x, y }, x, y);
@@ -1098,7 +1133,7 @@ export class Sim {
     this.state.projectiles.delete(id);
   }
 
-  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean }) {
+  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean; soak?: boolean }) {
     const id = this.id("h");
     const hz = new Hazard();
     hz.kind = o.kind;
@@ -1110,7 +1145,7 @@ export class Sim {
     hz.delay = o.delay;
     this.state.hazards.set(id, hz);
     this.onSpawn?.(hz, o.x, o.y);
-    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, lifeUntil: this.now + o.delay + (o.life ?? 600) });
+    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, soak: o.soak, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
   }
 
@@ -1130,8 +1165,17 @@ export class Sim {
     }
   }
 
-  /** Chill an enemy: slower to move (and to wind up its attacks) for a few seconds. */
+  /** Soak an enemy: slower, and lightning and frost bite it harder, for a few seconds. */
+  soak(ed: EnemyData, ms = 6000) {
+    const was = (ed.e.flags & EFlag.Soaked) !== 0;
+    ed.soakUntil = Math.max(ed.soakUntil ?? 0, this.now + ms);
+    ed.e.flags |= EFlag.Soaked;
+    if (!was) this.emit("fx", { k: "soaked", x: ed.e.x, y: ed.e.y, t: ed.id }, ed.e.x, ed.e.y);
+  }
+
+  /** Chill an enemy: slower to move (and to wind up its attacks) for a few seconds. Soaked enemies stay chilled twice as long. */
   chill(ed: EnemyData, ms = 3500) {
+    if (ed.e.flags & EFlag.Soaked) ms *= 2;
     ed.slowUntil = Math.max(ed.slowUntil, this.now + ms);
     ed.e.flags |= EFlag.Chilled;
   }
@@ -1186,6 +1230,10 @@ export class Sim {
       if (ed.curseUntil && (this.now > ed.curseUntil || ed.e.act === EAct.Dead)) {
         ed.curseUntil = undefined;
         ed.e.flags &= ~EFlag.Cursed;
+      }
+      if (ed.soakUntil && (this.now > ed.soakUntil || ed.e.act === EAct.Dead)) {
+        ed.soakUntil = undefined;
+        ed.e.flags &= ~EFlag.Soaked;
       }
       if (ed.burnUntil) {
         if (this.now > ed.burnUntil || ed.e.act === EAct.Dead) {
@@ -1244,6 +1292,10 @@ export class Sim {
           this.chill(ed);
           this.emit("fx", { k: "iceburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
         }
+        if (pj.special === "soak" && ed.e.act !== EAct.Dead) {
+          this.soak(ed);
+          this.emit("fx", { k: "splash", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
+        }
         if (pj.special === "curse" && ed.e.act !== EAct.Dead) {
           this.curse(ed);
           this.emit("fx", { k: "voidburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
@@ -1265,7 +1317,10 @@ export class Sim {
         for (const ed of this.enemies.values()) {
           const e = ed.e;
           if (e.act === EAct.Dead || Math.hypot(e.x - hz.hz.x, e.y - hz.hz.y) > hz.hz.radius + ed.def.radius) continue;
-          this.damageEnemy(ed, pd, hz.damage / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
+          // Lightning strikes the soaked harder.
+          const shock = hz.hz.kind === HazardKind.Lightning && e.flags & EFlag.Soaked ? SOAK_SHOCK : 1;
+          this.damageEnemy(ed, pd, (hz.damage * shock) / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
+          if (hz.soak && ed.e.act !== EAct.Dead) this.soak(ed);
           if (hz.burn && pd && ed.e.act !== EAct.Dead) this.ignite(ed, pd, hz.damage / (pd.atkMul || 1));
           if (hz.frost && ed.e.act !== EAct.Dead) this.chill(ed);
           if (hz.curse && ed.e.act !== EAct.Dead) this.curse(ed);

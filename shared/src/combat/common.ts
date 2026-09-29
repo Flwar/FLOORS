@@ -3,8 +3,8 @@ import { EFlag, type EnemyAttack } from "../enemies/defs.ts";
 
 export const PLAYER_RADIUS = 9;
 
-export const ProjKind = { Bolt: 0, Arrow: 1, Knife: 2, ShadowBolt: 3, Blade: 4, Reflected: 5, Wave: 6, Javelin: 7, Fireball: 8, IceShard: 9, VoidOrb: 10 } as const;
-export const HazardKind = { Hex: 0, Meteor: 1, Sigil: 2, Glyph: 3, Judgement: 4, Frost: 5, Lightning: 6, Void: 7 } as const;
+export const ProjKind = { Bolt: 0, Arrow: 1, Knife: 2, ShadowBolt: 3, Blade: 4, Reflected: 5, Wave: 6, Javelin: 7, Fireball: 8, IceShard: 9, VoidOrb: 10, TideWave: 11 } as const;
+export const HazardKind = { Hex: 0, Meteor: 1, Sigil: 2, Glyph: 3, Judgement: 4, Frost: 5, Lightning: 6, Void: 7, Tide: 8 } as const;
 
 /** Enraged enemies (boss phases, howl) wind up faster. Client and server both apply this. */
 export const ENRAGE_WINDUP = 0.82;

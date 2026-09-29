@@ -208,8 +208,46 @@ export const FLOOR5_EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 6: the spring tide, the wreckers, and the wandering merchant. */
+export const FLOOR6_EVENTS: EventDef[] = [
+  {
+    id: "springtide",
+    name: "The Spring Tide",
+    announce: "The spring tide is in over the Tidepools — the brinehounds run with it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 120, y: 126 }, { x: 138, y: 120 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "brinehound", level: 25 }, { key: "brinehound", level: 25 }, { key: "brinehound", level: 25 }, { key: "brinehound", level: 25 },
+      { key: "brinehound", level: 26, elite: true, hpScale: 1.8 }, { key: "siren", level: 25 },
+    ],
+    reward: { xp: 2800, gold: 560, loot: true },
+    lootPool: ["mat_brinepearl", "mat_leviathanscale", "helm_divers", "armor_sharkskin", "daggers_tide", "spear_tide"],
+  },
+  {
+    id: "wreckers",
+    name: "The Wreckers",
+    announce: "Lights on the Wreck Coast — the drowned crews are coming ashore to loot their own ships!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 154, y: 80 }),
+    enemies: [
+      { key: "drowned", level: 26 }, { key: "drowned", level: 26 }, { key: "drowned", level: 26 }, { key: "merrowguard", level: 26 },
+      { key: "coralgolem", level: 27, elite: true },
+    ],
+    reward: { xp: 3100, gold: 620, loot: true },
+    lootPool: ["mat_coral", "mat_leviathanscale", "armor_seasilk", "staff_tide", "sword_tide", "greatsword_tide"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has tied up at Saltmere's pier — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 47, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
 /** Each floor's world events. */
-export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS };
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS, 6: FLOOR6_EVENTS };
 
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {

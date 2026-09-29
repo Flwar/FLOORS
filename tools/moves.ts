@@ -149,6 +149,10 @@ async function trySkill(w: WeaponDef, i: number, sk: MoveDef, dist: number) {
       const cursed = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Cursed) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && (x.m.k === "cursed" || x.m.k === "voidburst"));
       check(`${w.name}: ${sk.name} curses the target`, cursed, cursed ? "cursed" : "not cursed");
     }
+    if (sk.soak || sk.special === "soak" || sk.special === "whirlpool") {
+      const soaked = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Soaked) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && (x.m.k === "soaked" || x.m.k === "splash"));
+      check(`${w.name}: ${sk.name} soaks the target`, soaked, soaked ? "soaked" : "not soaked");
+    }
     if (sk.special === "empower") check(`${w.name}: ${sk.name} empowers`, fx.includes("empower"), fx.join(",") || "no fx");
     if (sk.special === "bloodlust") {
       await idle();
