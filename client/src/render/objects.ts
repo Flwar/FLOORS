@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { floorOfRoom, itemBase, mapFloorNumber, missionReady, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { floorOfRoom, itemBase, mapFloorNumber, missionReady, MOON_PHASES, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SG, SG_MOON_BIT, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Drop } from "../../../server/src/state.ts";
 import { RES } from "../art/characters.ts";
 import { itemIconCanvas } from "../ui/icons.ts";
@@ -224,10 +224,13 @@ function markerFor(npc: string, inv?: InvView): string {
 /** Levers whose lit state is synced in the gate mask: the Stormspire's conduits and the Roost's flame seals. */
 const isConduit = (o: WorldObject) => o.kind === "lever" && (o.name.endsWith("Conduit") || o.name.startsWith("Seal of") || o.name.startsWith("Rune of"));
 const isSeal = (o: WorldObject) => o.kind === "lever" && o.name.startsWith("Seal of");
+/** The Sanctum's moon lanterns: each one's phase rides in the gate mask, two bits apiece. */
+const isMoon = (o: WorldObject) => o.kind === "lever" && o.name === "Moon Lantern";
 
 function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates: number): string {
   switch (o.kind) {
     case "lever":
+      if (isMoon(o)) return `moon${(gates >> (SG_MOON_BIT + Number(o.id.split("-")[1]) * 2)) & 3}${(gates >> SG.moonsNorth) & 1 ? "lit" : ""}`;
       return isConduit(o) && (gates >> (SS_CONDUIT_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
     case "chest":
       return inv?.discovered.includes(`chest:${o.id}`) ? "open" : "";
@@ -267,6 +270,7 @@ function objLabel(o: WorldObject, state: string, here: number): string {
       return `Rest at ${o.name}`;
     case "lever":
       if (isSeal(o)) return state === "lit" ? `${o.name} (burning)` : `Light the ${o.name}`;
+      if (isMoon(o)) return state.endsWith("lit") ? `Moon Lantern (${MOON_PHASES[Number(state[4])]}, aligned)` : `Turn the Moon Lantern (${MOON_PHASES[Number(state[4])]})`;
       if (o.name.startsWith("Rune of")) return state === "lit" ? `${o.name} (ringing)` : `Strike the ${o.name}`;
       return isConduit(o) ? (state === "lit" ? `${o.name} (awake)` : `Wake the ${o.name}`) : `Pull the ${o.name}`;
   }
@@ -288,6 +292,7 @@ function texFor(o: WorldObject, state: string): string {
       return "objBrazier";
     case "lever":
       if (isSeal(o)) return state === "lit" ? "objBrazier" : "objSeal";
+      if (isMoon(o)) return `objMoon${state[4] ?? 0}`;
       return isConduit(o) ? (state === "lit" ? "objConduitLit" : "objConduit") : "objLever";
     case "entry":
       return o.id.startsWith("enter-") ? "objNone" : "objDoormat";
@@ -361,6 +366,71 @@ function paintObjects(scene: Phaser.Scene) {
     g.ellipse(35, 45, 15, 5, 0, 0, Math.PI * 2);
     g.fill();
   });
+  // Moon lanterns: a black stone post holding a glass moon in one of four phases.
+  for (let ph = 0; ph < 4; ph++) {
+    make(`objMoon${ph}`, 70, 120, (g) => {
+      g.fillStyle = "rgba(0,0,0,0.3)";
+      g.beginPath();
+      g.ellipse(35, 114, 22, 6, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = O;
+      g.fillRect(25, 56, 20, 60);
+      g.fillStyle = "#3a3448";
+      g.fillRect(28, 59, 14, 55);
+      g.fillStyle = "#5a5070";
+      g.fillRect(28, 59, 4, 55);
+      // The glass moon.
+      const cx = 35;
+      const cy = 32;
+      const r = 22;
+      g.fillStyle = O;
+      g.beginPath();
+      g.arc(cx, cy, r + 3, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#120e1c";
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.fill();
+      g.save();
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.clip();
+      g.shadowColor = "#e0d8ff";
+      g.shadowBlur = ph ? 14 : 0;
+      const lit = g.createRadialGradient(cx - 5, cy - 6, 2, cx, cy, r);
+      lit.addColorStop(0, "#ffffff");
+      lit.addColorStop(1, "#c8b8f0");
+      g.fillStyle = lit;
+      if (ph === 3) {
+        g.beginPath();
+        g.arc(cx, cy, r, 0, Math.PI * 2);
+        g.fill();
+      } else if (ph === 2) {
+        g.fillRect(cx, cy - r, r, r * 2);
+      } else if (ph === 1) {
+        g.beginPath();
+        g.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2);
+        g.arc(cx + r * 0.55, cy, r * 1.15, Math.PI * 0.62, -Math.PI * 0.62, true);
+        g.closePath();
+        g.fill();
+      }
+      g.restore();
+      g.strokeStyle = "#8a7aa8";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.stroke();
+      // Silver cage.
+      g.strokeStyle = "#d8d0e8";
+      g.lineWidth = 1.5;
+      for (const a of [0.3, 1.2, 1.9, 2.8]) {
+        g.beginPath();
+        g.moveTo(cx + Math.cos(a) * (r + 3), cy + Math.sin(a) * (r + 3) * -1);
+        g.lineTo(cx + Math.cos(a) * (r + 3), cy + Math.sin(a) * (r + 3));
+        g.stroke();
+      }
+    });
+  }
   // The way out of a building: daylight through the doorway, and a rug in front of it.
   make("objDoormat", 96, 84, (g) => {
     g.fillStyle = O;

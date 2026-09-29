@@ -435,17 +435,22 @@ export class WorldScene extends Phaser.Scene {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 18 * s, y - 6 - Math.random() * 22 * s, Math.random() < 0.5 ? 0xdff4ff : 0x8fd3ff, 1, 3, 10, 700, 2.4);
       }
-      // Dragons breathe: fire, or (frost dragons) a blast of cold.
+      if (e.flags & EFlag.Cursed && Math.random() < delta / 120) {
+        const s = v.def.look.scale;
+        this.fx.rise(x + (Math.random() - 0.5) * 18 * s, y - 8 - Math.random() * 24 * s, Math.random() < 0.6 ? 0x2a1a44 : 0xb77af2, 1, 4, 22, 800, 2.8);
+      }
+      // Dragons breathe: fire, a blast of cold (frost dragons), or the dark itself (void dragons).
       if (v.fire) {
         const f = v.fire;
         const s = v.def.look.scale;
         const frost = v.def.look.element === "frost";
-        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : [0xffe08a, 0xff7a2a, 0xd8402c];
+        const dark = v.def.look.element === "shadow";
+        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : [0xffe08a, 0xff7a2a, 0xd8402c];
         for (let i = 0; i < Math.ceil(delta / 12); i++) {
           const spread = (Math.random() - 0.5) * 0.9;
           this.fx.sparks(f.x, f.y, f.a + spread, Math.random() < 0.4 ? palette[0] : Math.random() < 0.5 ? palette[1] : palette[2], 2, 180 + 120 * s, 0.25);
         }
-        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : 0xff9a3a, 4, 50, 3.4, 420);
+        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : 0xff9a3a, 4, 50, 3.4, 420);
         if (Math.random() < delta / 200) sfx.boom(false, f.x, f.y);
       }
       this.enemyTelegraph(id, e, v, x, y, view);
@@ -610,7 +615,7 @@ export class WorldScene extends Phaser.Scene {
 
   private updateLighting(delta: number) {
     const zone = this.me ? this.map.zoneAt(this.me.state.x, this.me.state.y) : undefined;
-    this.lighting.target = zone?.dark ? 0.8 : 0;
+    this.lighting.target = typeof zone?.dark === "number" ? zone.dark : zone?.dark ? 0.8 : 0;
     if (this.lighting.target === 0 && delta > 0) {
       this.lighting.update(this.cameras.main, [], delta);
       return;
@@ -623,8 +628,13 @@ export class WorldScene extends Phaser.Scene {
     const t0y = Math.floor((cam.y - 100) / TILE);
     const t1y = Math.ceil((cam.bottom + 100) / TILE);
     for (let ty = t0y; ty <= t1y; ty++)
-      for (let tx = t0x; tx <= t1x; tx++) if (this.map.get(tx, ty) === Tile.Crystal) lights.push({ x: tx * TILE + 16, y: ty * TILE, r: 70, color: 0x6fd0ff });
+      for (let tx = t0x; tx <= t1x; tx++) if (this.map.get(tx, ty) === Tile.Crystal) lights.push({ x: tx * TILE + 16, y: ty * TILE, r: 70, color: this.map.theme === "shadow" ? 0xd8b8ff : 0x6fd0ff });
+    for (const pr of this.map.props) {
+      if (pr.kind !== "lamp" || pr.tx < t0x - 4 || pr.tx > t1x + 4 || pr.ty < t0y - 4 || pr.ty > t1y + 4) continue;
+      lights.push({ x: pr.tx * TILE + 16, y: pr.ty * TILE - 8, r: 170, flicker: 0.4, color: 0xffc870 });
+    }
     for (const o of this.map.objects) {
+      if (o.kind === "lever" && o.name === "Moon Lantern") lights.push({ x: o.x, y: o.y - 30, r: 130, flicker: 0.2, color: 0xe0d8ff });
       if (o.kind === "campfire" || o.kind === "gate" || o.kind === "waystone") lights.push({ x: o.x, y: o.y - 20, r: o.kind === "campfire" ? 180 : 110, flicker: 0.5, color: o.kind === "campfire" ? 0xffa040 : 0xffe0a0 });
     }
     this.room.state.projectiles?.forEach((pr) => {
@@ -1272,9 +1282,11 @@ export class WorldScene extends Phaser.Scene {
       switch (h.kind) {
         case HazardKind.Glyph: {
           const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.2;
-          g.fillStyle(0xffe08a, 0.2 * pulse + 0.1);
+          // Aurelion's glyphs are golden; under the Void Queen's eclipse they are pools of moonlight.
+          const gc = this.map.theme === "shadow" ? 0xe8f0ff : 0xffe08a;
+          g.fillStyle(gc, 0.2 * pulse + 0.1);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
-          g.lineStyle(3, 0xffe08a, 0.9);
+          g.lineStyle(3, gc, 0.9);
           g.strokeEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           judgement = true;
           break;
@@ -1287,7 +1299,7 @@ export class WorldScene extends Phaser.Scene {
           break;
         default: {
           if (t > h.delay + 250) return;
-          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : 0xd8402c;
+          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : 0xd8402c;
           g.fillStyle(color, 0.08 + 0.2 * k);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.fillStyle(color, 0.35);
@@ -1307,6 +1319,12 @@ export class WorldScene extends Phaser.Scene {
             this.fx.burst(h.x, h.y - 6, 0xdff4ff, 22, 150, 2.8, 650);
             this.fx.ring(h.x, h.y, 0x8fd3ff, 6, h.radius, 380, 3);
             sfx.hit(true, h.x, h.y, true, "metal");
+          } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Void) {
+            // The rift bites: darkness erupts from the ground.
+            this.fx.burst(h.x, h.y - 6, 0x0c0814, 20, 120, 4, 700);
+            this.fx.ring(h.x, h.y, 0xb77af2, 6, h.radius, 380, 3);
+            for (let i = 0; i < 4; i++) this.skillFx.voidAt(h.x + (Math.random() - 0.5) * h.radius, h.y + (Math.random() - 0.5) * h.radius * 0.6, 0.8);
+            sfx.hit(true, h.x, h.y, true, "flesh");
           } else if (t >= h.delay && t < h.delay + 40) {
             this.fx.burst(h.x, h.y - 6, color, 24, 160, 3, 600);
             sfx.boom(h.kind === HazardKind.Meteor, h.x, h.y);
@@ -1335,6 +1353,17 @@ export class WorldScene extends Phaser.Scene {
         g2.fillStyle(0xeaf6ff, 1);
         g2.fillTriangle(x + Math.cos(pr.angle) * pr.radius * 1.6, y + Math.sin(pr.angle) * pr.radius * 1.6, x + Math.cos(pr.angle + 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle + 2.4) * pr.radius * 0.8, x + Math.cos(pr.angle - 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle - 2.4) * pr.radius * 0.8);
         if (Math.random() < 0.5) this.fx.rise(tx, ty, 0xdff4ff, 1, 3, 8, 300, 2);
+        return;
+      }
+      if (pr.kind === ProjKind.VoidOrb) {
+        const g2 = this.fx.ground;
+        g2.fillStyle(0xb77af2, 0.3);
+        g2.fillCircle(x, y, pr.radius * 1.7);
+        g2.fillStyle(0x0c0814, 1);
+        g2.fillCircle(x, y, pr.radius);
+        g2.lineStyle(2, 0xe0c8ff, 0.9);
+        g2.strokeCircle(x, y, pr.radius);
+        if (Math.random() < 0.6) this.fx.rise(tx, ty, Math.random() < 0.5 ? 0x2a1a44 : 0xb77af2, 1, 4, 10, 360, 2.6);
         return;
       }
       if (pr.kind === ProjKind.Fireball) {
@@ -1527,10 +1556,10 @@ export class WorldScene extends Phaser.Scene {
       this.hud.zone(zone);
       const mood = zone.music ?? (this.map.theme === "cave" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
-      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost" };
+      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow" };
       const theme = this.map.theme;
-      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
-      sfx.setRoom(this.map.theme === "cave" || zone.dark || zone.indoor ? "cave" : zone.safe ? "town" : "open");
+      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
+      sfx.setRoom(this.map.theme === "cave" || zone.dark === true || zone.indoor ? "cave" : zone.safe ? "town" : "open");
     }
     // Boss bar for the nearest engaged boss.
     let boss: Enemy | undefined;

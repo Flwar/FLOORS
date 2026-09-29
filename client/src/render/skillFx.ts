@@ -557,6 +557,81 @@ export class SkillFx {
         if (mine) shake(260, 0.01);
         break;
       }
+      // --- Void arts ----------------------------------------------------------------
+      case "eclipseslash":
+      case "nightblades":
+      case "umbra":
+      case "crescent":
+      case "siphon":
+      case "eclipse": {
+        const r = m.shape?.kind === "circle" ? m.shape.radius : m.shape?.kind === "arc" ? m.shape.range : 80;
+        const full = m.shape?.kind === "circle";
+        const big = m.vfx === "eclipse" || m.vfx === "umbra";
+        if (full) {
+          fx.ring(x, y - 6, 0x0c0814, 12, r, 480, big ? 12 : 8);
+          fx.ring(x, y - 6, c, 10, r * 1.15, 620, 3);
+          if (m.vfx === "eclipse") {
+            // The sun goes out: a black disc with a pale corona.
+            fx.ring(x, cy - 40, 0xf4f0ff, 18, 34, 900, 4);
+            fx.burst(x, cy - 40, 0x0c0814, 30, 60, 5, 900);
+            this.scene.cameras.main.flash(260, 20, 10, 40);
+          }
+        } else fx.trail(x, cy, a - 1.9, a + 1.9, r * 0.3, r, c, 380);
+        const n = big ? 16 : 10;
+        for (let i = 0; i < n; i++) {
+          const aa = full ? (i / n) * Math.PI * 2 : a - 1.7 + (i / (n - 1)) * 3.4;
+          const d = m.vfx === "siphon" ? r : r * 0.75;
+          this.voidAt(x + Math.cos(aa) * d, cy + Math.sin(aa) * d * 0.6, big ? 1.2 : 0.8);
+          if (m.vfx === "siphon") fx.streak(x + Math.cos(aa) * r, cy + Math.sin(aa) * r * 0.6, x, cy, c, 320, 3);
+        }
+        sfx.shoot("magic", x, y);
+        if (mine) shake(big ? 420 : 220, big ? 0.015 : 0.008);
+        break;
+      }
+      case "voidcleave":
+      case "starfall": {
+        const e = ahead(shapeLen);
+        fx.streak(x, cy, e.x, e.y, 0x0c0814, 320, m.vfx === "voidcleave" ? 18 : 12);
+        fx.streak(x, cy, e.x, e.y, c, 260, m.vfx === "voidcleave" ? 8 : 5);
+        for (let i = 1; i <= 7; i++) this.voidAt(x + (e.x - x) * (i / 7), cy + (e.y - cy) * (i / 7), 0.7);
+        if (m.vfx === "starfall") fx.star(e.x, e.y, 0xf4f0ff, 18, 520);
+        if (m.vfx === "voidcleave") for (let i = 1; i <= 6; i++) fx.crack(x + (e.x - x) * ((i - 1) / 6), y + (e.y - cy) * ((i - 1) / 6), x + (e.x - x) * (i / 6), y + (e.y - cy) * (i / 6), 0x6a3aa8, 2200, 4);
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(220, 0.009);
+        break;
+      }
+      case "nightfall":
+      case "shadewalk": {
+        const e = ahead(m.lunge || 200);
+        fx.streak(x, cy, e.x, e.y, 0x0c0814, 320, 14);
+        fx.streak(x, cy, e.x, e.y, c, 260, 4);
+        this.voidAt(x, cy, 1);
+        this.voidAt(e.x, e.y, 1);
+        break;
+      }
+      case "voidorbs":
+      case "shadowbolt":
+        fx.burst(ahead(16).x, ahead(16).y, c, 10, 80, 2.4, 380);
+        this.voidAt(ahead(16).x, ahead(16).y, 0.6);
+        break;
+      case "singularity": {
+        const off = m.shape?.kind === "circle" ? m.shape.offset : 150;
+        const r = m.shape?.kind === "circle" ? m.shape.radius : 84;
+        const e = { x: x + Math.cos(a) * off, y: y + Math.sin(a) * off * 0.8 };
+        fx.ring(e.x, e.y - 10, c, r, 6, 520, 5);
+        fx.ring(e.x, e.y - 10, 0x0c0814, r * 1.2, 4, 620, 8);
+        for (let i = 0; i < 12; i++) {
+          const aa = (i / 12) * Math.PI * 2;
+          fx.streak(e.x + Math.cos(aa) * r, e.y - 10 + Math.sin(aa) * r * 0.6, e.x, e.y - 10, c, 420, 3);
+        }
+        fx.burst(e.x, e.y - 10, 0x0c0814, 24, 40, 4, 700);
+        sfx.boom(true, e.x, e.y);
+        if (mine) shake(260, 0.01);
+        break;
+      }
+      case "voidrift":
+        // Played from the server's event, where the rift actually opens.
+        break;
       case "frost":
       case "blizzard":
       case "meteor":
@@ -588,6 +663,10 @@ export class SkillFx {
       case "rush":
         if (Math.random() < 0.7) this.fx.dust(x, y, 3, a + Math.PI);
         break;
+      case "nightfall":
+      case "shadewalk":
+        if (Math.random() < 0.8) this.fx.rise(x, y - 14, Math.random() < 0.5 ? c : 0x1a1028, 2, 10, 10, 360, 3.4);
+        break;
       case "cuts":
         if (Math.random() < 0.5) this.fx.trail(x, y - 14, a - 0.8, a + 0.8, 10, 44, Math.random() < 0.5 ? c : 0xffffff, 140);
         break;
@@ -599,6 +678,14 @@ export class SkillFx {
     const fx = this.fx;
     fx.rise(x, y, Math.random() < 0.5 ? 0xdff4ff : 0x9fd8ff, Math.ceil(4 * size), 8 * size, 30 * size, 640, 2.6 * size);
     fx.star(x, y - 6 * size, 0xffffff, 5 * size, 420);
+  }
+
+  /** A wisp of the void: dark motes and a pale spark. */
+  voidAt(x: number, y: number, size: number) {
+    const fx = this.fx;
+    fx.rise(x, y, Math.random() < 0.5 ? 0x2a1a44 : 0x0c0814, Math.ceil(4 * size), 9 * size, 34 * size, 700, 3 * size);
+    fx.rise(x, y, Math.random() < 0.5 ? 0xb77af2 : 0xd8b8ff, Math.ceil(2 * size), 6 * size, 40 * size, 520, 1.8 * size);
+    fx.star(x, y - 6 * size, 0xf0e8ff, 4 * size, 360);
   }
 
   /** A tongue of fire that leaps up and fades. */
@@ -620,6 +707,26 @@ export class SkillFx {
         fx.burst(x, y - 6, 0xdff4ff, 16, 110, 2.6, 560);
         this.frostAt(x, y - 6, 0.9);
         sfx.hit(true, x, y, true, "metal");
+        return true;
+      case "voidburst":
+        fx.burst(x, y - 6, 0xb77af2, 16, 110, 2.6, 560);
+        this.voidAt(x, y - 6, 0.9);
+        sfx.hit(true, x, y, true, "flesh");
+        return true;
+      case "cursed":
+        // A curse takes hold: a violet sigil flares over the target.
+        fx.ring(x, y - 34, 0xb77af2, 4, 16, 420, 3);
+        this.voidAt(x, y - 20, 0.6);
+        return true;
+      case "voidrift":
+        fx.ring(x, y, 0x0c0814, 10, r, 700, 10);
+        fx.ring(x, y, 0xb77af2, 6, r * 0.9, 900, 3);
+        for (let i = 0; i < 10; i++) this.voidAt(x + (Math.random() - 0.5) * r * 1.4, y + (Math.random() - 0.5) * r * 0.9, 0.9);
+        sfx.shoot("magic", x, y);
+        return true;
+      case "nightveil":
+        fx.burst(x, y - 16, 0x2a1a44, 18, 80, 3, 500);
+        fx.ring(x, y - 16, 0xd8b8ff, 6, 30, 360, 3);
         return true;
       case "fireburst":
         fx.burst(x, y - 6, 0xff9a3a, 18, 120, 3, 600);

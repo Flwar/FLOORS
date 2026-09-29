@@ -60,7 +60,8 @@ export interface Zone {
   level?: [number, number];
   /** Hidden areas are announced as discoveries. */
   secret?: boolean;
-  dark?: boolean;
+  /** Darkness: true is cave-dark (0.8), a number is how dark (twilight floors). */
+  dark?: boolean | number;
   /** Inside a building (no sky, no weather). */
   indoor?: boolean;
   music?: string;

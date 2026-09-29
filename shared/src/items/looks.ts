@@ -2,10 +2,10 @@
  * Visible equipment styles. Each armour, helm and weapon names one of these, and the
  * index is synced on the player so everyone sees what you wear.
  */
-export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave", "hide", "ringmail", "templar", "windrunner", "sunforged", "mystic", "dragonscale", "drakehide", "emberweave", "rimeplate", "furmantle", "frostweave"] as const;
+export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave", "hide", "ringmail", "templar", "windrunner", "sunforged", "mystic", "dragonscale", "drakehide", "emberweave", "rimeplate", "furmantle", "frostweave", "eclipse", "shadowsilk", "voidweave"] as const;
 export type ArmorStyle = (typeof ARMOR_STYLES)[number];
 
-export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown", "coif", "templar", "suncrown", "dragonhelm", "embercirclet", "rimecrown", "furhood"] as const;
+export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown", "coif", "templar", "suncrown", "dragonhelm", "embercirclet", "rimecrown", "furhood", "eclipsecrown", "shadowveil"] as const;
 export type HelmStyle = (typeof HELM_STYLES)[number];
 
 export const WEAPON_ARTS = [
@@ -32,6 +32,8 @@ export const WEAPON_ARTS = [
   "sword_dragon", "gs_dragon", "dg_dragon", "sp_dragon", "st_dragon",
   // Floor 4: the Frostforged set.
   "sword_rime", "gs_rime", "dg_rime", "sp_rime", "st_rime",
+  // Floor 5: the Eclipse set.
+  "sword_void", "gs_void", "dg_void", "sp_void", "st_void",
 ] as const;
 export type WeaponArtKey = (typeof WEAPON_ARTS)[number];
 

@@ -140,6 +140,8 @@ export interface EnemyData {
   burnNext?: number;
   burnDmg?: number;
   burnBy?: string;
+  /** Cursed: deals less damage and takes more until this time. */
+  curseUntil?: number;
   /** The level it spawned at; engaging a stronger player can raise it (see levelToTarget). */
   baseLevel: number;
   hpScale?: number;
@@ -175,6 +177,8 @@ interface HazardData {
   frost?: boolean;
   /** Sets what it hits burning (Meteor Storm). */
   burn?: boolean;
+  /** Curses what it hits (Void Rift). */
+  curse?: boolean;
   /** Glyphs are safe spots, not damage. */
   safe?: boolean;
   lifeUntil: number;
@@ -183,6 +187,8 @@ interface HazardData {
 export type Emit = (type: string, data: Record<string, unknown>, x: number, y: number) => void;
 
 const SAFE_RESPAWN_MS = 2500;
+/** Cursed enemies' blows land this much as hard. */
+const CURSE_DAMAGE = 0.7;
 export const RESPAWN_DELAY_MS = 9000;
 
 /**
@@ -344,7 +350,7 @@ export class Sim {
       pd.hitSeq = p.actSeq;
       pd.hitSet.clear();
     }
-    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm") return; // detonates as hazards
+    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift") return; // detonates as hazards
     const shape = m.shape!;
     const rad = aimToRad(p.actAim);
     const reach = shapeReach(shape) + 40;
@@ -371,7 +377,7 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
         pierce: pj.look === "wave",
         team: 0,
         owner: pd.sid,
@@ -435,6 +441,21 @@ export class Sim {
           const d = i === 0 ? 0 : shape.radius * (0.35 + Math.random() * 0.5);
           this.spawnHazard({ kind: HazardKind.Frost, team: 0, x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d * 0.8, radius: 46, delay: 550 + i * 160, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, frost: true });
         }
+        break;
+      }
+      case "voidrift": {
+        // Void Rift: a tear in the world where you aim that bites five times, cursing what it catches.
+        const shape = m.shape as Extract<Shape, { kind: "circle" }>;
+        let cx = p.x + Math.cos(rad) * shape.offset;
+        let cy = p.y + Math.sin(rad) * shape.offset;
+        if (!this.wallClear(p.x, p.y, cx, cy)) {
+          cx = p.x + Math.cos(rad) * shape.offset * 0.4;
+          cy = p.y + Math.sin(rad) * shape.offset * 0.4;
+        }
+        for (let i = 0; i < 5; i++) {
+          this.spawnHazard({ kind: HazardKind.Void, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, curse: true, life: 250 });
+        }
+        this.emit("fx", { k: "voidrift", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
         break;
       }
       case "frost":
@@ -578,6 +599,7 @@ export class Sim {
     }
     if (attacker && attacker.act === Act.Light && pd?.ch?.hasPerk("momentum")) dmg *= 1 + Math.min(0.25, attacker.combo * 0.05);
     if (ed.markUntil && this.now < ed.markUntil) dmg *= 1.3;
+    if (e.flags & EFlag.Cursed) dmg *= 1.1;
     if (pd && this.now < pd.empowerUntil) dmg *= 1 + pd.empower;
     if (pd?.ch) {
       if (def.boss && pd.ch.hasPerk("wyrmsbane")) dmg *= 1.15;
@@ -585,6 +607,7 @@ export class Sim {
     }
     if (pd && (m?.special === "burn" || (pd.ch?.hasPerk("emberblood") && Math.random() < 0.15))) this.ignite(ed, pd, base);
     if (m?.special === "chill" || (pd?.ch?.hasPerk("frostblood") && Math.random() < 0.2)) this.chill(ed);
+    if (m?.special === "curse" || m?.curse || (pd?.ch?.hasPerk("umbralTouch") && Math.random() < 0.2) || (dv?.effects.has("moonstone") && Math.random() < 0.125)) this.curse(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
     if (m?.special === "mark" && pd) {
       ed.markUntil = this.now + 6000;
@@ -821,6 +844,12 @@ export class Sim {
       this.emit("practice", { p: pd.sid, x, y }, x, y);
       return;
     }
+    if (pd.ch?.hasPerk("nightveil") && Math.random() < 0.1) {
+      // Nightveil: the blow passes through your shadow.
+      this.emit("evade", { p: pd.sid, x, y }, x, y);
+      this.emit("fx", { k: "nightveil", x, y, p: pd.sid }, x, y);
+      return;
+    }
     const mistimed = pd.timeline.length > 0 && pd.timeline[pd.timeline.length - 1].act === Act.Parry && p.act === Act.Parry;
     let amount = Math.max(1, Math.round((dmg * 100) / (100 + pd.defense)));
     if (this.now < pd.guardUntil) amount = Math.max(1, Math.round(amount * 0.5));
@@ -968,7 +997,7 @@ export class Sim {
   }
 
   enemyDamageMul(ed: EnemyData) {
-    return enemyDamageScale(ed.def, ed.e.level, (ed.e.flags & EFlag.Elite) !== 0);
+    return enemyDamageScale(ed.def, ed.e.level, (ed.e.flags & EFlag.Elite) !== 0) * (ed.e.flags & EFlag.Cursed ? CURSE_DAMAGE : 1);
   }
 
   /** Record an enemy attack reaching its active frames (called by the AI). */
@@ -1016,7 +1045,7 @@ export class Sim {
     this.state.projectiles.delete(id);
   }
 
-  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean }) {
+  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean }) {
     const id = this.id("h");
     const hz = new Hazard();
     hz.kind = o.kind;
@@ -1028,7 +1057,7 @@ export class Sim {
     hz.delay = o.delay;
     this.state.hazards.set(id, hz);
     this.onSpawn?.(hz, o.x, o.y);
-    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, lifeUntil: this.now + o.delay + (o.life ?? 600) });
+    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
   }
 
@@ -1054,6 +1083,14 @@ export class Sim {
     ed.e.flags |= EFlag.Chilled;
   }
 
+  /** Curse an enemy: its blows land 30% softer and it takes 10% more damage, for a few seconds. */
+  curse(ed: EnemyData, ms = 5000) {
+    const was = (ed.e.flags & EFlag.Cursed) !== 0;
+    ed.curseUntil = Math.max(ed.curseUntil ?? 0, this.now + ms);
+    ed.e.flags |= EFlag.Cursed;
+    if (!was) this.emit("fx", { k: "cursed", x: ed.e.x, y: ed.e.y, t: ed.id }, ed.e.x, ed.e.y);
+  }
+
   /** Set an enemy burning: an eighth of the blow again, every half second for four seconds. */
   ignite(ed: EnemyData, pd: PlayerData, base: number) {
     const burning = ed.burnUntil !== undefined && this.now < ed.burnUntil;
@@ -1069,6 +1106,10 @@ export class Sim {
       if (ed.markUntil && (this.now > ed.markUntil || ed.e.act === EAct.Dead)) {
         ed.markUntil = undefined;
         ed.e.flags &= ~EFlag.Marked;
+      }
+      if (ed.curseUntil && (this.now > ed.curseUntil || ed.e.act === EAct.Dead)) {
+        ed.curseUntil = undefined;
+        ed.e.flags &= ~EFlag.Cursed;
       }
       if (ed.burnUntil) {
         if (this.now > ed.burnUntil || ed.e.act === EAct.Dead) {
@@ -1127,6 +1168,10 @@ export class Sim {
           this.chill(ed);
           this.emit("fx", { k: "iceburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
         }
+        if (pj.special === "curse" && ed.e.act !== EAct.Dead) {
+          this.curse(ed);
+          this.emit("fx", { k: "voidburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
+        }
         if (!pj.pierce) {
           this.removeProjectile(pj.id);
           break;
@@ -1147,6 +1192,7 @@ export class Sim {
           this.damageEnemy(ed, pd, hz.damage / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
           if (hz.burn && pd && ed.e.act !== EAct.Dead) this.ignite(ed, pd, hz.damage / (pd.atkMul || 1));
           if (hz.frost && ed.e.act !== EAct.Dead) this.chill(ed);
+          if (hz.curse && ed.e.act !== EAct.Dead) this.curse(ed);
         }
       }
       if (this.now > hz.lifeUntil) {

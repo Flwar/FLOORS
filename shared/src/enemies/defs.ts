@@ -491,6 +491,8 @@ export const EFlag = {
   Marked: 128,
   /** Burning (dragonfire skills, Emberblood). */
   Burning: 256,
+  /** Cursed (void skills, Umbral Touch): deals 30% less damage, takes 10% more. */
+  Cursed: 512,
 } as const;
 
 /** Tick timeline of an enemy attack. */

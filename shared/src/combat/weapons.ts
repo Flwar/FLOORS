@@ -20,7 +20,7 @@ export interface MoveDef {
   poise: number;
   knockback: number;
   shape?: Shape;
-  projectile?: { count: number; spread: number; speed: number; range: number; radius: number; look?: "wave" | "javelin" | "knife" | "fire" | "ice" };
+  projectile?: { count: number; spread: number; speed: number; range: number; radius: number; look?: "wave" | "javelin" | "knife" | "fire" | "ice" | "void" };
   /** Forward travel (px) spread over the startup + active ticks. */
   lunge: number;
   stamina: number;
@@ -34,7 +34,9 @@ export interface MoveDef {
   impact: number;
   cooldown?: number;
   /** Special behaviour hook for skills. */
-  special?: "counterStance" | "warcry" | "frost" | "meteor" | "shadowstep" | "vault" | "rally" | "ironskin" | "venom" | "bloodlust" | "drain" | "mark" | "burn" | "meteors" | "storm" | "phoenix" | "empower" | "chill" | "hailstorm";
+  special?: "counterStance" | "warcry" | "frost" | "meteor" | "shadowstep" | "vault" | "rally" | "ironskin" | "venom" | "bloodlust" | "drain" | "mark" | "burn" | "meteors" | "storm" | "phoenix" | "empower" | "chill" | "hailstorm" | "curse" | "voidrift";
+  /** Curses what it hits, whatever else it does: cursed enemies deal 30% less damage and take 10% more. */
+  curse?: boolean;
   /** Empower: the damage bonus it grants (0.15 = +15%). */
   power?: number;
   /** Damage multiplier against staggered enemies. */
@@ -140,6 +142,9 @@ const SWORD: WeaponDef = {
     // Floor 4: the arts of the Frostvale.
     move({ id: "sword.glacial", name: "Glacial Cleave", anim: "heavySlash", startup: 16, active: 6, recovery: 22, damage: 42, poise: 70, lunge: 18, stamina: 22, knockback: 170, hitstop: 110, impact: 0.7, cooldown: 660, superArmor: true, special: "chill", shape: { kind: "arc", range: 84, arc: deg(200) }, desc: "A wide cut trailing frost: everything it touches is chilled — slower to move and to strike.", vfx: "glacial", color: 0x9fd8ff }),
     move({ id: "sword.verdict", name: "Winter's Verdict", anim: "thrust", startup: 18, active: 6, recovery: 24, damage: 58, poise: 90, lunge: 50, stamina: 26, knockback: 200, hitstop: 150, impact: 0.9, cooldown: 1080, superArmor: true, vsStagger: 1.7, special: "chill", shape: { kind: "line", length: 180, width: 26 }, desc: "A thrust of blue steel that freezes the air along its length. Devastating against the staggered.", vfx: "verdict", color: 0xdff4ff }),
+    // Floor 5: the Umbral Wilds.
+    move({ id: "sword.eclipse", name: "Eclipse Slash", anim: "heavySlash", startup: 14, active: 6, recovery: 20, damage: 46, poise: 70, lunge: 20, stamina: 22, knockback: 170, hitstop: 110, impact: 0.7, cooldown: 660, superArmor: true, curse: true, shape: { kind: "arc", range: 90, arc: deg(220) }, desc: "A black crescent cut with a pale edge. Everything it touches is cursed: its blows land 30% softer.", vfx: "eclipseslash", color: 0xb77af2 }),
+    move({ id: "sword.nightfall", name: "Nightfall", anim: "vanish", startup: 3, active: 12, recovery: 14, damage: 44, poise: 60, lunge: 200, stamina: 24, knockback: 150, hitstop: 130, impact: 0.8, cooldown: 900, iframes: [0, 16], special: "shadowstep", vsStagger: 1.8, curse: true, shape: { kind: "line", length: 44, width: 34 }, desc: "Step into the dark and out of it far ahead, untouchable, cutting and cursing all you pass. Brutal against the staggered.", vfx: "nightfall", color: 0x8a5ad8 }),
   ],
   parry: { window: 14, perfect: 6, recovery: 20, stamina: 8 },
   dodge: { distance: 96, ticks: 16, iStart: 2, iEnd: 12, recovery: 6, stamina: 20, attackFrom: 12 },
@@ -177,6 +182,8 @@ const GREATSWORD: WeaponDef = {
     // Floor 4: the arts of the Frostvale.
     move({ id: "gs.avalanche", name: "Avalanche Smash", anim: "overhead", startup: 24, active: 6, recovery: 28, damage: 56, poise: 120, lunge: 12, stamina: 28, knockback: 240, hitstop: 150, impact: 1, cooldown: 900, superArmor: true, special: "chill", shape: { kind: "circle", radius: 92, offset: 0 }, desc: "Bring the mountain's snow down around you: everything nearby is struck and chilled.", vfx: "avalanche", color: 0xbfe6ff }),
     move({ id: "gs.shatter", name: "Glacier Breaker", anim: "overhead", startup: 22, active: 6, recovery: 26, damage: 60, poise: 110, lunge: 10, stamina: 26, knockback: 200, hitstop: 140, impact: 0.9, cooldown: 1080, superArmor: true, special: "chill", shape: { kind: "line", length: 210, width: 44 }, desc: "Split the ice in a long line ahead of you: everything along the crack is struck and chilled.", vfx: "shatter", color: 0x8fd3ff }),
+    move({ id: "gs.umbra", name: "Umbral Cataclysm", anim: "overhead", startup: 24, active: 6, recovery: 28, damage: 62, poise: 120, lunge: 12, stamina: 28, knockback: 240, hitstop: 160, impact: 1, cooldown: 960, superArmor: true, curse: true, shape: { kind: "circle", radius: 100, offset: 0 }, desc: "Drive the blade into the ground and let the dark pour out: everything nearby is struck and cursed.", vfx: "umbra", color: 0x9a6ae0 }),
+    move({ id: "gs.voidcleave", name: "Void Cleaver", anim: "heavySlash", startup: 20, active: 6, recovery: 26, damage: 66, poise: 110, lunge: 16, stamina: 28, knockback: 210, hitstop: 150, impact: 0.9, cooldown: 1080, superArmor: true, curse: true, shape: { kind: "line", length: 220, width: 48 }, desc: "A cut so heavy it tears the world open along its length: everything in the tear is struck and cursed.", vfx: "voidcleave", color: 0xc49aff }),
   ],
   parry: { window: 11, perfect: 5, recovery: 26, stamina: 12 },
   dodge: { distance: 84, ticks: 18, iStart: 2, iEnd: 11, recovery: 8, stamina: 24, attackFrom: 14 },
@@ -216,6 +223,8 @@ const DAGGERS: WeaponDef = {
     // Floor 4: the arts of the Frostvale.
     move({ id: "dg.frostfang", name: "Frostfang Flurry", anim: "twin", startup: 5, active: 14, recovery: 12, damage: 22, poise: 20, lunge: 20, stamina: 18, knockback: 70, hitstop: 50, impact: 0.3, cooldown: 540, iframes: [0, 10], special: "chill", shape: { kind: "arc", range: 50, arc: deg(250) }, desc: "A blur of frozen blades all around you, untouchable for a moment. Everything cut is chilled.", vfx: "frostfang", color: 0xbfe6ff }),
     move({ id: "dg.shiver", name: "Shiver Step", anim: "vanish", startup: 3, active: 12, recovery: 12, damage: 36, poise: 30, lunge: 190, stamina: 20, knockback: 90, hitstop: 100, impact: 0.6, cooldown: 780, iframes: [0, 16], vsStagger: 1.6, special: "chill", shape: { kind: "line", length: 40, width: 32 }, desc: "Become a gust of snow: dart far ahead, untouchable, and leave your target chilled.", vfx: "shiver", color: 0x9fb8ff }),
+    move({ id: "dg.nightblades", name: "Night Blades", anim: "twin", startup: 5, active: 14, recovery: 12, damage: 25, poise: 22, lunge: 20, stamina: 18, knockback: 70, hitstop: 50, impact: 0.35, cooldown: 540, iframes: [0, 10], curse: true, shape: { kind: "arc", range: 54, arc: deg(260) }, desc: "Blades of shadow all around you, untouchable for a moment. Everything cut is cursed.", vfx: "nightblades", color: 0xb77af2 }),
+    move({ id: "dg.shadewalk", name: "Shade Walk", anim: "vanish", startup: 3, active: 12, recovery: 12, damage: 40, poise: 34, lunge: 210, stamina: 20, knockback: 90, hitstop: 110, impact: 0.6, cooldown: 780, iframes: [0, 16], special: "shadowstep", vsStagger: 1.8, curse: true, shape: { kind: "line", length: 40, width: 32 }, desc: "Walk through the world the way the shades do: dart far ahead, untouchable, and leave a curse behind.", vfx: "shadewalk", color: 0x7a4ad1 }),
   ],
   parry: { window: 12, perfect: 6, recovery: 16, stamina: 6 },
   dodge: { distance: 108, ticks: 14, iStart: 1, iEnd: 11, recovery: 4, stamina: 15, attackFrom: 10 },
@@ -253,6 +262,8 @@ const SPEAR: WeaponDef = {
     // Floor 4: the arts of the Frostvale.
     move({ id: "sp.icicle", name: "Icicle Lance", anim: "thrust", startup: 12, active: 5, recovery: 20, damage: 44, poise: 60, lunge: 30, stamina: 22, knockback: 170, hitstop: 120, impact: 0.7, cooldown: 720, special: "chill", shape: { kind: "line", length: 190, width: 22 }, desc: "A thrust that grows a spear of ice through a whole line of enemies, chilling them.", vfx: "icicle", color: 0xdff4ff }),
     move({ id: "sp.hailspin", name: "Hailstorm Spin", anim: "spin", startup: 8, active: 14, recovery: 18, damage: 34, poise: 50, stamina: 22, knockback: 180, hitstop: 80, impact: 0.6, cooldown: 780, iframes: [0, 12], superArmor: true, special: "chill", shape: { kind: "circle", radius: 88, offset: 0 }, desc: "Whirl the spear through a storm of hail: everything around you is struck and chilled.", vfx: "hailspin", color: 0xbfe6ff }),
+    move({ id: "sp.starfall", name: "Starfall Lance", anim: "thrust", startup: 12, active: 5, recovery: 20, damage: 48, poise: 64, lunge: 34, stamina: 22, knockback: 180, hitstop: 120, impact: 0.7, cooldown: 720, curse: true, shape: { kind: "line", length: 200, width: 24 }, desc: "A thrust that trails a falling star through a whole line of enemies, cursing them.", vfx: "starfall", color: 0xe0c8ff }),
+    move({ id: "sp.crescent", name: "Crescent Moon", anim: "spin", startup: 8, active: 14, recovery: 18, damage: 38, poise: 52, stamina: 22, knockback: 180, hitstop: 90, impact: 0.6, cooldown: 780, iframes: [0, 12], superArmor: true, curse: true, shape: { kind: "circle", radius: 92, offset: 0 }, desc: "Sweep the spear in a full pale circle, like the moon's own edge: everything around you is struck and cursed.", vfx: "crescent", color: 0xd8b8ff }),
   ],
   parry: { window: 13, perfect: 5, recovery: 20, stamina: 8 },
   dodge: { distance: 96, ticks: 16, iStart: 2, iEnd: 12, recovery: 6, stamina: 20, attackFrom: 12 },
@@ -290,6 +301,8 @@ const STAFF: WeaponDef = {
     // Floor 4: the arts of the Frostvale.
     move({ id: "st.shards", name: "Ice Shard Volley", anim: "cast", startup: 10, active: 1, recovery: 18, damage: 15, poise: 16, stamina: 20, knockback: 60, hitstop: 50, impact: 0.2, cooldown: 600, special: "chill", projectile: { count: 5, spread: 0.6, speed: 480, range: 300, radius: 8, look: "ice" }, desc: "Five shards of ice in a fan. Whatever they hit is chilled.", vfx: "iceshards", color: 0x9fd8ff }),
     move({ id: "st.spike", name: "Glacial Spike", anim: "cast", startup: 18, active: 4, recovery: 22, damage: 52, poise: 90, stamina: 26, knockback: 220, hitstop: 120, impact: 0.9, cooldown: 900, special: "chill", shape: { kind: "circle", radius: 64, offset: 140 }, desc: "A spire of ice bursts from the ground where you aim, chilling everything around it.", vfx: "glacialspike", color: 0xdff4ff }),
+    move({ id: "st.voidorbs", name: "Void Orbs", anim: "cast", startup: 10, active: 1, recovery: 18, damage: 19, poise: 18, stamina: 20, knockback: 70, hitstop: 60, impact: 0.25, cooldown: 600, special: "curse", projectile: { count: 3, spread: 0.45, speed: 420, range: 320, radius: 10, look: "void" }, desc: "Three orbs of nothing in a fan. Whatever they touch is cursed.", vfx: "voidorbs", color: 0xb77af2 }),
+    move({ id: "st.singularity", name: "Singularity", anim: "cast", startup: 18, active: 4, recovery: 22, damage: 58, poise: 110, stamina: 26, knockback: -110, hitstop: 130, impact: 0.9, cooldown: 960, curse: true, shape: { kind: "circle", radius: 84, offset: 150 }, desc: "Collapse the air where you aim into a point of darkness: everything around it is dragged in, struck and cursed.", vfx: "singularity", color: 0x9a6ae0 }),
   ],
   parry: { window: 12, perfect: 5, recovery: 22, stamina: 8 },
   dodge: { distance: 112, ticks: 10, iStart: 0, iEnd: 9, recovery: 8, stamina: 22, attackFrom: 10 },
@@ -332,6 +345,11 @@ export const UNIVERSAL_SKILLS: MoveDef[] = [
   move({ id: "any.prison", name: "Glacial Prison", anim: "thrust", startup: 10, active: 5, recovery: 16, damage: 20, poise: 220, lunge: 24, stamina: 18, knockback: 20, hitstop: 120, impact: 0.6, cooldown: 1080, special: "chill", shape: { kind: "line", length: 60, width: 40 }, desc: "Encase a foe in ice: it staggers, and stays chilled long after.", vfx: "prison", color: 0x8fd3ff }),
   move({ id: "any.hailstorm", name: "Hailstorm", anim: "cast", startup: 22, active: 4, recovery: 24, damage: 30, poise: 50, stamina: 30, knockback: 150, hitstop: 100, impact: 0.8, cooldown: 1500, special: "hailstorm", shape: { kind: "circle", radius: 110, offset: 150 }, desc: "Call the Frostvale's sky down where you aim: six blasts of hail, each chilling what it strikes.", vfx: "hailstorm", color: 0xdff4ff }),
   move({ id: "any.absolutezero", name: "Absolute Zero", anim: "nova", startup: 20, active: 6, recovery: 26, damage: 70, poise: 240, stamina: 32, knockback: 260, hitstop: 170, impact: 1, cooldown: 1800, superArmor: true, special: "chill", shape: { kind: "circle", radius: 150, offset: 0 }, desc: "The Winter King's last word: the air itself freezes around you, staggering and chilling everything nearby.", vfx: "absolutezero", color: 0xeaf6ff }),
+  // Floor 5: the Umbral Wilds' own.
+  move({ id: "any.shadowbolt", name: "Shadow Bolt", anim: "cast", startup: 10, active: 1, recovery: 14, damage: 26, poise: 24, stamina: 14, knockback: 90, hitstop: 60, impact: 0.3, cooldown: 420, special: "curse", projectile: { count: 1, spread: 0, speed: 520, range: 340, radius: 10, look: "void" }, desc: "A bolt of living shadow, the voidcallers' first lesson: it curses what it hits.", vfx: "shadowbolt", color: 0xb77af2 }),
+  move({ id: "any.siphon", name: "Soul Siphon", anim: "nova", startup: 12, active: 4, recovery: 18, damage: 28, poise: 30, stamina: 18, knockback: -80, hitstop: 70, impact: 0.4, cooldown: 900, special: "drain", curse: true, shape: { kind: "circle", radius: 96, offset: 0 }, desc: "Pull the souls of everything nearby toward you: it is cursed, and you heal for 40% of the damage dealt.", vfx: "siphon", color: 0xc070ff }),
+  move({ id: "any.voidrift", name: "Void Rift", anim: "cast", startup: 18, active: 4, recovery: 22, damage: 24, poise: 40, stamina: 26, knockback: 40, hitstop: 70, impact: 0.5, cooldown: 1320, special: "voidrift", shape: { kind: "circle", radius: 78, offset: 150 }, desc: "Tear the world open where you aim: the rift bites five times, cursing everything caught in it.", vfx: "voidrift", color: 0x9a6ae0 }),
+  move({ id: "any.eclipse", name: "Eclipse", anim: "nova", startup: 20, active: 6, recovery: 26, damage: 74, poise: 240, stamina: 32, knockback: 260, hitstop: 170, impact: 1, cooldown: 1800, superArmor: true, special: "empower", power: 0.2, curse: true, shape: { kind: "circle", radius: 160, offset: 0 }, desc: "The Void Queen's last light: the sun goes out around you. Everything nearby is struck and cursed, and your blows land 20% harder for 6 seconds.", vfx: "eclipse", color: 0xe0c8ff }),
 ];
 /** Loadout index of the first universal skill (weapon skills sit below it). */
 export const UNIVERSAL_BASE = 64;

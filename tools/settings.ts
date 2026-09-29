@@ -17,7 +17,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true, args:
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
 // SERVER=ws://host:port points the page at another game server (the dev page defaults to :2567).
-const url = `http://localhost:5173/?guest=${guest}${process.env.SERVER ? `&server=${encodeURIComponent(process.env.SERVER)}` : ""}`;
+const url = `${process.env.CLIENT ?? "http://localhost:5173"}/?guest=${guest}${process.env.SERVER ? `&server=${encodeURIComponent(process.env.SERVER)}` : ""}`;
 const ready = () => page.waitForFunction(() => (window as any).__floors?.debug?.me, null, { timeout: 20000 });
 const S = (expr: string) => page.evaluate(`window.__floors.debug.settings.value.${expr}`);
 

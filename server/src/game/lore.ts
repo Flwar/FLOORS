@@ -34,4 +34,13 @@ export const RUMOURS: Record<number, string[]> = {
     "Halla at the Runeforge can carve the cold into steel. Bring her rime shards and pelts.",
     "The Winter King says every fire goes out. He's been saying it for three hundred years. Someone should make him stop.",
   ],
+  5: [
+    "Shades flicker out of reach and back again. Wait for them to come to you — then don't let them leave.",
+    "A cursed thing hits softer and bleeds easier. The Archivist in the Chapel can teach you how to do it to them.",
+    "There's a way past the willows at the north end of the Weeping Marsh. The Moonwell is still there, if you believe the old songs.",
+    "Nightwing breathes the dark itself. If you stand in it, you won't see the tail coming.",
+    "In the Hall of Moons, every lantern drags its neighbour round. Start from the west and work your way east.",
+    "Mira at the Moonforge says a void heart weighs nothing and pulls at everything. She keeps hers in a lead box.",
+    "When the Queen puts the sun out, find the moonlight. It's the only thing in the Sanctum she can't touch.",
+  ],
 };

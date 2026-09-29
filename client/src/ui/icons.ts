@@ -174,6 +174,126 @@ export function itemIcon(key: string, rarity = 0): string {
       }
       break;
     }
+    // --- Floor 5: the Umbral Wilds ---------------------------------------------------
+    case "mat_umbralshard": {
+      // A splinter of night: a black shard with a violet edge.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(34, 4); g.lineTo(48, 26); g.lineTo(38, 60); g.lineTo(20, 52); g.lineTo(18, 22);
+      g.closePath();
+      g.fill();
+      const ug = g.createLinearGradient(18, 6, 48, 58);
+      ug.addColorStop(0, "#b77af2");
+      ug.addColorStop(0.4, "#2a1a44");
+      ug.addColorStop(1, "#0c0814");
+      g.fillStyle = ug;
+      g.beginPath();
+      g.moveTo(34, 9); g.lineTo(44, 26); g.lineTo(36, 56); g.lineTo(23, 50); g.lineTo(22, 24);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "rgba(224,200,255,0.9)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(34, 12); g.lineTo(42, 27);
+      g.stroke();
+      break;
+    }
+    case "mat_shadowsilk": {
+      // A spool of thread spun from shadow.
+      g.fillStyle = outline;
+      g.fillRect(14, 10, 36, 8);
+      g.fillRect(14, 46, 36, 8);
+      g.fillRect(18, 16, 28, 32);
+      g.fillStyle = "#6a5a4a";
+      g.fillRect(16, 12, 32, 4);
+      g.fillRect(16, 48, 32, 4);
+      const sg = g.createLinearGradient(20, 0, 44, 0);
+      sg.addColorStop(0, "#3a2e54");
+      sg.addColorStop(0.5, "#6a5a9a");
+      sg.addColorStop(1, "#1e1830");
+      g.fillStyle = sg;
+      g.fillRect(20, 17, 24, 30);
+      g.strokeStyle = "rgba(216,184,255,0.55)";
+      g.lineWidth = 1.2;
+      for (let y = 20; y < 46; y += 4) {
+        g.beginPath();
+        g.moveTo(20, y); g.lineTo(44, y + 2);
+        g.stroke();
+      }
+      break;
+    }
+    case "mat_voidheart":
+    case "art_eclipse": {
+      const halo = g.createRadialGradient(32, 32, 4, 32, 32, 30);
+      halo.addColorStop(0, key === "art_eclipse" ? "rgba(255,255,255,0.95)" : "rgba(183,122,242,0.8)");
+      halo.addColorStop(1, "rgba(120,80,200,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      if (key === "art_eclipse") {
+        // A sliver of the eclipse: a black disc wearing a white corona.
+        g.fillStyle = outline;
+        g.beginPath();
+        g.arc(32, 32, 19, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#06040a";
+        g.beginPath();
+        g.arc(32, 32, 16, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = "#f4f0ff";
+        g.lineWidth = 2;
+        for (let i = 0; i < 12; i++) {
+          const an = (i / 12) * Math.PI * 2;
+          g.beginPath();
+          g.moveTo(32 + Math.cos(an) * 20, 32 + Math.sin(an) * 20);
+          g.lineTo(32 + Math.cos(an) * (25 + (i % 2) * 4), 32 + Math.sin(an) * (25 + (i % 2) * 4));
+          g.stroke();
+        }
+      } else {
+        // A hole in the world the size of a fist.
+        g.fillStyle = outline;
+        g.beginPath();
+        g.moveTo(32, 54);
+        g.bezierCurveTo(8, 38, 12, 14, 26, 16);
+        g.quadraticCurveTo(32, 18, 32, 24);
+        g.quadraticCurveTo(32, 18, 38, 16);
+        g.bezierCurveTo(52, 14, 56, 38, 32, 54);
+        g.fill();
+        const hg = g.createRadialGradient(32, 32, 2, 32, 34, 22);
+        hg.addColorStop(0, "#000000");
+        hg.addColorStop(0.6, "#1a0e2e");
+        hg.addColorStop(1, "#b77af2");
+        g.fillStyle = hg;
+        g.beginPath();
+        g.moveTo(32, 50);
+        g.bezierCurveTo(12, 36, 15, 18, 26, 19);
+        g.quadraticCurveTo(31, 21, 32, 27);
+        g.quadraticCurveTo(33, 21, 38, 19);
+        g.bezierCurveTo(49, 18, 52, 36, 32, 50);
+        g.fill();
+      }
+      break;
+    }
+    case "key_sanctum": {
+      // The Moon Sigil: a silver disc holding a crescent.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 32, 22, 0, Math.PI * 2);
+      g.fill();
+      const mg = g.createRadialGradient(26, 24, 2, 32, 32, 20);
+      mg.addColorStop(0, "#ffffff");
+      mg.addColorStop(1, "#9a90b0");
+      g.fillStyle = mg;
+      g.beginPath();
+      g.arc(32, 32, 19, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#2a1a44";
+      g.beginPath();
+      g.arc(32, 32, 12, Math.PI * 0.3, Math.PI * 1.7, false);
+      g.arc(38, 32, 9.4, Math.PI * 1.62, Math.PI * 0.38, true);
+      g.closePath();
+      g.fill();
+      break;
+    }
     case "mat_cinder": {
       // A lump of black stone, glowing through its cracks.
       g.fillStyle = outline;

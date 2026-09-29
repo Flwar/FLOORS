@@ -1,7 +1,7 @@
 import { WEAPONS, type WeaponKey } from "./combat/weapons.ts";
 import { Mod } from "./sim/player.ts";
 
-export const MAX_LEVEL = 20;
+export const MAX_LEVEL = 24;
 /** XP needed to go from `level` to `level + 1`. */
 export const xpToNext = (level: number) => Math.round(85 * Math.pow(level, 1.55));
 export const baseHp = (level: number) => 100 + (level - 1) * 10;
@@ -71,6 +71,13 @@ export const PERK_CHOICES: { level: number; options: [PerkDef, PerkDef] }[] = [
     options: [
       { id: "frostblood", name: "Frostblood", desc: "Your blows have a 20% chance to chill enemies: slower to move and to strike." },
       { id: "glacialHide", name: "Glacial Hide", desc: "+25 defense and +8% maximum health." },
+    ],
+  },
+  {
+    level: 21,
+    options: [
+      { id: "umbralTouch", name: "Umbral Touch", desc: "Your blows have a 20% chance to curse enemies: they deal 30% less damage and take 10% more." },
+      { id: "nightveil", name: "Nightveil", desc: "One blow in ten passes through you like shadow, doing no harm." },
     ],
   },
 ];

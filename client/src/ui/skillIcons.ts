@@ -525,6 +525,92 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
       fillInk(g, "#eaf6ff", 2);
     }
   },
+  // --- Void arts ------------------------------------------------------------------------
+  eclipseslash: (g, c) => {
+    GLYPH.sunder(g, c);
+    moonMark(g, 44, 18, 9, "#f4f0ff");
+  },
+  nightfall: (g, c) => {
+    GLYPH.phantom(g, c);
+    moonMark(g, 48, 44, 8, "#f4f0ff");
+  },
+  umbra: (g, c) => {
+    GLYPH.quake(g, c);
+    voidOrb(g, 32, 20, 8, c);
+  },
+  voidcleave: (g, c) => {
+    GLYPH.fissure(g, c);
+    voidOrb(g, 48, 18, 7, c);
+  },
+  nightblades: (g, c) => {
+    GLYPH.cuts(g, c);
+    voidOrb(g, 32, 32, 7, c);
+  },
+  shadewalk: (g, c) => {
+    GLYPH.phantom(g, c);
+    voidOrb(g, 48, 44, 7, c);
+  },
+  starfall: (g, c) => {
+    GLYPH.pierce(g, c);
+    star(g, 46, 18, 9, 5, 0.45);
+    fillInk(g, "#f4f0ff", 2.5);
+  },
+  crescent: (g, c) => {
+    moonMark(g, 32, 32, 24, c);
+    moonMark(g, 32, 32, 12, "#f4f0ff");
+  },
+  voidorbs: (g, c) => {
+    for (const [x, y] of [[20, 44], [32, 28], [46, 42]] as const) voidOrb(g, x, y, 8, c);
+  },
+  singularity: (g, c) => {
+    for (let i = 0; i < 3; i++) {
+      g.beginPath();
+      g.arc(32, 32, 24 - i * 7, i, i + Math.PI * 1.4);
+      ink(g, i ? c : "#f4f0ff", 2.5);
+    }
+    voidOrb(g, 32, 32, 7, c);
+  },
+  shadowbolt: (g, c) => {
+    g.beginPath();
+    g.moveTo(8, 56);
+    g.lineTo(36, 28);
+    ink(g, c, 5);
+    voidOrb(g, 42, 22, 11, c);
+  },
+  siphon: (g, c) => {
+    for (const [x, y] of [[12, 14], [52, 14], [12, 50], [52, 50]] as const) {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(32 + (x - 32) * 0.35, 32 + (y - 32) * 0.35);
+      ink(g, "#f4f0ff", 2.5);
+    }
+    voidOrb(g, 32, 32, 10, c);
+  },
+  voidrift: (g, c) => {
+    g.beginPath();
+    g.ellipse(32, 40, 24, 11, 0, 0, Math.PI * 2);
+    fillInk(g, "#0c0814", 3);
+    g.beginPath();
+    g.ellipse(32, 40, 24, 11, 0, 0, Math.PI * 2);
+    ink(g, c, 2.5);
+    for (const [x, h] of [[22, 20], [32, 28], [42, 18]] as const) {
+      g.beginPath();
+      g.moveTo(x, 40);
+      g.lineTo(x + 2, 40 - h);
+      ink(g, c, 3);
+    }
+  },
+  eclipse: (g, c) => {
+    g.beginPath();
+    g.arc(32, 32, 24, 0, Math.PI * 2);
+    const gr = g.createRadialGradient(32, 32, 14, 32, 32, 26);
+    gr.addColorStop(0, "#ffffff");
+    gr.addColorStop(1, c);
+    fillInk(g, gr, 3);
+    g.beginPath();
+    g.arc(32, 32, 17, 0, Math.PI * 2);
+    fillInk(g, "#0c0814", 2);
+  },
   absolutezero: (g, c) => {
     flake(g, 32, 32, 24, c);
     flake(g, 32, 32, 12, "#ffffff");
@@ -1108,6 +1194,26 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
   },
 };
 
+/** A crescent moon, opening to the right. */
+function moonMark(g: G, x: number, y: number, r: number, color: string) {
+  g.beginPath();
+  g.arc(x, y, r, Math.PI * 0.3, Math.PI * 1.7, false);
+  g.arc(x + r * 0.5, y, r * 0.78, Math.PI * 1.62, Math.PI * 0.38, true);
+  g.closePath();
+  fillInk(g, color, 2.5);
+}
+
+/** An orb of the void: black, with a violet rim. */
+function voidOrb(g: G, x: number, y: number, r: number, color: string) {
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  const gr = g.createRadialGradient(x, y, 1, x, y, r);
+  gr.addColorStop(0, "#000000");
+  gr.addColorStop(0.65, "#1a0e2e");
+  gr.addColorStop(1, color);
+  fillInk(g, gr, 2.5);
+}
+
 /** Paint a skill icon (by vfx key and colour) into a 64×64 design space. */
 export function drawSkillIcon(g: G, vfx: string, color: number) {
   const c = hex(color);
@@ -1140,6 +1246,7 @@ export function drawSkillIcon(g: G, vfx: string, color: number) {
 const PASSIVE_COLOR: Record<string, number> = {
   fleetfoot: 0x8fe0c0, deepLungs: 0x9fd3ff, secondWind: 0x9fe08a, ironSkin: 0xc9d3dd, wardensGrace: 0xffe08a, riposteMaster: 0xffc27a, keenEye: 0xdfe8ff,
   executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b, frostblood: 0x8fd3ff, glacialHide: 0xdfeaf4,
+  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a,
 };
 
 /** A passive skill's icon (shield and star in its colour). */

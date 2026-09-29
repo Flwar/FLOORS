@@ -31,6 +31,8 @@ const SKY_WAYSTONES = ["ws:ws-landing", "ws:ws-terraces", "ws:ws-gardens", "ws:w
 const EMBER_CHESTS = ["chest:hoard-chest", "chest:canyon-chest", "chest:wastes-chest"];
 const EMBER_WAYSTONES = ["ws:ws-emberhold", "ws:ws-slopes", "ws:ws-canyon", "ws:ws-wastes", "ws:ws-caldera"];
 const FROST_CHESTS = ["chest:cache-chest", "chest:lake-chest", "chest:pine-chest"];
+const UMBRAL_CHESTS = ["chest:moonwell-chest", "chest:marsh-chest", "chest:crater-chest"];
+const UMBRAL_WAYSTONES = ["ws:ws-duskhollow", "ws:ws-gloaming", "ws:ws-marsh", "ws:ws-moon", "ws:ws-spires"];
 const FROST_WAYSTONES = ["ws:ws-rimeholt", "ws:ws-snowfields", "ws:ws-lake", "ws:ws-pinewood", "ws:ws-peak"];
 const has = (c: AchievementContext, list: string[]) => list.every((k) => c.discovered.includes(k));
 
@@ -72,6 +74,15 @@ const DEFS: Def[] = [
   { id: "giant", name: "Giantfeller", desc: "Defeat Jarnhild the Frost Giant.", test: (c) => c.bossKills.includes("jarnhild") },
   { id: "winter-breaks", name: "Winter Breaks", desc: "Defeat Hrimthar, the Winter King.", test: (c) => c.bossKills.includes("hrimthar") },
   { id: "veteran", name: "Veteran", desc: "Reach level 16.", test: (c) => c.level >= 16 },
+  // Floor 5
+  { id: "umbral", name: "Into the Dark", desc: "Set foot on Floor 5.", test: (c) => c.discovered.includes("zone:umbral-wilds") },
+  { id: "moonwell", name: "Moonlight Remembered", desc: "Find the Moonwell on Floor 5.", test: (c) => c.discovered.includes("zone:moonwell") },
+  { id: "umbral-treasure", name: "Plunder in the Dark", desc: "Open every chest on Floor 5.", test: (c) => has(c, UMBRAL_CHESTS) },
+  { id: "umbral-roads", name: "Lantern Roads", desc: "Attune every waystone on Floor 5.", test: (c) => has(c, UMBRAL_WAYSTONES) },
+  { id: "void-wyrm", name: "Wyrm of the Void", desc: "Defeat Nightwing, the Void Wyrm.", test: (c) => c.bossKills.includes("nightwing") },
+  { id: "hollow-knight", name: "Hollowed Out", desc: "Defeat Maelgrim, the Hollow Knight.", test: (c) => c.bossKills.includes("maelgrim") },
+  { id: "dawn-returns", name: "The Dawn Returns", desc: "Defeat Nyxara, Queen of the Void.", test: (c) => c.bossKills.includes("nyxara") },
+  { id: "champion", name: "Champion of the Tower", desc: "Reach level 24.", test: (c) => c.level >= 24 },
   { id: "master-of-arms", name: "Master of Arms", desc: "Reach mastery 10 with a weapon.", test: (c) => c.maxMastery >= 10 },
   { id: "seasoned", name: "Seasoned", desc: "Reach level 8.", test: (c) => c.level >= 8 },
   { id: "hoarder", name: "Deep Pockets", desc: "Carry 1,000 gold.", test: (c) => c.gold >= 1000 },

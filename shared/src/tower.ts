@@ -7,6 +7,8 @@ import { buildFloor3 } from "./world/floor3.ts";
 import { buildRoost } from "./world/roost.ts";
 import { buildFloor4 } from "./world/floor4.ts";
 import { buildGlacier } from "./world/glacier.ts";
+import { buildFloor5 } from "./world/floor5.ts";
+import { buildSanctum } from "./world/sanctum.ts";
 
 /**
  * The tower: every floor, its boss dungeon, and how they connect. Rooms, travel, level caps,
@@ -84,6 +86,14 @@ export const TOWER: FloorDef[] = [
     uncharted: { title: "The Glacier Throne has no map", text: "Its halls shift as the ice moves. Climb toward the cold at its heart." },
     mapSeller: "Ottar the Outfitter sells one in Rimeholt, for 120 gold.",
     build: buildFloor4, buildDungeon: buildGlacier,
+  },
+  {
+    n: 5, room: "floor5", dungeon: "sanctum", title: "The Umbral Wilds", town: "Duskhollow", dungeonName: "The Abyssal Sanctum", levels: [20, 24], levelCap: 24,
+    up: "sealed-stair6", down: "descent5", door: "sanctum-door", boss: "nyxara", arrival: "umbral-wilds",
+    theme: "shadow", dungeonTheme: "shadow", sky: "void", dungeonSky: "void", music: "duskhollow", dungeonMusic: "sanctum",
+    uncharted: { title: "The Sanctum is not on any map", text: "Nobody draws a map of the dark. Follow the pale runner toward the throne." },
+    mapSeller: "Corvin the Collector sells one at the Nightmarket in Duskhollow, for 150 gold.",
+    build: buildFloor5, buildDungeon: buildSanctum,
   },
 ];
 

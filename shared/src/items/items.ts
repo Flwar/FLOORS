@@ -16,7 +16,8 @@ export type ItemEffect =
   | "longDodge" // dodge travels 15% further
   | "secondWindCharm" // perfect parries restore health
   | "emberbrand" // ripostes explode in flame
-  | "dawnbreaker"; // perfect parries release a radiant wave
+  | "dawnbreaker" // perfect parries release a radiant wave
+  | "moonstone"; // blows sometimes curse
 
 export interface ItemBase {
   key: string;
@@ -184,6 +185,13 @@ export function upgradeCost(it: Item): { gold: number; mats: { key: string; qty:
   const b = itemBase(it.key);
   if (!b || !isEquipment(b)) return undefined;
   const n = it.plus + 1;
+  // Floor 5's own gear (tier 7) is worked with void materials.
+  if (b.tier >= 7) {
+    const mats = [{ key: "mat_umbralshard", qty: 2 * n }];
+    if (n >= 3) mats.push({ key: "mat_shadowsilk", qty: n - 1 });
+    if (n >= 5) mats.push({ key: "mat_voidheart", qty: 1 });
+    return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
+  }
   // Floor 4's own gear (tier 6) is worked with frost materials.
   if (b.tier >= 6) {
     const mats = [{ key: "mat_rimeshard", qty: 2 * n }];

@@ -4,7 +4,7 @@ import type { ArmorStyle, WeaponArtKey } from "@floors/shared";
 /** Textures are painted at RES× their world size and displayed at 1/RES scale. */
 export const RES = 2;
 
-export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood";
+export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood" | "eclipsecrown" | "shadowveil";
 
 export interface CharLook {
   key: string;
@@ -115,6 +115,7 @@ export const ARMOR_BULK: Record<ArmorStyle, number> = {
   hide: 1.04, ringmail: 1.06, templar: 1.12, windrunner: 1.03, sunforged: 1.16, mystic: 1.04,
   dragonscale: 1.15, drakehide: 1.05, emberweave: 1.04,
   rimeplate: 1.15, furmantle: 1.08, frostweave: 1.04,
+  eclipse: 1.15, shadowsilk: 1.03, voidweave: 1.04,
 };
 
 function outfit(look: CharLook): Outfit {
@@ -178,6 +179,13 @@ function outfit(look: CharLook): Outfit {
       return { finish: "leather", base: "#e8eef2", trim: "#8fd3ff", belt: "#5a4a3a", sleeve: "#d6dfe6", hand: "#8a6a4a", leg: "#6a7a8a", boot: "#4a3a2a", cape: "#f4f8fb", capeTrim: "#b8c8d6", straps: true };
     case "frostweave":
       return { finish: "robe", base: "#dfeaf4", trim: "#6fb8ff", belt: "#8fd3ff", sleeve: "#dfeaf4", hand: look.skin, leg: "#b8c8d6", boot: "#5a6a7a", rune: "#8fd3ff" };
+    // Floor 5: the Eclipse set — black plate edged in silver, shadowsilk, robes of the night sky.
+    case "eclipse":
+      return { finish: "plate", base: "#2e2840", trim: "#e0d8f0", belt: "#16121e", sleeve: "#262036", hand: "#1c1828", leg: "#252034", boot: "#120e18", pauldron: "#40385a", cape: "#150f22", capeTrim: "#b77af2", rune: "#d8b8ff" };
+    case "shadowsilk":
+      return { finish: "leather", base: "#241e30", trim: "#b77af2", belt: "#15121c", sleeve: "#1e1a28", hand: "#15121c", leg: "#1a1622", boot: "#0e0c12", cape: "#1a1426", capeTrim: "#8a5ad8", straps: true, rune: "#c49aff" };
+    case "voidweave":
+      return { finish: "robe", base: "#1c1634", trim: "#e0c8ff", belt: "#b77af2", sleeve: "#1c1634", hand: look.skin, leg: "#120e22", boot: "#0a0814", rune: "#e0c8ff" };
     default:
       return { finish: "cloth", base: look.cloth, trim: look.trim, belt: look.trim, sleeve: look.cloth, hand: look.skin, leg: shade(look.cloth, -55), boot: "#4a3526" };
   }
@@ -1008,6 +1016,76 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
       }
       break;
     }
+    case "eclipsecrown": {
+      // Black steel crowned with a silver crescent.
+      drawDome(g, cx, cy, "#5a5070", "#16121e");
+      g.fillStyle = "#e0d8f0";
+      g.fillRect(cx - 12, cy - 2.4, 24, 2.4);
+      if (view !== "back") {
+        const mx = view === "side" ? cx + 1 : cx;
+        const my = cy - 15;
+        const crescent = (r: number) => {
+          g.beginPath();
+          g.arc(mx, my, r, Math.PI * 0.3, Math.PI * 1.7, false);
+          g.arc(mx + r * 0.5, my, r * 0.78, Math.PI * 1.62, Math.PI * 0.38, true);
+          g.closePath();
+        };
+        glow(g, "#d8b8ff", 7);
+        g.fillStyle = OUTLINE;
+        crescent(7.6);
+        g.fill();
+        noGlow(g);
+        g.fillStyle = "#f4f0ff";
+        crescent(6);
+        g.fill();
+        g.fillStyle = OUTLINE;
+        g.fillRect(view === "side" ? cx + 2 : cx - 8, cy - 1, view === "side" ? 10 : 16, 3);
+        glow(g, "#b77af2", 5);
+        g.fillStyle = "#d8b8ff";
+        for (const ex of view === "side" ? [cx + 8] : [cx - 4, cx + 4]) g.fillRect(ex - 1.5, cy - 0.2, 3, 1.6);
+        noGlow(g);
+      }
+      break;
+    }
+    case "shadowveil": {
+      // A hood of shadowsilk: where the face should be, only dark and two pale lights.
+      g.fillStyle = OUTLINE;
+      blob(g, cx, cy - 1, 14.5, 14.5);
+      g.fill();
+      const hg = g.createRadialGradient(cx - 4, cy - 8, 2, cx, cy, 14);
+      hg.addColorStop(0, "#5a4a7a");
+      hg.addColorStop(1, "#1a1428");
+      g.fillStyle = hg;
+      blob(g, cx, cy - 1, 12.8, 12.8);
+      g.fill();
+      // The hood's peak falls back.
+      g.fillStyle = OUTLINE;
+      g.beginPath();
+      g.moveTo(cx - 5, cy - 12);
+      g.lineTo(view === "side" ? cx - 9 : cx, cy - 20);
+      g.lineTo(cx + 5, cy - 12);
+      g.fill();
+      g.fillStyle = "#3a2e54";
+      g.beginPath();
+      g.moveTo(cx - 3.4, cy - 12.5);
+      g.lineTo(view === "side" ? cx - 7.6 : cx, cy - 18);
+      g.lineTo(cx + 3.4, cy - 12.5);
+      g.fill();
+      if (view !== "back") {
+        const fx = view === "side" ? cx + 5 : cx;
+        g.fillStyle = "#06050a";
+        blob(g, fx, cy + 2, view === "side" ? 5 : 8, 7.6);
+        g.fill();
+        glow(g, "#d8b8ff", 6);
+        g.fillStyle = "#f4ecff";
+        for (const ex of view === "side" ? [fx + 2] : [fx - 3, fx + 3]) {
+          blob(g, ex, cy + 1.5, 1.4, 1.1);
+          g.fill();
+        }
+        noGlow(g);
+      }
+      break;
+    }
     case "furhood": {
       // White fur, with a wolf's head worn as a crown.
       g.fillStyle = OUTLINE;
@@ -1672,6 +1750,12 @@ export function weaponTrail(kind: WeaponArt): number {
     case "sp_rime":
     case "st_rime":
       return 0xdff4ff;
+    case "sword_void":
+    case "gs_void":
+    case "dg_void":
+    case "sp_void":
+    case "st_void":
+      return 0xd8b8ff;
     case "gs_moon":
       return 0xd8d0ff;
     case "gs_gilded":
@@ -1759,6 +1843,11 @@ const WEAPON_SIZE: Record<WeaponArt, [number, number, number]> = {
   dg_rime: [40, 16, 7],
   sp_rime: [112, 28, 22],
   st_rime: [84, 36, 10],
+  sword_void: [68, 22, 9],
+  gs_void: [100, 36, 14],
+  dg_void: [42, 16, 7],
+  sp_void: [114, 28, 22],
+  st_void: [86, 36, 10],
 };
 
 export function weaponSize(kind: WeaponArt) {
@@ -2552,6 +2641,89 @@ export function drawWeapon(g: CanvasRenderingContext2D, kind: WeaponArt, rarity 
       sg.addColorStop(1, "#e8a030");
       g.fillStyle = sg;
       blob(g, ox, cy, 7, 7);
+      g.fill();
+      break;
+    }
+    // --- Floor 5: the Eclipse set -------------------------------------------------
+    case "sword_void":
+    case "gs_void":
+    case "dg_void": {
+      const big = kind === "gs_void";
+      const small = kind === "dg_void";
+      straightBlade(g, w, h, grip, {
+        width: big ? 12.4 : small ? 4.6 : 7.6, hi: "#6a6080", mid: "#2a2438", lo: "#0c0a12", guard: "#e0d8f0", guardW: big ? 30 : small ? 12 : 20,
+        grip: "#1e1830", edge: "#f4f0ff", edgeGlow: "#b77af2", pommel: "#b77af2",
+      });
+      // Stars caught in the dark of the blade.
+      glow(g, "#d8b8ff", 5);
+      g.fillStyle = rarity >= 3 ? accent : "#f0e8ff";
+      const x0 = grip + 12;
+      const x1 = w - (big ? 16 : 11);
+      for (let x = x0, i = 0; x < x1; x += big ? 11 : 7, i++) {
+        const r = i % 3 === 0 ? (big ? 1.6 : 1.1) : big ? 0.9 : 0.6;
+        blob(g, x, cy + (i % 2 ? 1 : -1) * (big ? 2 : 0.8), r, r);
+        g.fill();
+      }
+      noGlow(g);
+      break;
+    }
+    case "sp_void": {
+      shaft(g, 0, w - 26, cy, "#3a3048", 3.4);
+      g.fillStyle = "#e0d8f0";
+      for (const x of [grip, grip + 30, w - 32]) g.fillRect(x, cy - 3, 2.6, 6);
+      // A fallen star for a head, trailing its light.
+      const trail = g.createLinearGradient(w - 40, 0, w - 12, 0);
+      trail.addColorStop(0, "rgba(183,122,242,0)");
+      trail.addColorStop(1, "rgba(224,200,255,0.9)");
+      g.fillStyle = trail;
+      g.beginPath();
+      g.moveTo(w - 40, cy);
+      g.lineTo(w - 14, cy - 5);
+      g.lineTo(w - 14, cy + 5);
+      g.closePath();
+      g.fill();
+      const star = (r: number) => {
+        g.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+          const rr = i % 2 ? r * 0.45 : r;
+          g.lineTo(w - 11 + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+        }
+        g.closePath();
+      };
+      glow(g, "#d8b8ff", 10);
+      g.fillStyle = OUTLINE;
+      star(11);
+      g.fill();
+      noGlow(g);
+      g.fillStyle = rarity >= 3 ? accent : "#f4f0ff";
+      star(9);
+      g.fill();
+      break;
+    }
+    case "st_void": {
+      shaft(g, 0, w - 20, cy, "#2e2640", 3.8);
+      g.fillStyle = "#e0d8f0";
+      for (const x of [6, grip + 12, w - 34]) g.fillRect(x, cy - 3, 2.6, 6);
+      // Two silver crescents cradling a void heart.
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(w - 28, cy);
+        g.quadraticCurveTo(w - 22, cy + sgn * 17, w - 6, cy + sgn * 12);
+        inked(g, "#e0d8f0", 2.2);
+      }
+      const ox = w - 13;
+      glow(g, "#b77af2", 14);
+      g.fillStyle = OUTLINE;
+      blob(g, ox, cy, 9.6, 9.6);
+      g.fill();
+      noGlow(g);
+      const og = g.createRadialGradient(ox, cy, 1, ox, cy, 8.4);
+      og.addColorStop(0, "#000000");
+      og.addColorStop(0.6, "#1a0e2e");
+      og.addColorStop(1, rarity >= 3 ? accent : "#b77af2");
+      g.fillStyle = og;
+      blob(g, ox, cy, 8.2, 8.2);
       g.fill();
       break;
     }

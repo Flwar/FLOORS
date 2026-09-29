@@ -52,6 +52,12 @@ export class Sky {
       paintStars(scene);
       const img = scene.add.tileSprite(0, 0, w * 2, h * 2, "skyStars").setOrigin(0).setScrollFactor(0).setDepth(-89).setAlpha(0.9);
       this.layers.push({ img, speed: 1, parallax: 0.05 });
+      // Pale motes of the dark drifting up past the isles, and faintly in front of them.
+      paintMotes(scene);
+      for (const [parallax, rise, alpha, depth] of [[0.2, 10, 0.8, -88], [0.5, 18, 0.35, 5e5]] as const) {
+        const m = scene.add.tileSprite(0, 0, w * 2, h * 2, "skyMotes").setOrigin(0).setScrollFactor(0).setDepth(depth).setAlpha(alpha).setBlendMode(Phaser.BlendModes.ADD);
+        this.layers.push({ img: m, speed: 2, parallax, rise });
+      }
     }
     for (let i = 0; i < 5; i++) {
       const img = scene.add.image(0, 0, "farIsland").setScrollFactor(0.08 + i * 0.02).setDepth(-95).setAlpha(0.55 - i * 0.05).setScale(0.35 + (i % 3) * 0.12);
@@ -109,6 +115,25 @@ function paintStars(scene: Phaser.Scene) {
     g.beginPath();
     g.arc(x, y, r, 0, Math.PI * 2);
     g.fill();
+  }
+  tex.refresh();
+}
+
+function paintMotes(scene: Phaser.Scene) {
+  if (scene.textures.exists("skyMotes")) return;
+  const tex = scene.textures.createCanvas("skyMotes", 512, 512)!;
+  const g = tex.getContext();
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 60; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 512;
+    const r = 0.8 + rnd() * 1.8;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r * 3);
+    gr.addColorStop(0, rnd() < 0.5 ? "rgba(224,200,255,0.9)" : "rgba(170,140,240,0.8)");
+    gr.addColorStop(1, "rgba(120,80,200,0)");
+    g.fillStyle = gr;
+    g.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
   }
   tex.refresh();
 }

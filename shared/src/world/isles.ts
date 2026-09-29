@@ -166,9 +166,10 @@ export function isleBuilder(m: WorldMap) {
 /**
  * Guarantee that every NPC, object and enemy spawn can be walked to from the spawn point:
  * anything sealed off by trees or rocks gets a small clearing and the cheapest trail cut
- * through to open ground (never through walls, water or the sky).
+ * through to open ground (never through the sky; through water and ruins only when `ford`
+ * says so — a ford of reeds across a marsh pool, a gap broken in a line of spires).
  */
-export function connectEverything(m: WorldMap) {
+export function connectEverything(m: WorldMap, ford: { water?: boolean; ruins?: boolean } = {}) {
   const W = m.width;
   const H = m.height;
   const reach = new Uint8Array(W * H);
@@ -223,7 +224,7 @@ export function connectEverything(m: WorldMap) {
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
         const t = m.get(nx, ny);
-        const step = t === Tile.Tree ? 4 : t === Tile.Rock ? 6 : m.isSolidTile(nx, ny) ? Infinity : 1;
+        const step = t === Tile.Tree ? 4 : t === Tile.Rock ? 6 : ford.water && t === Tile.Water ? 9 : ford.ruins && t === Tile.RuinWall ? 12 : m.isSolidTile(nx, ny) ? Infinity : 1;
         const j = ny * W + nx;
         if (cost[i] + step < cost[j]) {
           cost[j] = cost[i] + step;
@@ -236,7 +237,9 @@ export function connectEverything(m: WorldMap) {
     for (let i = goal; i !== -1; i = from[i]) {
       const x = i % W;
       const y = (i - x) / W;
-      if (m.get(x, y) === Tile.Tree || m.get(x, y) === Tile.Rock) m.set(x, y, Tile.TallGrass);
+      const t = m.get(x, y);
+      if (t === Tile.Tree || t === Tile.Rock || (ford.water && t === Tile.Water)) m.set(x, y, Tile.TallGrass);
+      else if (ford.ruins && t === Tile.RuinWall) m.set(x, y, Tile.StoneFloor);
     }
     flood(start);
   }

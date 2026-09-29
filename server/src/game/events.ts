@@ -170,8 +170,46 @@ export const FLOOR4_EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 5: the blood moon, the eclipse tide, and the wandering merchant. */
+export const FLOOR5_EVENTS: EventDef[] = [
+  {
+    id: "bloodmoon",
+    name: "The Blood Moon",
+    announce: "A red moon shows through the dark over the Gloaming — the void hounds run mad beneath it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 76, y: 90 }, { x: 108, y: 96 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "voidhound", level: 21 }, { key: "voidhound", level: 21 }, { key: "voidhound", level: 21 }, { key: "voidhound", level: 21 },
+      { key: "voidhound", level: 22, elite: true, hpScale: 1.8 }, { key: "shade", level: 21 },
+    ],
+    reward: { xp: 2200, gold: 480, loot: true },
+    lootPool: ["mat_shadowsilk", "mat_voidheart", "helm_shadowveil", "armor_shadowsilk", "daggers_void", "spear_void"],
+  },
+  {
+    id: "eclipsetide",
+    name: "The Eclipse Tide",
+    announce: "The void spills over the Shattered Moon — golems and knights march out of the craters!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 152, y: 84 }),
+    enemies: [
+      { key: "voidgolem", level: 22 }, { key: "voidgolem", level: 22 }, { key: "voidcaller", level: 22 }, { key: "voidcaller", level: 22 },
+      { key: "abyssalknight", level: 23, elite: true },
+    ],
+    reward: { xp: 2500, gold: 540, loot: true },
+    lootPool: ["mat_umbralshard", "mat_voidheart", "armor_voidweave", "staff_void", "sword_void", "greatsword_void"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has lit a lantern in Duskhollow — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 92, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
 /** Each floor's world events. */
-export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS };
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS };
 
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {
