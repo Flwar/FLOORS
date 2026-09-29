@@ -3,7 +3,7 @@ import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from
 import {
   AFFIXES, Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
   isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, skillEntry, skillMove, streetPoint, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
-  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, mealById, RARITY_NAMES, HUNT_BONUS, HUNT_TITLES } from "@floors/shared";
+  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, drinkById, RARITY_NAMES, HUNT_BONUS, HUNT_TITLES } from "@floors/shared";
 import type { Enemy, Hazard, Player, Projectile, WorldState } from "../../../server/src/state.ts";
 import { ambience } from "../audio/ambience.ts";
 import { Minimap } from "../ui/minimap.ts";
@@ -452,6 +452,11 @@ export class WorldScene extends Phaser.Scene {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 16 * s, y - 20 * s - Math.random() * 10, 0x8ff0e0, 1, 2, -18, 600, 2.2);
       }
+      if (e.flags & EFlag.Dazzled && Math.random() < delta / 150) {
+        // Dazzled: glints of sunlight flicker around its head.
+        const s = v.def.look.scale;
+        this.fx.star(x + (Math.random() - 0.5) * 20 * s, y - 26 * s - Math.random() * 10, Math.random() < 0.5 ? 0xffffff : 0xffe08a, 4, 240);
+      }
       if (e.flags & EFlag.Shielded && e.act !== EAct.Dead && Math.random() < delta / 240) {
         const s = v.def.look.scale;
         this.fx.ring(x, y - 12 * s, 0xbfe8ff, 16 * s, 19 * s, 420, 2);
@@ -468,12 +473,13 @@ export class WorldScene extends Phaser.Scene {
         const dark = v.def.look.element === "shadow";
         const sea = v.def.look.element === "tide";
         const steam = v.def.look.element === "steam";
-        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : sea ? [0xffffff, 0x8ff0e0, 0x1fa8c0] : steam ? [0xffffff, 0xe8e0d0, 0xb8b0a8] : [0xffe08a, 0xff7a2a, 0xd8402c];
+        const sunny = v.def.look.element === "sun";
+        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : dark ? [0xe0c8ff, 0x7a4ad1, 0x1a1028] : sea ? [0xffffff, 0x8ff0e0, 0x1fa8c0] : steam ? [0xffffff, 0xe8e0d0, 0xb8b0a8] : sunny ? [0xffffff, 0xfff0a0, 0xffb030] : [0xffe08a, 0xff7a2a, 0xd8402c];
         for (let i = 0; i < Math.ceil(delta / 12); i++) {
           const spread = (Math.random() - 0.5) * 0.9;
           this.fx.sparks(f.x, f.y, f.a + spread, Math.random() < 0.4 ? palette[0] : Math.random() < 0.5 ? palette[1] : palette[2], 2, 180 + 120 * s, 0.25);
         }
-        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : sea ? 0xdffaf4 : steam ? 0xf0f0f0 : 0xff9a3a, 4, 50, 3.4, 420);
+        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : dark ? 0x2a1a44 : sea ? 0xdffaf4 : steam ? 0xf0f0f0 : sunny ? 0xfff8e0 : 0xff9a3a, 4, 50, 3.4, 420);
         if (Math.random() < delta / 200) sfx.boom(false, f.x, f.y);
       }
       this.enemyTelegraph(id, e, v, x, y, view);
@@ -1265,11 +1271,14 @@ export class WorldScene extends Phaser.Scene {
           this.fx.rise(m.x, m.y - 10, 0xffd27a, 8);
           sfx.chime(2);
           break;
-        case "eat": {
-          // A good meal: warm steam and a glow of its colour.
+        case "drink": {
+          // A good drink: a raised mug, foam, and a glow of its colour.
           const c = Number.parseInt(String(m.c ?? "#f3e6c4").slice(1), 16);
-          this.fx.rise(m.x, m.y - 16, c, 14, 14, 40, 900, 2);
+          // Foam and bubbles rising off the mug, a glow of the drink, and a cheerful clink.
+          this.fx.rise(m.x + 6, m.y - 34, 0xfff8ec, 8, 8, 30, 700, 2.6);
+          this.fx.rise(m.x + 6, m.y - 28, c, 10, 10, 46, 900, 2);
           this.fx.ring(m.x, m.y - 10, c, 6, 28, 500, 3);
+          this.fx.text(m.x, m.y - 52, "Cheers!", { color: "#fff0c0", size: 9, bold: true }, 800, 20);
           sfx.chime(2);
           break;
         }
@@ -1408,7 +1417,7 @@ export class WorldScene extends Phaser.Scene {
         case HazardKind.Glyph: {
           const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.2;
           // Aurelion's glyphs are golden; under the Void Queen's eclipse they are pools of moonlight.
-          const gc = this.map.theme === "shadow" ? 0xe8f0ff : this.map.theme === "tide" ? 0xf4ecd0 : this.map.theme === "brass" ? 0x9fd3ff : 0xffe08a;
+          const gc = this.map.theme === "shadow" ? 0xe8f0ff : this.map.theme === "tide" ? 0xf4ecd0 : this.map.theme === "brass" ? 0x9fd3ff : this.map.theme === "sand" ? 0x3a5aa8 : 0xffe08a;
           g.fillStyle(gc, 0.2 * pulse + 0.1);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.lineStyle(3, gc, 0.9);
@@ -1424,7 +1433,7 @@ export class WorldScene extends Phaser.Scene {
           break;
         default: {
           if (t > h.delay + 250) return;
-          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : h.kind === HazardKind.Tide ? 0x3fb8c8 : h.kind === HazardKind.Steam ? 0xe8e0d0 : 0xd8402c;
+          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : h.kind === HazardKind.Void ? 0x9a5ae0 : h.kind === HazardKind.Tide ? 0x3fb8c8 : h.kind === HazardKind.Steam ? 0xe8e0d0 : h.kind === HazardKind.Sun ? 0xffd24a : 0xd8402c;
           g.fillStyle(color, 0.08 + 0.2 * k);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.fillStyle(color, 0.35);
@@ -1443,6 +1452,13 @@ export class WorldScene extends Phaser.Scene {
             this.fx.streak(h.x + (Math.random() - 0.5) * 20, h.y - 140, h.x, h.y - 6, 0xeaf6ff, 140, 5);
             this.fx.burst(h.x, h.y - 6, 0xdff4ff, 22, 150, 2.8, 650);
             this.fx.ring(h.x, h.y, 0x8fd3ff, 6, h.radius, 380, 3);
+            sfx.hit(true, h.x, h.y, true, "metal");
+          } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Sun) {
+            // A shaft of sunlight (or a gust of the sandstorm) strikes.
+            this.fx.streak(h.x, h.y - 200, h.x, h.y - 6, 0xfff0a0, 200, 12);
+            this.fx.burst(h.x, h.y - 6, 0xffd24a, 16, 120, 2.6, 560);
+            this.fx.ring(h.x, h.y, 0xffffff, 6, h.radius, 380, 3);
+            this.fx.dust(h.x, h.y, 5);
             sfx.hit(true, h.x, h.y, true, "metal");
           } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Steam) {
             // A blast of scalding steam.
@@ -1489,6 +1505,13 @@ export class WorldScene extends Phaser.Scene {
         g2.fillStyle(0xeaf6ff, 1);
         g2.fillTriangle(x + Math.cos(pr.angle) * pr.radius * 1.6, y + Math.sin(pr.angle) * pr.radius * 1.6, x + Math.cos(pr.angle + 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle + 2.4) * pr.radius * 0.8, x + Math.cos(pr.angle - 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle - 2.4) * pr.radius * 0.8);
         if (Math.random() < 0.5) this.fx.rise(tx, ty, 0xdff4ff, 1, 3, 8, 300, 2);
+        return;
+      }
+      if (pr.kind === ProjKind.Sunbolt) {
+        // A bolt of gathered sunlight.
+        this.fx.streak(tx, ty, x, y, 0xffd24a, 70, 6);
+        this.fx.streak(tx, ty, x, y, 0xffffff, 50, 2.4);
+        if (Math.random() < 0.35) this.fx.star(x, y, 0xfff8e0, 4, 160);
         return;
       }
       if (pr.kind === ProjKind.Spark) {
@@ -1689,9 +1712,9 @@ export class WorldScene extends Phaser.Scene {
     if (!this.me || !p) return;
     const s = this.me.state;
     this.hud.vitals(p.hp, p.hpMax, s.stamina, s.staminaMax, s.exhausted, p.level);
-    const meal = this.ui.inv?.meal;
-    const mealDef = meal && meal.until > Date.now() ? mealById(meal.id) : undefined;
-    this.hud.meal(mealDef && { name: mealDef.name, color: mealDef.color, min: Math.ceil((meal!.until - Date.now()) / 60000) });
+    const drink = this.ui.inv?.drink;
+    const drinkDef = drink && drink.until > Date.now() ? drinkById(drink.id) : undefined;
+    this.hud.drink(drinkDef && { name: drinkDef.name, color: drinkDef.color, min: Math.ceil((drink!.until - Date.now()) / 60000) });
     const w = WEAPONS[s.weapon];
     this.hud.weapon(w.name);
     const quick = s.mods & Mod.QuickCast ? 0.75 : 1;
@@ -1722,9 +1745,9 @@ export class WorldScene extends Phaser.Scene {
       this.hud.zone(zone);
       const mood = zone.music ?? (this.map.theme === "cave" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
-      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow", tide: "sea", saltmere: "town", cathedral: "sea", brass: "brass", gearhaven: "town", engine: "brass" };
+      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost", umbral: "shadow", duskhollow: "town", sanctum: "shadow", tide: "sea", saltmere: "town", cathedral: "sea", brass: "brass", gearhaven: "town", engine: "brass", sands: "sands", sunwell: "town", pyramid: "sands" };
       const theme = this.map.theme;
-      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "tide" ? "sea" : theme === "brass" ? "brass" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
+      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "shadow" ? "shadow" : theme === "tide" ? "sea" : theme === "brass" ? "brass" : theme === "sand" ? "sands" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
       sfx.setRoom(this.map.theme === "cave" || zone.dark === true || zone.indoor ? "cave" : zone.safe ? "town" : "open");
     }
     // Boss bar for the nearest engaged boss.

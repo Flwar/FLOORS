@@ -235,11 +235,11 @@ button.small { padding: 2px 8px; font-size: 11px; min-height: 0; }
 .relic-menu .tt-dim { padding: 4px 6px 6px; }
 
 /* The inn's menu. */
-.dialog .meals { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-.dialog .meal-row { display: grid; grid-template-columns: 10px auto 1fr; align-items: center; gap: 8px; text-align: left; }
-.dialog .meal-row i { width: 10px; height: 10px; border-radius: 50%; }
-.dialog .meal-row span { opacity: 0.8; font-size: 0.92em; }
-.dialog .meal-row.active { outline: 1px solid #e8c55a; }
+.dialog .drinks { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.dialog .drink-row { display: grid; grid-template-columns: 10px auto 1fr; align-items: center; gap: 8px; text-align: left; }
+.dialog .drink-row i { width: 10px; height: 10px; border-radius: 50%; }
+.dialog .drink-row span { opacity: 0.8; font-size: 0.92em; }
+.dialog .drink-row.active { outline: 1px solid #e8c55a; }
 
 /* The smith's work on one item. */
 .smith-menu { min-width: 300px; max-width: 330px; }

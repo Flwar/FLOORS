@@ -629,9 +629,87 @@ export class SkillFx {
         if (mine) shake(260, 0.01);
         break;
       }
+      // --- Sun arts ------------------------------------------------------------------
+      case "khopesh":
+      case "scarabs":
+      case "dunebreaker":
+      case "sunwheel": {
+        const r = m.shape?.kind === "circle" ? m.shape.radius : m.shape?.kind === "arc" ? m.shape.range : 80;
+        const full = m.shape?.kind === "circle";
+        if (full) {
+          fx.ring(x, y - 6, 0xfff8e0, 10, r, 420, 6);
+          fx.ring(x, y - 6, c, 10, r * 1.15, 600, 3);
+        } else fx.trail(x, cy, a - 2, a + 2, r * 0.3, r, c, 360);
+        for (let i = 0; i < 9; i++) {
+          const aa = full ? (i / 9) * Math.PI * 2 : a - 1.8 + (i / 8) * 3.6;
+          this.sunAt(x + Math.cos(aa) * r * 0.8, cy + Math.sin(aa) * r * 0.6, 0.8);
+        }
+        if (m.vfx === "dunebreaker") fx.dust(x, y, 16);
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(m.vfx === "dunebreaker" ? 380 : 220, m.vfx === "dunebreaker" ? 0.014 : 0.008);
+        break;
+      }
+      case "sunpierce":
+      case "solarflare":
+      case "obelisk": {
+        const e = ahead(shapeLen);
+        const big = m.vfx === "solarflare";
+        fx.streak(x, cy, e.x, e.y, c, 300, big ? 22 : 12);
+        fx.streak(x, cy, e.x, e.y, 0xffffff, 200, big ? 8 : 4);
+        for (let i = 1; i <= 6; i++) this.sunAt(x + (e.x - x) * (i / 6), cy + (e.y - cy) * (i / 6), big ? 1 : 0.7);
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(big ? 380 : 220, big ? 0.014 : 0.009);
+        break;
+      }
+      case "miragestep": {
+        const e = ahead(m.lunge || 220);
+        fx.streak(x, cy, e.x, e.y, c, 280, 10);
+        fx.burst(x, cy, 0xfff0c0, 14, 60, 3, 600);
+        this.sunAt(e.x, e.y, 1);
+        break;
+      }
+      case "sunrays":
+      case "sunbolt":
+        this.sunAt(ahead(16).x, ahead(16).y, 0.9);
+        sfx.hit(false, x, y, true, "metal");
+        break;
+      case "noonday": {
+        const off = m.shape?.kind === "circle" ? m.shape.offset : 150;
+        const r = m.shape?.kind === "circle" ? m.shape.radius : 88;
+        const e = { x: x + Math.cos(a) * off, y: y + Math.sin(a) * off * 0.8 };
+        fx.streak(e.x, e.y - 260, e.x, e.y - 6, 0xfff8e0, 360, 30);
+        fx.streak(e.x, e.y - 260, e.x, e.y - 6, 0xffffff, 240, 12);
+        fx.ring(e.x, e.y, 0xffffff, 8, r, 420, 6);
+        fx.ring(e.x, e.y, c, 10, r * 1.2, 600, 3);
+        for (let i = 0; i < 5; i++) this.flameAt(e.x + (Math.random() - 0.5) * r, e.y + (Math.random() - 0.5) * r * 0.6, 0.8);
+        sfx.boom(true, e.x, e.y);
+        if (mine) shake(280, 0.011);
+        break;
+      }
+      case "carapace":
+        fx.ring(x, cy, 0xffe08a, 30, 18, 420, 5);
+        fx.ring(x, cy, c, 24, 28, 700, 3);
+        this.sunAt(x, cy - 10, 1);
+        sfx.parry(false, x, y);
+        break;
+      case "sunfall": {
+        const r = m.shape?.kind === "circle" ? m.shape.radius : 180;
+        fx.streak(x, y - 320, x, y - 6, 0xffffff, 420, 40);
+        fx.streak(x, y - 320, x, y - 6, c, 520, 70);
+        fx.ring(x, y - 6, 0xffffff, 10, r, 520, 8);
+        fx.ring(x, y - 6, 0xffb030, 10, r * 1.15, 760, 4);
+        for (let i = 0; i < 12; i++) {
+          const aa = (i / 12) * Math.PI * 2;
+          this.sunAt(x + Math.cos(aa) * r * 0.7, y - 6 + Math.sin(aa) * r * 0.45, 1.2);
+        }
+        sfx.boom(true, x, y);
+        if (mine) shake(520, 0.02);
+        break;
+      }
       case "voidrift":
       case "whirlpool":
       case "steamvent":
+      case "sandstorm":
         // Played from the server's event, where the rift (or the whirlpool) actually opens.
         break;
       // --- Clockwork arts -----------------------------------------------------------
@@ -782,6 +860,10 @@ export class SkillFx {
       case "ticktock":
         if (Math.random() < 0.8) this.fx.rise(x, y - 10, Math.random() < 0.5 ? c : 0xffffff, 2, 8, 10, 300, 2.4);
         break;
+      case "miragestep":
+        // Heat shimmer where you were.
+        if (Math.random() < 0.8) this.fx.rise(x, y - 12, Math.random() < 0.5 ? 0xfff0c0 : c, 2, 10, 8, 420, 3.2);
+        break;
       case "eelstep":
       case "riptidedash":
         if (Math.random() < 0.8) this.fx.rise(x, y - 10, Math.random() < 0.5 ? c : 0xffffff, 2, 10, 14, 360, 3);
@@ -818,6 +900,13 @@ export class SkillFx {
     fx.star(x, y, 0xfff0c0, 4 * size, 260);
   }
 
+  /** A glint of sunlight: a white-gold star and a few golden sparks. */
+  sunAt(x: number, y: number, size: number) {
+    const fx = this.fx;
+    fx.star(x, y, 0xfff8e0, 6 * size, 300);
+    fx.sparks(x, y, -Math.PI / 2, Math.random() < 0.5 ? 0xffd24a : 0xffb030, Math.ceil(4 * size), 120 * size, Math.PI * 1.6);
+  }
+
   /** A puff of steam. */
   steamAt(x: number, y: number, size: number) {
     const fx = this.fx;
@@ -851,6 +940,58 @@ export class SkillFx {
         fx.burst(x, y - 6, 0xdff4ff, 16, 110, 2.6, 560);
         this.frostAt(x, y - 6, 0.9);
         sfx.hit(true, x, y, true, "metal");
+        return true;
+      // --- The Sunscorched Sands -------------------------------------------------------
+      case "sunburst":
+        fx.burst(x, y - 6, 0xffe08a, 14, 100, 2.6, 520);
+        this.sunAt(x, y - 8, 1);
+        sfx.hit(false, x, y, true, "metal");
+        return true;
+      case "dazzled":
+        // Blinded: a flash of white-gold in its eyes.
+        fx.star(x, y - 30, 0xffffff, 12, 360);
+        fx.ring(x, y - 26, 0xffd24a, 4, 18, 360, 3);
+        return true;
+      case "dazzlemiss":
+        fx.text(x + (Math.random() - 0.5) * 16, y - 44, "MISS", { color: "#ffe08a", size: 9, bold: true }, 700, 22);
+        this.sunAt(x, y - 20, 0.6);
+        return true;
+      case "sandstorm":
+        fx.ring(x, y, 0xe8c070, 8, r, 800, 5);
+        for (let i = 0; i < 10; i++) fx.dust(x + (Math.random() - 0.5) * r * 1.4, y + (Math.random() - 0.5) * r * 0.9, 4);
+        sfx.boom(false, x, y);
+        return true;
+      case "suncarry":
+        // The sun in someone's hands, burning.
+        fx.star(x, y - 48, 0xfff8e0, 13, 280);
+        fx.ring(x, y - 48, 0xffd24a, 5, 14, 260, 3);
+        fx.rise(x, y - 44, Math.random() < 0.5 ? 0xffd24a : 0xffffff, 3, 8, 24, 480, 2.6);
+        return true;
+      case "suntaken":
+        fx.streak(x, y - 240, x, y - 6, 0xfff8e0, 420, 26);
+        fx.ring(x, y - 6, 0xffd24a, 8, 60, 520, 5);
+        this.sunAt(x, y - 30, 1.4);
+        sfx.chime(3);
+        return true;
+      case "sunfade":
+        fx.burst(x, y - 40, 0x8a7a5a, 16, 60, 3, 700);
+        fx.ring(x, y - 40, 0xffd24a, 16, 4, 400, 3);
+        return true;
+      case "altarlit":
+        fx.streak(x, y - 200, x, y - 6, 0xfff0a0, 420, 20);
+        fx.ring(x, y - 6, 0xffb030, 8, 70, 560, 6);
+        for (let i = 0; i < 5; i++) this.flameAt(x + (Math.random() - 0.5) * 20, y - 10, 1);
+        this.sunAt(x, y - 30, 1.4);
+        sfx.boom(false, x, y);
+        return true;
+      case "sunchamber":
+        fx.ring(x, y, 0xfff0a0, 20, r, 900, 8);
+        fx.ring(x, y, 0xffb030, 30, r * 1.1, 1200, 4);
+        for (let i = 0; i < 16; i++) {
+          const aa = (i / 16) * Math.PI * 2;
+          this.sunAt(x + Math.cos(aa) * r * 0.6, y + Math.sin(aa) * r * 0.4, 1.4);
+        }
+        sfx.boom(true, x, y);
         return true;
       case "sparkburst":
         this.sparkAt(x, y - 6, 1);

@@ -285,7 +285,45 @@ export const FLOOR7_EVENTS: EventDef[] = [
 ];
 
 /** Each floor's world events. */
-export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS, 6: FLOOR6_EVENTS, 7: FLOOR7_EVENTS };
+/** Floor 8: the great sandstorm, the tombs opening, and the wandering merchant. */
+export const FLOOR8_EVENTS: EventDef[] = [
+  {
+    id: "sandstorm",
+    name: "The Great Sandstorm",
+    announce: "A wall of sand is rolling across the Dune Sea — and things are walking inside it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 80, y: 92 }, { x: 102, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "sandwraith", level: 33 }, { key: "sandwraith", level: 33 }, { key: "sandjackal", level: 33 }, { key: "sandjackal", level: 33 },
+      { key: "sandwraith", level: 34, elite: true, hpScale: 1.8 }, { key: "sunpriest", level: 33 },
+    ],
+    reward: { xp: 3800, gold: 700, loot: true },
+    lootPool: ["mat_scarab", "mat_solarheart", "helm_veil", "armor_nomad", "daggers_solar", "spear_solar"],
+  },
+  {
+    id: "tombs",
+    name: "The Tombs Open",
+    announce: "The Colossus's tombs have cracked open — the guardians are marching on the sands!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 152, y: 86 }),
+    enemies: [
+      { key: "tombguard", level: 34 }, { key: "tombguard", level: 34 }, { key: "sandgolem", level: 34 }, { key: "sunpriest", level: 34 },
+      { key: "tombguard", level: 35, elite: true },
+    ],
+    reward: { xp: 4200, gold: 780, loot: true },
+    lootPool: ["mat_sunstone", "mat_solarheart", "armor_sunweave", "staff_solar", "sword_solar", "greatsword_solar"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has pitched her tent by the well in Sunwell — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 93, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS, 6: FLOOR6_EVENTS, 7: FLOOR7_EVENTS, 8: FLOOR8_EVENTS };
 
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {

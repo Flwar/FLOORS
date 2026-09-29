@@ -53,7 +53,7 @@ export interface EnemyLook {
   horns?: boolean;
   glow?: string;
   /** Dragons: what they breathe (fire by default). */
-  element?: "fire" | "frost" | "shadow" | "tide" | "steam";
+  element?: "fire" | "frost" | "shadow" | "tide" | "steam" | "sun";
 }
 
 export interface EnemyDef {
@@ -499,6 +499,8 @@ export const EFlag = {
   Sundered: 2048,
   /** A Shielded elite's ward is up: it soaks blows until it breaks. */
   Shielded: 4096,
+  /** Dazzled (sun skills, Sunstrike): one blow in three it throws goes wide. */
+  Dazzled: 8192,
 } as const;
 
 /**

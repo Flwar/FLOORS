@@ -158,7 +158,103 @@ function dragonHead(g: G, x: number, y: number, s: number, color: string) {
   g.fill();
 }
 
+/** A little sun: a white-gold disc with rays. */
+function sunDisc(g: G, x: number, y: number, r: number) {
+  g.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const rr = i % 2 ? r * 1.15 : r * 1.6;
+    g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  g.closePath();
+  fillInk(g, "#ffd24a", 2.5);
+  g.beginPath();
+  g.arc(x, y, r * 0.8, 0, Math.PI * 2);
+  fillInk(g, "#fff8e0", 2);
+}
+
 const GLYPH: Record<string, (g: G, c: string) => void> = {
+  // --- Sun arts -----------------------------------------------------------------------
+  khopesh: (g, c) => {
+    GLYPH.sweep(g, c);
+    sunDisc(g, 48, 16, 6);
+  },
+  sunpierce: (g, c) => {
+    GLYPH.pierce(g, c);
+    sunDisc(g, 16, 16, 6);
+  },
+  dunebreaker: (g, c) => {
+    GLYPH.quake(g, c);
+    sunDisc(g, 46, 14, 6);
+  },
+  solarflare: (g, c) => {
+    GLYPH.fissure(g, c);
+    sunDisc(g, 16, 16, 7);
+  },
+  scarabs: (g, c) => {
+    GLYPH.cuts(g, c);
+    sunDisc(g, 32, 32, 6);
+  },
+  miragestep: (g, c) => {
+    GLYPH.dash(g, c);
+    sunDisc(g, 48, 18, 6);
+  },
+  obelisk: (g, c) => {
+    g.beginPath();
+    g.moveTo(26, 54); g.lineTo(28, 18); g.lineTo(32, 10); g.lineTo(36, 18); g.lineTo(38, 54);
+    g.closePath();
+    fillInk(g, "#e8d4a0", 3);
+    g.beginPath();
+    g.moveTo(12, 40);
+    g.lineTo(56, 24);
+    ink(g, c, 5);
+    sunDisc(g, 46, 14, 5);
+  },
+  sunwheel: (g, c) => {
+    GLYPH.whirlspear(g, c);
+    sunDisc(g, 32, 32, 7);
+  },
+  sunrays: (g, c) => {
+    for (const a of [-0.45, 0, 0.45]) {
+      g.beginPath();
+      g.moveTo(16, 32);
+      g.lineTo(16 + Math.cos(a) * 40, 32 + Math.sin(a) * 40);
+      ink(g, c, 4);
+    }
+    sunDisc(g, 16, 32, 7);
+  },
+  noonday: (g, c) => {
+    g.beginPath();
+    g.moveTo(24, 6); g.lineTo(40, 6); g.lineTo(46, 50); g.lineTo(18, 50);
+    g.closePath();
+    const bg = g.createLinearGradient(0, 6, 0, 50);
+    bg.addColorStop(0, "rgba(255,248,224,0.95)");
+    bg.addColorStop(1, c);
+    fillInk(g, bg, 2.5);
+    sunDisc(g, 32, 12, 7);
+  },
+  sunbolt: (g, c) => {
+    GLYPH.barrage(g, c);
+    sunDisc(g, 14, 32, 6);
+  },
+  carapace: (g, c) => {
+    g.beginPath();
+    g.ellipse(32, 34, 18, 22, 0, 0, Math.PI * 2);
+    fillInk(g, c, 3.5);
+    g.beginPath();
+    g.moveTo(32, 14); g.lineTo(32, 56);
+    g.moveTo(16, 28); g.quadraticCurveTo(32, 22, 48, 28);
+    ink(g, "#5a3a10", 2.5);
+    sunDisc(g, 32, 12, 5);
+  },
+  sandstorm: (g, c) => {
+    GLYPH.cyclone(g, c);
+    sunDisc(g, 48, 14, 5);
+  },
+  sunfall: (g, c) => {
+    GLYPH.heaven(g, c);
+    sunDisc(g, 32, 14, 9);
+  },
   // --- Dragon arts and universal skills ----------------------------------------------
   dragonfang: (g, c) => {
     GLYPH.dash(g, c);
@@ -1485,7 +1581,7 @@ export function drawSkillIcon(g: G, vfx: string, color: number) {
 const PASSIVE_COLOR: Record<string, number> = {
   fleetfoot: 0x8fe0c0, deepLungs: 0x9fd3ff, secondWind: 0x9fe08a, ironSkin: 0xc9d3dd, wardensGrace: 0xffe08a, riposteMaster: 0xffc27a, keenEye: 0xdfe8ff,
   executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b, frostblood: 0x8fd3ff, glacialHide: 0xdfeaf4,
-  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a, stormcaller: 0x9fd3ff, tidalGrace: 0x8ff0e0, siegebreaker: 0xff9a3a, clockworkHeart: 0xffd070,
+  umbralTouch: 0xb77af2, nightveil: 0x6a5a9a, stormcaller: 0x9fd3ff, tidalGrace: 0x8ff0e0, siegebreaker: 0xff9a3a, clockworkHeart: 0xffd070, sunstrike: 0xffd24a, oasisHeart: 0x3ab8a0,
 };
 
 /** A passive skill's icon (shield and star in its colour). */

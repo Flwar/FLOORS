@@ -37,6 +37,8 @@ const TIDE_CHESTS = ["chest:grotto-chest", "chest:wreck-chest", "chest:kelp-ches
 const TIDE_WAYSTONES = ["ws:ws-saltmere", "ws:ws-tidepools", "ws:ws-coral", "ws:ws-wrecks", "ws:ws-cliffs"];
 const BRASS_CHESTS = ["chest:vault-chest", "chest:scrap-chest", "chest:orchard-chest"];
 const BRASS_WAYSTONES = ["ws:ws-gearhaven", "ws:ws-foundry", "ws:ws-vents", "ws:ws-orchard", "ws:ws-rails"];
+const SAND_CHESTS = ["chest:mirage-chest", "chest:canyon-chest", "chest:colossus-chest"];
+const SAND_WAYSTONES = ["ws:ws-sunwell", "ws:ws-dunes", "ws:ws-glass", "ws:ws-colossus", "ws:ws-sunspire"];
 const FROST_WAYSTONES = ["ws:ws-rimeholt", "ws:ws-snowfields", "ws:ws-lake", "ws:ws-pinewood", "ws:ws-peak"];
 const has = (c: AchievementContext, list: string[]) => list.every((k) => c.discovered.includes(k));
 
@@ -105,6 +107,15 @@ const DEFS: Def[] = [
   { id: "forgemaster", name: "Hammer and Anvil", desc: "Defeat Forgemaster Vulk.", test: (c) => c.bossKills.includes("vulk") },
   { id: "engine-stops", name: "The Engine Stops", desc: "Defeat the Archon Engine.", test: (c) => c.bossKills.includes("archon") },
   { id: "mythic", name: "Myth of the Tower", desc: "Reach level 32.", test: (c) => c.level >= 32 },
+  // Floor 8
+  { id: "sunscorched", name: "Sunscorched", desc: "Set foot on Floor 8.", test: (c) => c.discovered.includes("zone:sunscorched-sands") },
+  { id: "mirage", name: "It Was Real", desc: "Find the Mirage Oasis on Floor 8.", test: (c) => c.discovered.includes("zone:mirage-oasis") },
+  { id: "sand-treasure", name: "Buried Treasure", desc: "Open every chest on Floor 8.", test: (c) => has(c, SAND_CHESTS) },
+  { id: "sand-roads", name: "Caravan Roads", desc: "Attune every waystone on Floor 8.", test: (c) => has(c, SAND_WAYSTONES) },
+  { id: "sandmaw", name: "Wormsign", desc: "Defeat Sandmaw, the Dune Wyrm.", test: (c) => c.bossKills.includes("sandmaw") },
+  { id: "embalmer", name: "Unwrapped", desc: "Defeat Nephra the Embalmer.", test: (c) => c.bossKills.includes("nephra") },
+  { id: "sunset", name: "Sunset", desc: "Defeat Solkaris, the Sun Pharaoh.", test: (c) => c.bossKills.includes("solkaris") },
+  { id: "beyond", name: "Beyond Myth", desc: "Reach level 36.", test: (c) => c.level >= 36 },
   { id: "master-of-arms", name: "Master of Arms", desc: "Reach mastery 10 with a weapon.", test: (c) => c.maxMastery >= 10 },
   { id: "seasoned", name: "Seasoned", desc: "Reach level 8.", test: (c) => c.level >= 8 },
   { id: "hoarder", name: "Deep Pockets", desc: "Carry 1,000 gold.", test: (c) => c.gold >= 1000 },

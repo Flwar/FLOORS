@@ -37,12 +37,12 @@ export interface SkillEntry {
 }
 
 /** Rarity by a weapon's skill index: its first skills are common, its last legendary. */
-const WEAPON_RARITY = [0, 1, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 3, 3, 3, 3, 3, 3, 3, 3];
+const WEAPON_RARITY = [0, 1, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 /** Where a weapon's skills are first found, by skill index (Floors 4 and up add two per weapon). */
-const WEAPON_FROM = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7];
+const WEAPON_FROM = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8];
 /** Where ordinary skills of each rarity are sold, unless listed in FROM. */
 const FROM_BY_RARITY = [1, 1, 2, 3, 3];
-const FROM: Record<string, number> = { frostblood: 4, glacialHide: 4, umbralTouch: 5, nightveil: 5, stormcaller: 6, tidalGrace: 6, siegebreaker: 7, clockworkHeart: 7 };
+const FROM: Record<string, number> = { frostblood: 4, glacialHide: 4, umbralTouch: 5, nightveil: 5, stormcaller: 6, tidalGrace: 6, siegebreaker: 7, clockworkHeart: 7, sunstrike: 8, oasisHeart: 8 };
 const UNIVERSAL_RARITY: Record<string, number> = {
   "any.kick": 0, "any.knife": 0, "any.secondwind": 1, "any.warcry": 1, "any.blink": 1, "any.ironwill": 2, "any.fireball": 2, "any.winter": 2,
   "any.thunder": 2, "any.bloodrage": 3, "any.star": 3, "any.storm": 3, "any.sunburst": 3, "any.wyrmwrath": 4, "any.phoenix": 4,
@@ -51,6 +51,7 @@ const UNIVERSAL_RARITY: Record<string, number> = {
   "any.shadowbolt": 1, "any.siphon": 2, "any.voidrift": 3, "any.eclipse": 4,
   "any.tidalwave": 1, "any.riptide": 2, "any.whirlpool": 3, "any.leviathan": 4,
   "any.shrapnel": 1, "any.overclock": 2, "any.steamvent": 3, "any.titanfist": 4,
+  "any.sunbolt": 1, "any.carapace": 2, "any.sandstorm": 3, "any.sunfall": 4,
 };
 
 /**
@@ -66,11 +67,12 @@ export const FLOOR_OF: Record<string, number> = {
   "any.shadowbolt": 5, "any.siphon": 5, "any.voidrift": 5, "any.eclipse": 5,
   "any.tidalwave": 6, "any.riptide": 6, "any.whirlpool": 6, "any.leviathan": 6,
   "any.shrapnel": 7, "any.overclock": 7, "any.steamvent": 7, "any.titanfist": 7,
+  "any.sunbolt": 8, "any.carapace": 8, "any.sandstorm": 8, "any.sunfall": 8,
 };
-export const FLOOR_NAMES = ["", "Emberwatch", "the Gilded Terraces", "the Ember Reaches", "the Frostvale", "the Umbral Wilds", "the Drowned Isles", "the Clockwork Heights"];
+export const FLOOR_NAMES = ["", "Emberwatch", "the Gilded Terraces", "the Ember Reaches", "the Frostvale", "the Umbral Wilds", "the Drowned Isles", "the Clockwork Heights", "the Sunscorched Sands"];
 const PASSIVE_RARITY: Record<string, number> = {
   fleetfoot: 0, deepLungs: 0, secondWind: 1, ironSkin: 1, wardensGrace: 1, riposteMaster: 2, keenEye: 2, executioner: 2, momentum: 2,
-  scaleguard: 2, lastStand: 2, unbroken: 3, emberblood: 3, wyrmsbane: 3, frostblood: 3, glacialHide: 2, umbralTouch: 3, nightveil: 3, stormcaller: 3, tidalGrace: 3, siegebreaker: 3, clockworkHeart: 3,
+  scaleguard: 2, lastStand: 2, unbroken: 3, emberblood: 3, wyrmsbane: 3, frostblood: 3, glacialHide: 2, umbralTouch: 3, nightveil: 3, stormcaller: 3, tidalGrace: 3, siegebreaker: 3, clockworkHeart: 3, sunstrike: 3, oasisHeart: 3,
 };
 
 export const scrollKey = (id: string) => `scroll_${id.replace(/\./g, "_")}`;
@@ -167,7 +169,7 @@ export function scrollShop(floor: number): { key: string; price: number; marks: 
 for (let f = 1; f < FLOOR_NAMES.length; f++) SHOPS[`scrolls${f}`] = scrollShop(f);
 
 /** The floor an enemy of this level belongs to. */
-const floorOfLevel = (level: number) => (level <= 8 ? 1 : level <= 12 ? 2 : level <= 16 ? 3 : level <= 20 ? 4 : level <= 24 ? 5 : level <= 28 ? 6 : 7);
+const floorOfLevel = (level: number) => (level <= 8 ? 1 : level <= 12 ? 2 : level <= 16 ? 3 : level <= 20 ? 4 : level <= 24 ? 5 : level <= 28 ? 6 : level <= 32 ? 7 : 8);
 
 /**
  * A scroll dropped by a kill, if any. Ordinary enemies almost never carry one; elites

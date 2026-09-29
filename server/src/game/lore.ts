@@ -61,4 +61,13 @@ export const RUMOURS: Record<number, string[]> = {
     "Ada at the Gearworks says an aether core is a tiny sun in a jar. She doesn't say what happens if you drop it.",
     "When the Archon overloads, get to a grounding pylon. Everything else in that room is going to burn.",
   ],
+  8: [
+    "A dazzled thing swings at shadows. Blind it with the sun first — one blow in three will go wide.",
+    "The jackals come in threes, and they leap from further than you think. Parry the leap; they tumble when they miss.",
+    "Beyond the Glass Flats, behind the northern rocks, there's a buried road. The mapmakers say it goes nowhere. The mapmakers are liars.",
+    "Sandmaw sleeps under the dunes of the Sunspire. It swallowed the Solar Seal — the only thing the Pyramid's door will open for.",
+    "In the Pyramid there's a well of sunlight. Carry it to the dark altars, one at a time. It burns out in your hands if you dawdle.",
+    "Tamsin at the Sunforge says a Heart of the Sun is a noon you can hold in your fist. She keeps hers in a lead box.",
+    "When the Pharaoh calls High Noon, get into the shade of an obelisk. There is no other shade in that room.",
+  ],
 };

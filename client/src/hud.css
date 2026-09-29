@@ -82,7 +82,7 @@ body { font-family: "Trebuchet MS", system-ui, sans-serif; color: var(--ink); us
   .slot { width: 44px; height: 44px; }
 }
 
-/* The meal you ate at the inn, and how long it has left. */
-#meal { margin-top: 4px; font-size: 11px; color: #f3e6c4; text-shadow: 0 1px 2px #000; display: flex; align-items: center; gap: 5px; }
-#meal[hidden] { display: none; }
-#meal i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+/* The drink you had at the bar, and how long it has left. */
+#drink { margin-top: 4px; font-size: 11px; color: #f3e6c4; text-shadow: 0 1px 2px #000; display: flex; align-items: center; gap: 5px; }
+#drink[hidden] { display: none; }
+#drink i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }

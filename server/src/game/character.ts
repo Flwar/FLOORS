@@ -1,7 +1,7 @@
 import {
   baseHp, baseStamina, combatBonus, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemMasteryLevel, itemStats, knownIndices, makeItem, masteryProgress,
   MAX_LEVEL, Mod, NO_SKILL, scrollSkill, setsWorn, skillEntry, skillMods, WEAPON_ARTS, WEAPONS, xpToNext,
-  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type SkillEntry, type WeaponKey, mealById, type MealDef } from "@floors/shared";
+  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type SkillEntry, type WeaponKey, drinkById, type DrinkDef } from "@floors/shared";
 
 /** Main-story quests that used to award a skill point (for converting old characters). */
 const OLD_QUEST_POINTS = ["q_welcome", "q_grakk", "q_undercroft", "q_keeper", "f2_causeway", "f2_storm", "f2_spire"];
@@ -31,8 +31,8 @@ export interface CharacterData {
   version: 1;
   /** When a Floor Boss trophy will carry you again (Date.now() time). */
   relicAt?: number;
-  /** The inn meal you last ate, and when it wears off (Date.now() time). */
-  meal?: { id: string; until: number };
+  /** The drink you last had at a bar, and when it wears off (Date.now() time). */
+  drink?: { id: string; until: number };
   /** Hunter's Lore: kills of each kind of enemy. */
   hunts?: Record<string, number>;
   /** Rested: bonus experience still to be paid out (kills pay double until it's spent). */
@@ -295,15 +295,16 @@ export class Character {
     if (this.hasPerk("deepLungs")) stamina += 15;
     if (this.hasPerk("tidalGrace")) stamina += 20;
     if (this.hasPerk("clockworkHeart")) stamina += 25;
-    // An inn meal: one thing, done well, for a while.
-    const meal = this.meal();
-    if (meal?.stamina) stamina += meal.stamina;
-    if (meal?.dmgPct) power *= 1 + meal.dmgPct;
+    // A drink at the bar: one thing, done well, for a while.
+    const drink = this.drink();
+    if (drink?.stamina) stamina += drink.stamina;
+    if (drink?.dmgPct) power *= 1 + drink.dmgPct;
     let hpMax = baseHp(d.level) + hp;
-    if (meal?.hpPct) hpMax *= 1 + meal.hpPct;
+    if (drink?.hpPct) hpMax *= 1 + drink.hpPct;
     if (this.hasPerk("wardensGrace")) hpMax = Math.round(hpMax * 1.1);
     if (this.hasPerk("glacialHide")) hpMax = Math.round(hpMax * 1.08);
     if (this.hasPerk("clockworkHeart")) hpMax = Math.round(hpMax * 1.08);
+    if (this.hasPerk("oasisHeart")) hpMax = Math.round(hpMax * 1.1);
     this.derived = {
       atkMul: (power / 100) * (1 + (d.level - 1) * 0.04),
       defense,
@@ -318,17 +319,17 @@ export class Character {
     this.dirty = true;
   }
 
-  /** The inn meal still doing you good, if any. */
-  meal(): MealDef | undefined {
-    const m = this.data.meal;
-    return m && m.until > Date.now() ? mealById(m.id) : undefined;
+  /** The drink still doing you good, if any. */
+  drink(): DrinkDef | undefined {
+    const m = this.data.drink;
+    return m && m.until > Date.now() ? drinkById(m.id) : undefined;
   }
 
-  /** A meal has worn off: forget it, and lose what it gave. Returns true if one did. */
-  expireMeal(): boolean {
-    const m = this.data.meal;
+  /** A drink has worn off: forget it, and lose what it gave. Returns true if one did. */
+  expireDrink(): boolean {
+    const m = this.data.drink;
     if (!m || m.until > Date.now()) return false;
-    this.data.meal = undefined;
+    this.data.drink = undefined;
     this.recompute();
     return true;
   }
@@ -540,7 +541,7 @@ export class Character {
       stats: d.stats,
       achievements: d.achievements,
       relicAt: d.relicAt && d.relicAt > Date.now() ? d.relicAt : undefined,
-      meal: this.meal() ? d.meal : undefined,
+      drink: this.drink() ? d.drink : undefined,
       hunts: d.hunts ?? {},
       rested: d.rested || undefined,
       derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax, effects: [...this.derived.effects] },

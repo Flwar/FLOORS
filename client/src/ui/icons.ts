@@ -49,6 +49,135 @@ export function itemIcon(key: string, rarity = 0): string {
   } else if (key.startsWith("map_")) {
     drawMap(g);
   } else switch (base?.kind === "consumable" || base?.kind === "material" || base?.kind === "artifact" || base?.kind === "key" ? key : base?.kind) {
+    // --- Floor 8: the Sunscorched Sands ------------------------------------------------
+    case "mat_sunstone": {
+      // A chip of amber desert glass, still warm.
+      const halo = g.createRadialGradient(32, 34, 3, 32, 34, 26);
+      halo.addColorStop(0, "rgba(255,200,90,0.8)");
+      halo.addColorStop(1, "rgba(255,160,40,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(18, 46); g.lineTo(24, 18); g.lineTo(40, 12); g.lineTo(48, 30); g.lineTo(42, 52); g.lineTo(26, 54);
+      g.closePath();
+      g.fill();
+      const sg = g.createLinearGradient(20, 14, 46, 52);
+      sg.addColorStop(0, "#fff4c8");
+      sg.addColorStop(0.5, "#ffb040");
+      sg.addColorStop(1, "#b8641c");
+      g.fillStyle = sg;
+      g.beginPath();
+      g.moveTo(21, 45); g.lineTo(26, 20); g.lineTo(39, 15); g.lineTo(45, 30); g.lineTo(40, 49); g.lineTo(27, 51);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.75)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(28, 22); g.lineTo(26, 40);
+      g.stroke();
+      break;
+    }
+    case "mat_scarab": {
+      // A golden beetle's wing-case.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.ellipse(32, 34, 17, 21, 0, 0, Math.PI * 2);
+      g.fill();
+      const cg = g.createRadialGradient(26, 26, 2, 32, 34, 20);
+      cg.addColorStop(0, "#fff4c0");
+      cg.addColorStop(0.55, "#e8b030");
+      cg.addColorStop(1, "#8a5a10");
+      g.fillStyle = cg;
+      g.beginPath();
+      g.ellipse(32, 34, 14.5, 18.5, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = outline;
+      g.lineWidth = 2.4;
+      g.beginPath();
+      g.moveTo(32, 16); g.lineTo(32, 52);
+      g.moveTo(20, 26); g.quadraticCurveTo(32, 22, 44, 26);
+      g.stroke();
+      g.fillStyle = "#2a5aa8";
+      g.beginPath();
+      g.arc(32, 14, 5, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
+    case "mat_solarheart":
+    case "key_pyramid": {
+      // A noon you can hold (and the Solar Seal: a gold disc with a sun on its face).
+      const seal = key === "key_pyramid";
+      const halo = g.createRadialGradient(32, 32, 4, 32, 32, 30);
+      halo.addColorStop(0, "rgba(255,240,170,0.95)");
+      halo.addColorStop(1, "rgba(255,180,40,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = outline;
+      g.beginPath();
+      for (let i = 0; i < 24; i++) {
+        const ang = (i / 24) * Math.PI * 2;
+        const rad = i % 2 ? (seal ? 19 : 14) : seal ? 24 : 20;
+        g.lineTo(32 + Math.cos(ang) * rad, 32 + Math.sin(ang) * rad);
+      }
+      g.closePath();
+      g.fill();
+      const sg = g.createRadialGradient(28, 28, 2, 32, 32, seal ? 20 : 15);
+      sg.addColorStop(0, "#ffffff");
+      sg.addColorStop(0.5, "#ffe08a");
+      sg.addColorStop(1, "#d88a20");
+      g.fillStyle = sg;
+      g.beginPath();
+      g.arc(32, 32, seal ? 16 : 11.5, 0, Math.PI * 2);
+      g.fill();
+      if (seal) {
+        // The closed eye on the seal's face.
+        g.strokeStyle = outline;
+        g.lineWidth = 2.6;
+        g.beginPath();
+        g.arc(32, 28, 8, Math.PI * 0.15, Math.PI * 0.85);
+        g.stroke();
+        for (const dx of [-5, 0, 5]) {
+          g.beginPath();
+          g.moveTo(32 + dx, 35);
+          g.lineTo(32 + dx * 1.3, 39);
+          g.stroke();
+        }
+      }
+      break;
+    }
+    case "art_suncrown": {
+      // The Sun Pharaoh's crown: a gold band, a sun disc between horns, a cobra at the brow.
+      const halo = g.createRadialGradient(32, 26, 4, 32, 26, 30);
+      halo.addColorStop(0, "rgba(255,230,140,0.8)");
+      halo.addColorStop(1, "rgba(255,180,40,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(12, 52); g.lineTo(14, 36); g.lineTo(50, 36); g.lineTo(52, 52);
+      g.closePath();
+      g.fill();
+      g.beginPath();
+      g.arc(32, 22, 14, 0, Math.PI * 2);
+      g.fill();
+      const bg = g.createLinearGradient(0, 36, 0, 52);
+      bg.addColorStop(0, "#fff0a0");
+      bg.addColorStop(1, "#c8862a");
+      g.fillStyle = bg;
+      g.fillRect(15, 38, 34, 12);
+      g.fillStyle = "#2a5aa8";
+      for (let x = 17; x < 48; x += 6) g.fillRect(x, 40, 3, 8);
+      const dg = g.createRadialGradient(28, 18, 2, 32, 22, 12);
+      dg.addColorStop(0, "#ffffff");
+      dg.addColorStop(0.5, "#ffd24a");
+      dg.addColorStop(1, "#e87a20");
+      g.fillStyle = dg;
+      g.beginPath();
+      g.arc(32, 22, 11, 0, Math.PI * 2);
+      g.fill();
+      break;
+    }
     case "mat_essence": {
       const halo = g.createRadialGradient(32, 34, 3, 32, 34, 28);
       halo.addColorStop(0, "rgba(214,160,255,0.95)");

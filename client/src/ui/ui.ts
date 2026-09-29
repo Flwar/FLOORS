@@ -1,7 +1,7 @@
 import {
   ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, itemMasteryLevel, MAX_LEVEL, questDef, QUESTS, RARITY_COLORS,
   RARITY_NAMES, roomLabel, scrollSkill, SCROLL_SOURCES, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
-  masteryProgress, weaponMasteryDamage, gearSetOf, relicOf, relicPower, isDungeonRoom, TOWER, MEALS, MEAL_MS, salvageYield, temperCost, ENEMIES, HUNT_BONUS, HUNT_RANKS, HUNT_TITLES, huntRank,
+  masteryProgress, weaponMasteryDamage, gearSetOf, relicOf, relicPower, isDungeonRoom, TOWER, DRINKS, DRINK_MS, salvageYield, temperCost, ENEMIES, HUNT_BONUS, HUNT_RANKS, HUNT_TITLES, huntRank,
 } from "@floors/shared";
 import type { Room } from "@colyseus/sdk";
 import { sfx } from "../audio/sfx.ts";
@@ -43,8 +43,8 @@ export interface InvView {
   derived: { atk: number; defense: number; hpMax: number; staminaMax: number };
   /** When a Floor Boss trophy will carry you again. */
   relicAt?: number;
-  /** The inn meal doing you good, and when it wears off. */
-  meal?: { id: string; until: number };
+  /** The drink doing you good, and when it wears off. */
+  drink?: { id: string; until: number };
   /** Hunter's Lore: kills of each kind of enemy. */
   hunts?: Record<string, number>;
   /** Rested experience still to be paid out (kills pay double). */
@@ -59,8 +59,8 @@ export interface DialogMsg {
   offers: { id: string; name: string; pitch: string; main: boolean }[];
   done: { id: string; name: string; thanks: string }[];
   services: string[];
-  /** What a meal costs at this inn. */
-  mealPrice?: number;
+  /** What a drink costs at this bar. */
+  drinkPrice?: number;
   shop?: { key: string; price: number; rarity?: number; marks?: number }[];
 }
 
@@ -885,15 +885,15 @@ export class GameUI {
 
   // --- Dialog, shops, smith, bank -----------------------------------------------------
 
-  /** The inn's four dishes: one meal at a time, a new one replaces the old. */
-  private mealMenu(d: DialogMsg) {
-    const box = el(`<div class="meals"><div class="tt-dim">Order a meal (${d.mealPrice ?? 0}g · lasts ${MEAL_MS / 60000} minutes · a new one replaces the old)</div></div>`);
-    const cur = this.inv?.meal && this.inv.meal.until > Date.now() ? this.inv.meal : undefined;
-    for (const m of MEALS) {
-      const eating = cur?.id === m.id;
-      const row = el(`<button class="meal-row${eating ? " active" : ""}"><i style="background:${m.color}"></i><b>${esc(m.name)}</b><span>${esc(m.desc)}${eating ? ` · ${Math.ceil((cur!.until - Date.now()) / 60000)} min left` : ""}</span></button>`);
+  /** The bar's four drinks: one at a time, and a new one replaces the old. */
+  private drinkMenu(d: DialogMsg) {
+    const box = el(`<div class="drinks"><div class="tt-dim">Drinks at the bar (${d.drinkPrice ?? 0}g · lasts ${DRINK_MS / 60000} minutes · a new drink replaces the old)</div></div>`);
+    const cur = this.inv?.drink && this.inv.drink.until > Date.now() ? this.inv.drink : undefined;
+    for (const m of DRINKS) {
+      const drinking = cur?.id === m.id;
+      const row = el(`<button class="drink-row${drinking ? " active" : ""}"><i style="background:${m.color}"></i><b>${esc(m.name)}</b><span>${esc(m.desc)}${drinking ? ` · ${Math.ceil((cur!.until - Date.now()) / 60000)} min left` : ""}</span></button>`);
       row.addEventListener("click", () => {
-        this.room?.send("inn:eat", { npc: d.npc, meal: m.id });
+        this.room?.send("bar:drink", { npc: d.npc, drink: m.id });
         window.setTimeout(() => this.dialog === d && this.render("dialog"), 400);
       });
       box.append(row);
@@ -939,7 +939,7 @@ export class GameUI {
       });
     }
     if (services.childElementCount) body.append(services);
-    if (d.services.includes("meals")) body.append(this.mealMenu(d));
+    if (d.services.includes("drinks")) body.append(this.drinkMenu(d));
     if (this.mode === "shop" && d.shop) {
       const shopKey = d.services.find((s) => s.startsWith("shop:"))!.slice(5);
       const list = el(`<div class="shop"></div>`);

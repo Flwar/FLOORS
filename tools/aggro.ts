@@ -84,8 +84,13 @@ for (let i = 0; i < 3; i++) {
   keepBothAlive();
   await wait(300);
 }
-await wait(800);
-const before = await who();
+// (It only turns between swings: give it a moment to finish the one it started.)
+let before = await who();
+for (let i = 0; i < 12 && before !== B.name; i++) {
+  keepBothAlive();
+  await wait(250);
+  before = await who();
+}
 A.room.send("dev:strike", { damage: 5 });
 await wait(900);
 check("a small hit doesn't steal it from the bigger threat", (await who()) === before, `${before} → ${await who()}`);

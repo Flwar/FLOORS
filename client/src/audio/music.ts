@@ -22,6 +22,8 @@ const MINOR = [0, 2, 3, 5, 7, 8, 10];
 const DORIAN = [0, 2, 3, 5, 7, 9, 10];
 const LYDIAN = [0, 2, 4, 6, 7, 9, 11];
 const MIXOLYDIAN = [0, 2, 4, 5, 7, 9, 10];
+/** Phrygian dominant: the desert's scale (a raised third over a flat second). */
+const HIJAZ = [0, 1, 4, 5, 7, 8, 10];
 
 const TRACKS: Record<string, Track> = {
   town: { bpm: 84, root: 55, scale: MAJOR, chords: [[0, 2, 4], [3, 5, 0], [4, 6, 1], [0, 2, 4], [5, 0, 2], [3, 5, 0], [1, 3, 5], [4, 6, 1]], pad: "triangle", padLevel: 0.05, arp: { pattern: [0, 1, 2, 1, 0, 2, 1, 2], level: 0.035, wave: "sine", octave: 1 }, bass: { level: 0.06, pattern: [0, -1, -1, -1, 0, -1, 2, -1] } },
@@ -58,6 +60,10 @@ const TRACKS: Record<string, Track> = {
   // Floor 7: the Clockwork Heights — a ticking, mechanical ostinato; Gearhaven a music-box waltz; the Engine a pounding march.
   brass: { bpm: 104, root: 50, scale: DORIAN, chords: [[0, 2, 4], [4, 6, 1], [5, 0, 2], [3, 5, 0]], pad: "triangle", padLevel: 0.035, arp: { pattern: [0, 4, 0, 4, 2, 4, 2, 5], level: 0.032, wave: "square", octave: 1 }, bass: { level: 0.06, pattern: [0, -1, 0, -1, 4, -1, 4, -1] }, drums: { kick: [1, 0, 0, 0, 1, 0, 0, 0], hat: [1, 1, 1, 1, 1, 1, 1, 1], level: 0.08 } },
   gearhaven: { bpm: 90, root: 60, scale: MAJOR, chords: [[0, 2, 4], [3, 5, 0], [4, 6, 1], [0, 2, 4]], pad: "sine", padLevel: 0.035, arp: { pattern: [0, 2, 4, 7, 4, 2, 0, 2], level: 0.036, wave: "triangle", octave: 2 }, bass: { level: 0.045, pattern: [0, -1, -1, 4, -1, -1, 4, -1] } },
+  // Floor 8: the Sunscorched Sands — a slow hijaz melody over a drone; Sunwell a lilting market tune; the Pyramid a solemn procession.
+  sands: { bpm: 88, root: 50, scale: HIJAZ, chords: [[0, 2, 4], [1, 3, 5], [0, 2, 4], [6, 1, 3]], pad: "sine", padLevel: 0.04, drone: 0.035, arp: { pattern: [0, 1, 2, 1, 4, 2, 1, 0], level: 0.034, wave: "triangle", octave: 1 }, bass: { level: 0.05, pattern: [0, -1, -1, 0, -1, -1, 4, -1] }, drums: { kick: [1, 0, 0, 1, 0, 0, 1, 0], hat: [0, 0, 1, 0, 0, 1, 0, 0], level: 0.07 } },
+  sunwell: { bpm: 100, root: 57, scale: HIJAZ, chords: [[0, 2, 4], [3, 5, 0], [1, 3, 5], [0, 2, 4]], pad: "triangle", padLevel: 0.035, arp: { pattern: [0, 2, 1, 2, 4, 2, 1, 2], level: 0.036, wave: "triangle", octave: 2 }, bass: { level: 0.045, pattern: [0, -1, 4, -1, 0, -1, 4, -1] }, drums: { kick: [1, 0, 0, 1, 0, 1, 0, 0], hat: [0, 1, 1, 0, 1, 0, 1, 1], level: 0.06 } },
+  pyramid: { bpm: 72, root: 45, scale: HIJAZ, chords: [[0, 2, 4], [1, 3, 5], [5, 0, 2], [0, 2, 4]], pad: "sawtooth", padLevel: 0.024, drone: 0.05, arp: { pattern: [0, -1, 1, -1, 4, -1, 1, -1], level: 0.03, wave: "sine", octave: 1 }, bass: { level: 0.08, pattern: [0, -1, -1, -1, 0, -1, 1, -1] }, drums: { kick: [1, 0, 0, 0, 1, 0, 0, 0], hat: [0, 0, 0, 0, 0, 0, 1, 0], level: 0.14 } },
   engine: { bpm: 124, root: 43, scale: MINOR, chords: [[0, 2, 4], [5, 0, 2], [6, 1, 3], [4, 6, 1]], pad: "sawtooth", padLevel: 0.022, drone: 0.04, arp: { pattern: [0, 0, 4, 0, 2, 0, 4, 6], level: 0.03, wave: "square", octave: 1 }, bass: { level: 0.09, pattern: [0, 0, -1, 0, 0, -1, 3, 4] }, drums: { kick: [1, 0, 1, 0, 1, 0, 1, 0], hat: [0, 1, 0, 1, 0, 1, 0, 1], level: 0.2 } },
   victory: { bpm: 100, root: 60, scale: MAJOR, chords: [[0, 2, 4], [3, 5, 0], [4, 6, 1], [0, 2, 4]], pad: "triangle", padLevel: 0.06, arp: { pattern: [0, 2, 4, 7, 4, 2, 0, 4], level: 0.04, wave: "triangle", octave: 1 }, bass: { level: 0.07, pattern: [0, -1, 0, -1, 0, -1, 0, -1] }, drums: { kick: [1, 0, 0, 0, 1, 0, 0, 0], level: 0.15 } },
 };

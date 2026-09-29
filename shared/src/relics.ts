@@ -16,6 +16,7 @@ export const RELICS: Record<string, { floor: number; gate?: boolean }> = {
   art_eclipse: { floor: 5 },
   art_tidecrown: { floor: 6 },
   art_archoncore: { floor: 7 },
+  art_suncrown: { floor: 8 },
 };
 
 /** How long a trophy needs before it will carry you again (shared by all of them). */

@@ -57,6 +57,13 @@ export const GEAR_SETS: GearSet[] = [
     two: { hp: 60, defense: 16 },
     three: { effect: "setBrass", desc: "Your blows have a 30% chance to sunder armour, and you deal 10% more damage to the sundered." },
   },
+  {
+    id: "solar",
+    name: "Solar",
+    pieces: ["sword_solar", "greatsword_solar", "daggers_solar", "spear_solar", "staff_solar", "armor_solar", "armor_nomad", "armor_sunweave", "helm_nemes", "helm_veil"],
+    two: { hp: 64, defense: 17 },
+    three: { effect: "setSolar", desc: "Your blows have a 30% chance to dazzle, and you deal 10% more damage to the dazzled." },
+  },
 ];
 
 const BY_PIECE = new Map(GEAR_SETS.flatMap((s) => s.pieces.map((k) => [k, s] as const)));

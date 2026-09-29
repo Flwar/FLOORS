@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { floorOfRoom, itemBase, mapFloorNumber, missionReady, MOON_PHASES, CG_VALVE_BIT, EG_BREAKER_BIT, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SG, SG_MOON_BIT, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { floorOfRoom, itemBase, mapFloorNumber, missionReady, MOON_PHASES, CG_VALVE_BIT, EG_BREAKER_BIT, PG_ALTAR_BIT, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SG, SG_MOON_BIT, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Drop } from "../../../server/src/state.ts";
 import { RES } from "../art/characters.ts";
 import { itemIconCanvas } from "../ui/icons.ts";
@@ -230,11 +230,16 @@ const isMoon = (o: WorldObject) => o.kind === "lever" && o.name === "Moon Lanter
 const isValve = (o: WorldObject) => o.kind === "lever" && o.name === "Sluice Valve";
 /** The Engine's breakers: live ones ride in the gate mask. */
 const isBreaker = (o: WorldObject) => o.kind === "lever" && o.name === "Breaker";
+/** The Pyramid's sun altars: lit ones ride in the gate mask; the Sunwell gives the light. */
+const isAltar = (o: WorldObject) => o.kind === "lever" && o.name === "Sun Altar";
+const isSunwell = (o: WorldObject) => o.kind === "lever" && o.name === "The Sunwell";
 
 function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates: number): string {
   switch (o.kind) {
     case "lever":
       if (isBreaker(o)) return (gates >> (EG_BREAKER_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
+      if (isAltar(o)) return (gates >> (PG_ALTAR_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
+      if (isSunwell(o)) return "lit";
       if (isValve(o)) return (gates >> (CG_VALVE_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
       if (isMoon(o)) return `moon${(gates >> (SG_MOON_BIT + Number(o.id.split("-")[1]) * 2)) & 3}${(gates >> SG.moonsNorth) & 1 ? "lit" : ""}`;
       return isConduit(o) && (gates >> (SS_CONDUIT_BIT + Number(o.id.split("-")[1]))) & 1 ? "lit" : "";
@@ -278,6 +283,8 @@ function objLabel(o: WorldObject, state: string, here: number): string {
       if (isSeal(o)) return state === "lit" ? `${o.name} (burning)` : `Light the ${o.name}`;
       if (isValve(o)) return state === "lit" ? "Sluice Valve (shut)" : "Turn the Sluice Valve";
       if (isBreaker(o)) return state === "lit" ? "Breaker (live!)" : "Throw the Breaker";
+      if (isAltar(o)) return state === "lit" ? "Sun Altar (blazing)" : "Bring the sun to the Sun Altar";
+      if (isSunwell(o)) return "Take the sun from the Sunwell";
       if (isMoon(o)) return state.endsWith("lit") ? `Moon Lantern (${MOON_PHASES[Number(state[4])]}, aligned)` : `Turn the Moon Lantern (${MOON_PHASES[Number(state[4])]})`;
       if (o.name.startsWith("Rune of")) return state === "lit" ? `${o.name} (ringing)` : `Strike the ${o.name}`;
       return isConduit(o) ? (state === "lit" ? `${o.name} (awake)` : `Wake the ${o.name}`) : `Pull the ${o.name}`;
@@ -302,6 +309,8 @@ function texFor(o: WorldObject, state: string): string {
       if (isSeal(o)) return state === "lit" ? "objBrazier" : "objSeal";
       if (isMoon(o)) return `objMoon${state[4] ?? 0}`;
       if (isBreaker(o)) return state === "lit" ? "objConduitLit" : "objConduit";
+      if (isAltar(o)) return state === "lit" ? "objBrazier" : "objSeal";
+      if (isSunwell(o)) return "objConduitLit";
       return isConduit(o) ? (state === "lit" ? "objConduitLit" : "objConduit") : "objLever";
     case "entry":
       return o.id.startsWith("enter-") ? "objNone" : "objDoormat";

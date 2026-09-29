@@ -40,7 +40,8 @@
     "leash": "tsx tools/leash.ts",
     "relics": "tsx tools/relics.ts",
     "questflow": "tsx tools/questflow.ts",
-    "progress": "tsx tools/progress.ts"
+    "progress": "tsx tools/progress.ts",
+    "floor8": "tsx tools/floor8.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

@@ -22,6 +22,7 @@ const PROFILES: Record<string, Profile> = {
   frost: { bed: { type: "highpass", freq: 900, q: 0.5, level: 0.06, wobble: 0.85 }, events: [{ kind: "chime", every: [9, 18], level: 0.03 }] },
   shadow: { bed: { type: "lowpass", freq: 260, q: 1.1, level: 0.07, wobble: 0.6 }, events: [{ kind: "owl", every: [14, 30], level: 0.04 }, { kind: "chime", every: [16, 30], level: 0.025 }] },
   sea: { bed: { type: "bandpass", freq: 480, q: 0.35, level: 0.085, wobble: 0.95 }, events: [{ kind: "bird", every: [5, 12], level: 0.035 }, { kind: "creak", every: [12, 24], level: 0.03 }] },
+  sands: { bed: { type: "bandpass", freq: 420, q: 0.6, level: 0.1, wobble: 0.8 }, events: [{ kind: "chime", every: [14, 28], level: 0.025 }] },
   brass: { bed: { type: "lowpass", freq: 220, q: 1, level: 0.08, wobble: 0.4 }, events: [{ kind: "creak", every: [4, 9], level: 0.05 }, { kind: "chime", every: [8, 16], level: 0.03 }, { kind: "bell", every: [30, 60], level: 0.03 }] },
   storm: { bed: { type: "bandpass", freq: 420, q: 0.5, level: 0.075, wobble: 0.9 }, events: [{ kind: "creak", every: [6, 14], level: 0.06 }, { kind: "chime", every: [12, 24], level: 0.03 }] },
 };

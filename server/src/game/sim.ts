@@ -152,6 +152,8 @@ export interface EnemyData {
   soakUntil?: number;
   /** Sundered: its armour counts for nothing, until this time. */
   sunderUntil?: number;
+  /** Dazzled: one blow in three it throws goes wide, until this time. */
+  dazzleUntil?: number;
   /** Elite affix (Affix.*). */
   affix: number;
   /** Threat per player (damage dealt, taunts), fading over time: the enemy fights whoever tops it. */
@@ -210,6 +212,8 @@ interface HazardData {
   soak?: boolean;
   /** Sunders what it hits (Steam Vent). */
   sunder?: boolean;
+  /** Dazzles what it hits (Sandstorm). */
+  dazzle?: boolean;
   /** Glyphs are safe spots, not damage. */
   safe?: boolean;
   lifeUntil: number;
@@ -222,6 +226,8 @@ const SAFE_RESPAWN_MS = 2500;
 const CURSE_DAMAGE = 0.7;
 /** Lightning strikes soaked enemies this much harder. */
 const SOAK_SHOCK = 1.35;
+/** A dazzled enemy's blows go wide this often. */
+const DAZZLE_MISS = 1 / 3;
 /** Shielded elites: the ward is this share of their health, and returns this long after the last blow. */
 const SHIELD_SHARE = 0.2;
 const SHIELD_BACK_MS = 8000;
@@ -403,7 +409,7 @@ export class Sim {
       pd.hitSeq = p.actSeq;
       pd.hitSet.clear();
     }
-    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift" || m.special === "whirlpool" || m.special === "steamvent") return; // detonates as hazards
+    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm" || m.special === "voidrift" || m.special === "whirlpool" || m.special === "steamvent" || m.special === "sandstorm") return; // detonates as hazards
     const shape = m.shape!;
     const rad = aimToRad(p.actAim);
     const reach = shapeReach(shape) + 40;
@@ -430,7 +436,7 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "tide" ? ProjKind.TideWave : pj.look === "spark" ? ProjKind.Spark : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "void" ? ProjKind.VoidOrb : pj.look === "tide" ? ProjKind.TideWave : pj.look === "spark" ? ProjKind.Spark : pj.look === "sun" ? ProjKind.Sunbolt : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
         pierce: pj.look === "wave" || (pj.look === "tide" && pj.count === 1),
         team: 0,
         owner: pd.sid,
@@ -524,6 +530,21 @@ export class Sim {
           this.spawnHazard({ kind: HazardKind.Tide, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, soak: true, life: 250 });
         }
         this.emit("fx", { k: "whirlpool", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
+        break;
+      }
+      case "sandstorm": {
+        // Sandstorm: scours five times where you aim, dazzling what it catches.
+        const shape = m.shape as Extract<Shape, { kind: "circle" }>;
+        let cx = p.x + Math.cos(rad) * shape.offset;
+        let cy = p.y + Math.sin(rad) * shape.offset;
+        if (!this.wallClear(p.x, p.y, cx, cy)) {
+          cx = p.x + Math.cos(rad) * shape.offset * 0.4;
+          cy = p.y + Math.sin(rad) * shape.offset * 0.4;
+        }
+        for (let i = 0; i < 5; i++) {
+          this.spawnHazard({ kind: HazardKind.Sun, team: 0, x: cx, y: cy, radius: shape.radius, delay: 450 + i * 420, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, dazzle: true, life: 250 });
+        }
+        this.emit("fx", { k: "sandstorm", x: cx, y: cy, r: shape.radius, ms: 450 + 5 * 420 }, cx, cy);
         break;
       }
       case "steamvent": {
@@ -665,6 +686,7 @@ export class Sim {
     poise *= md?.poise ?? 1;
     knockback *= md?.knock ?? 1;
     let crit = 0;
+    let countered = false;
     if (e.flags & EFlag.Riposte) {
       dmg *= (attacker ? WEAPONS[attacker.weapon].riposte : 2) * (md?.riposte ?? 1) * (pd?.ch?.hasPerk("riposteMaster") ? 1.4 : 1);
       crit = 2;
@@ -693,6 +715,7 @@ export class Sim {
       poise *= 1.5;
       if (dv?.effects.has("setBrass")) dmg *= 1.1;
     }
+    if (e.flags & EFlag.Dazzled && (dv?.effects.has("setSolar") || pd?.ch?.hasPerk("sunstrike"))) dmg *= 1.1;
     if (e.flags & EFlag.Soaked) {
       if (m?.vfx === "lightning" || m?.vfx === "storm") dmg *= SOAK_SHOCK;
       if (dv?.effects.has("setTide")) dmg *= 1.1;
@@ -702,6 +725,7 @@ export class Sim {
       dmg *= 1.5;
       crit = Math.max(crit, 1);
       pd.counterUntil = 0;
+      countered = true;
       this.emit("fx", { k: "counter", x: e.x, y: e.y }, e.x, e.y);
     }
     if (ed.affix === Affix.Warded && e.hp > e.hpMax / 2) dmg *= 0.65;
@@ -725,6 +749,8 @@ export class Sim {
     }
     const heavyBlow = attacker && (attacker.act === Act.Heavy || attacker.act === Act.Skill);
     if (m?.special === "sunder" || m?.sunder || (m && heavyBlow && pd?.ch?.hasPerk("siegebreaker")) || (dv?.effects.has("tinkercog") && Math.random() < 1 / 6) || (dv?.effects.has("setBrass") && Math.random() < 0.3)) this.sunder(ed);
+    // Dazzle: sun arts, the Solar set, the Golden Scarab, and Sunstrike's ripostes and counters.
+    if (m?.dazzle || ((crit === 2 || countered) && pd?.ch?.hasPerk("sunstrike")) || (dv?.effects.has("goldscarab") && Math.random() < 1 / 6) || (dv?.effects.has("setSolar") && Math.random() < 0.3)) this.dazzle(ed);
     if (m?.special === "soak" || m?.soak || (dv?.effects.has("tideshell") && Math.random() < 1 / 6) || (dv?.effects.has("setTide") && Math.random() < 0.3)) this.soak(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
     // Hunter's Lore: you know how to kill what you've killed many times.
@@ -1019,6 +1045,13 @@ export class Sim {
       this.emit("practice", { p: pd.sid, x, y }, x, y);
       return;
     }
+    // Dazzled: one blow in three it throws goes wide.
+    const dazzler = source.ed ?? (source.proj?.enemyId ? this.enemies.get(source.proj.enemyId) : undefined);
+    if (dazzler && dazzler.e.flags & EFlag.Dazzled && Math.random() < DAZZLE_MISS) {
+      this.emit("evade", { p: pd.sid, x, y }, x, y);
+      this.emit("fx", { k: "dazzlemiss", x, y, p: pd.sid }, x, y);
+      return;
+    }
     if (pd.ch?.hasPerk("nightveil") && Math.random() < 0.1) {
       // Nightveil: the blow passes through your shadow.
       this.emit("evade", { p: pd.sid, x, y }, x, y);
@@ -1224,7 +1257,7 @@ export class Sim {
     this.state.projectiles.delete(id);
   }
 
-  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean; soak?: boolean; sunder?: boolean }) {
+  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean; curse?: boolean; soak?: boolean; sunder?: boolean; dazzle?: boolean }) {
     const id = this.id("h");
     const hz = new Hazard();
     hz.kind = o.kind;
@@ -1236,7 +1269,7 @@ export class Sim {
     hz.delay = o.delay;
     this.state.hazards.set(id, hz);
     this.onSpawn?.(hz, o.x, o.y);
-    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, soak: o.soak, sunder: o.sunder, lifeUntil: this.now + o.delay + (o.life ?? 600) });
+    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, curse: o.curse, soak: o.soak, sunder: o.sunder, dazzle: o.dazzle, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
   }
 
@@ -1260,6 +1293,15 @@ export class Sim {
   }
 
   /** Sunder an enemy: its armour counts for nothing and it staggers half again as fast, for a few seconds. */
+  /** Dazzle an enemy: one blow in three it throws goes wide, for a few seconds. */
+  dazzle(ed: EnemyData, ms = 5000) {
+    if (ed.e.act === EAct.Dead) return;
+    const was = (ed.e.flags & EFlag.Dazzled) !== 0;
+    ed.dazzleUntil = Math.max(ed.dazzleUntil ?? 0, this.now + ms);
+    ed.e.flags |= EFlag.Dazzled;
+    if (!was) this.emit("fx", { k: "dazzled", x: ed.e.x, y: ed.e.y, t: ed.id }, ed.e.x, ed.e.y);
+  }
+
   sunder(ed: EnemyData, ms = 5000) {
     const was = (ed.e.flags & EFlag.Sundered) !== 0;
     ed.sunderUntil = Math.max(ed.sunderUntil ?? 0, this.now + ms);
@@ -1358,6 +1400,10 @@ export class Sim {
         ed.soakUntil = undefined;
         ed.e.flags &= ~EFlag.Soaked;
       }
+      if (ed.dazzleUntil && (this.now > ed.dazzleUntil || ed.e.act === EAct.Dead)) {
+        ed.dazzleUntil = undefined;
+        ed.e.flags &= ~EFlag.Dazzled;
+      }
       if (ed.sunderUntil && (this.now > ed.sunderUntil || ed.e.act === EAct.Dead)) {
         ed.sunderUntil = undefined;
         ed.e.flags &= ~EFlag.Sundered;
@@ -1419,6 +1465,10 @@ export class Sim {
           this.chill(ed);
           this.emit("fx", { k: "iceburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
         }
+        if (pj.special === "dazzle" && ed.e.act !== EAct.Dead) {
+          this.dazzle(ed);
+          this.emit("fx", { k: "sunburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
+        }
         if (pj.special === "sunder" && ed.e.act !== EAct.Dead) {
           this.sunder(ed);
           this.emit("fx", { k: "sparkburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
@@ -1453,6 +1503,7 @@ export class Sim {
           this.damageEnemy(ed, pd, (hz.damage * shock) / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
           if (hz.soak && ed.e.act !== EAct.Dead) this.soak(ed);
           if (hz.sunder && ed.e.act !== EAct.Dead) this.sunder(ed);
+          if (hz.dazzle && ed.e.act !== EAct.Dead) this.dazzle(ed);
           if (hz.burn && pd && ed.e.act !== EAct.Dead) this.ignite(ed, pd, hz.damage / (pd.atkMul || 1));
           if (hz.frost && ed.e.act !== EAct.Dead) this.chill(ed);
           if (hz.curse && ed.e.act !== EAct.Dead) this.curse(ed);
@@ -1538,7 +1589,7 @@ export class Sim {
       if (pd.p.sit && (p.act !== Act.None || p.gait !== 0)) pd.p.sit = 0;
       if (p.act !== Act.Dead && pd.p.hp > 0 && pd.p.hp < pd.p.hpMax && this.now > pd.combatUntil) {
         // Sitting down to rest closes them faster.
-        pd.regen += pd.p.hpMax * 0.02 * (pd.p.sit ? REST_REGEN : 1) * dt;
+        pd.regen += pd.p.hpMax * 0.02 * (pd.p.sit ? REST_REGEN : 1) * (pd.ch?.hasPerk("oasisHeart") ? 2 : 1) * dt;
         if (pd.regen >= 1) {
           const add = Math.floor(pd.regen);
           pd.regen -= add;

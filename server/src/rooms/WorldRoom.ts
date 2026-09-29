@@ -1,7 +1,7 @@
 import { matchMaker, type Client } from "colyseus";
 import {
   Act, floorDef, floorOfRoom, itemBase, makeItem, questDef, SKILLBOOK, sellPrice, SHOPS, TILE, TOWER, upgradeCost, WEAPONS,
-  type FloorDef, type NpcDef, type WorldMap, type WorldObject, relicOf, RELIC_COOLDOWN_MS, mealById, mealPrice, MEAL_MS, salvageYield, temperCost } from "@floors/shared";
+  type FloorDef, type NpcDef, type WorldMap, type WorldObject, relicOf, RELIC_COOLDOWN_MS, drinkById, drinkPrice, DRINK_MS, salvageYield, temperCost } from "@floors/shared";
 import { BANK_SIZE, type Character } from "../game/character.ts";
 import { accept, offers, questEvent, turnIns, type QuestEvent } from "../game/quests.ts";
 import { Spawners } from "../game/spawners.ts";
@@ -236,19 +236,19 @@ export class WorldRoom extends GameRoom {
       }
       this.travel(client.sessionId, me.ch, to.room, to.down ?? "");
     });
-    // Inn meals: order from the innkeeper; one at a time, and a new one replaces the old.
-    this.onMessage("inn:eat", (client, msg: { npc: string; meal: string }) => {
+    // Drinks at the bar: order from the innkeeper; one at a time, and a new one replaces the old.
+    this.onMessage("bar:drink", (client, msg: { npc: string; drink: string }) => {
       const me = this.player(client);
-      const meal = mealById(String(msg?.meal));
+      const drink = drinkById(String(msg?.drink));
       const npc = this.map.npcs.find((n) => n.id === String(msg?.npc));
-      if (!me || !meal || !npc || npc.role !== "inn" || me.p.act === Act.Dead || !this.npcNear(client, undefined, npc.id)) return;
-      const price = mealPrice(this.floor.n);
-      if (me.ch.data.gold < price) return this.notify(client, `${meal.name} costs ${price} gold.`, "error");
+      if (!me || !drink || !npc || npc.role !== "inn" || me.p.act === Act.Dead || !this.npcNear(client, undefined, npc.id)) return;
+      const price = drinkPrice(this.floor.n);
+      if (me.ch.data.gold < price) return this.notify(client, `${drink.name} costs ${price} gold.`, "error");
       me.ch.data.gold -= price;
-      me.ch.data.meal = { id: meal.id, until: Date.now() + MEAL_MS };
+      me.ch.data.drink = { id: drink.id, until: Date.now() + DRINK_MS };
       me.ch.recompute();
-      this.emitNear("fx", { k: "eat", x: me.p.x, y: me.p.y, p: client.sessionId, c: meal.color }, me.p.x, me.p.y);
-      this.notify(client, `${meal.name}: ${meal.desc} (${MEAL_MS / 60000} minutes)`, "good");
+      this.emitNear("fx", { k: "drink", x: me.p.x, y: me.p.y, p: client.sessionId, c: drink.color }, me.p.x, me.p.y);
+      this.notify(client, `${drink.name}: ${drink.desc} (${DRINK_MS / 60000} minutes)`, "good");
     });
     this.onMessage("shop:buy", (client, msg: { shop: string; idx: number }) => {
       const me = this.player(client);
@@ -425,7 +425,7 @@ export class WorldRoom extends GameRoom {
     if (npc.role === "smith") services.push("smith");
     if (shop) services.push("sell");
     if (npc.role === "storage") services.push("bank");
-    if (npc.role === "inn") services.push("rumour", "meals");
+    if (npc.role === "inn") services.push("rumour", "drinks");
     const done = updates.filter((u) => u.done).map((u) => ({ id: u.id, name: u.name, thanks: questDef(u.id)!.thanks }));
     client.send("dialog", {
       npc: npc.id,
@@ -436,7 +436,7 @@ export class WorldRoom extends GameRoom {
       done,
       services,
       shop: shop === "merchant" ? this.events.merchantStock : shop ? SHOPS[shop] : undefined,
-      mealPrice: npc.role === "inn" ? mealPrice(this.floor.n) : undefined,
+      drinkPrice: npc.role === "inn" ? drinkPrice(this.floor.n) : undefined,
     });
   }
 

@@ -14,6 +14,7 @@ export class Sky {
     const COLORS: Record<SkyKind, [number, number]> = {
       day: [0x8fc2e6, 0xd8ecf6], dusk: [0x2a3350, 0x0e1320], gold: [0xf7dca0, 0xa9c6e8], storm: [0x5a6a86, 0x2a3350],
       ember: [0x6a2414, 0x1a0806], frost: [0xb8d4ea, 0xeef6fb], void: [0x1a0f2e, 0x05030c], sea: [0x6fc8e8, 0xd8f4f0], smog: [0xd8a868, 0x5a3a24],
+      desert: [0xf4c878, 0xfff2d0],
     };
     const colors = COLORS[tint];
     this.bg = scene.add.graphics().setScrollFactor(0).setDepth(-100);
@@ -31,7 +32,17 @@ export class Sky {
       if (tint === "void") img.setTint(0x4a3a6a).setAlpha(alpha * 0.6);
       if (tint === "sea") img.setTint(0xeaffff);
       if (tint === "smog") img.setTint(0xb08a60);
+      // The Sunscorched Sands: thin, sun-bleached cloud.
+      if (tint === "desert") img.setTint(0xfff0d0).setAlpha(alpha * 0.45);
       this.layers.push({ img, speed, parallax });
+    }
+    if (tint === "desert") {
+      // Sand blowing across the sky, and faintly in front of the isles.
+      paintDust(scene);
+      for (const [parallax, speed, alpha, depth] of [[0.2, 40, 0.7, -88], [0.5, 90, 0.22, 5e5]] as const) {
+        const img = scene.add.tileSprite(0, 0, w * 2, h * 2, "skyDust").setOrigin(0).setScrollFactor(0).setDepth(depth).setAlpha(alpha);
+        this.layers.push({ img, speed, parallax, rise: 3 });
+      }
     }
     if (tint === "smog") {
       // Sparks from the foundries drifting up past the isles.
@@ -84,6 +95,7 @@ export class Sky {
       if (tint === "void") img.setTint(0x3a2a5a);
       if (tint === "sea") img.setTint(0xa8e0d0);
       if (tint === "smog") img.setTint(0x7a5a3a);
+      if (tint === "desert") img.setTint(0xe8c890);
       img.setPosition(300 + i * 900, 200 + ((i * 373) % 700));
       this.islands.push(img);
     }
@@ -103,6 +115,35 @@ export class Sky {
       l.img.setScale(1 / cam.zoom);
     }
   }
+}
+
+/** Blowing sand: fine specks and a few longer streaks, drifting sideways. */
+function paintDust(scene: Phaser.Scene) {
+  if (scene.textures.exists("skyDust")) return;
+  const tex = scene.textures.createCanvas("skyDust", 512, 512)!;
+  const g = tex.getContext();
+  let seed = 23;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 220; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 512;
+    const r = 0.6 + rnd() * 1.4;
+    g.fillStyle = `rgba(${200 + Math.floor(rnd() * 40)},${160 + Math.floor(rnd() * 40)},${100 + Math.floor(rnd() * 30)},${0.35 + rnd() * 0.5})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 512;
+    g.strokeStyle = `rgba(230,200,140,${0.15 + rnd() * 0.2})`;
+    g.lineWidth = 1 + rnd();
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + 30 + rnd() * 50, y + (rnd() - 0.5) * 6);
+    g.stroke();
+  }
+  tex.refresh();
 }
 
 function paintSnow(scene: Phaser.Scene) {

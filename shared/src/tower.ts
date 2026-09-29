@@ -13,6 +13,8 @@ import { buildFloor6 } from "./world/floor6.ts";
 import { buildCathedral } from "./world/cathedral.ts";
 import { buildFloor7 } from "./world/floor7.ts";
 import { buildEngine } from "./world/engine.ts";
+import { buildFloor8 } from "./world/floor8.ts";
+import { buildPyramid } from "./world/pyramid.ts";
 
 /**
  * The tower: every floor, its boss dungeon, and how they connect. Rooms, travel, level caps,
@@ -20,8 +22,8 @@ import { buildEngine } from "./world/engine.ts";
  * (map, dungeon, enemies, items, quests) plus one entry here.
  */
 
-export type Theme = "meadow" | "cave" | "gilded" | "storm" | "ember" | "frost" | "shadow" | "tide" | "brass";
-export type Sky = "day" | "dusk" | "gold" | "storm" | "ember" | "frost" | "void" | "sea" | "smog";
+export type Theme = "meadow" | "cave" | "gilded" | "storm" | "ember" | "frost" | "shadow" | "tide" | "brass" | "sand";
+export type Sky = "day" | "dusk" | "gold" | "storm" | "ember" | "frost" | "void" | "sea" | "smog" | "desert";
 
 export interface FloorDef {
   n: number;
@@ -114,6 +116,14 @@ export const TOWER: FloorDef[] = [
     uncharted: { title: "The Engine redraws itself", text: "Its halls move as you walk them. Follow the pale runner up, toward the heat." },
     mapSeller: "Fennick the Merchant sells one at the Emporium in Gearhaven, for 210 gold.",
     build: buildFloor7, buildDungeon: buildEngine,
+  },
+  {
+    n: 8, room: "floor8", dungeon: "pyramid", title: "The Sunscorched Sands", town: "Sunwell", dungeonName: "The Sun Pyramid", levels: [32, 36], levelCap: 36,
+    up: "sealed-stair9", down: "descent8", door: "pyramid-door", boss: "solkaris", arrival: "sunscorched-sands",
+    theme: "sand", dungeonTheme: "sand", sky: "desert", dungeonSky: "dusk", music: "sunwell", dungeonMusic: "pyramid",
+    uncharted: { title: "The Pyramid swallows maps", text: "Its halls turn in the dark. Follow the pale runner up, toward the light at the top." },
+    mapSeller: "Zahir the Trader sells one at the Bazaar in Sunwell, for 240 gold.",
+    build: buildFloor8, buildDungeon: buildPyramid,
   },
 ];
 

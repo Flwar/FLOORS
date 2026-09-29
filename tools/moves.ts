@@ -157,6 +157,10 @@ async function trySkill(w: WeaponDef, i: number, sk: MoveDef, dist: number) {
       const sundered = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Sundered) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && (x.m.k === "sundered" || x.m.k === "sparkburst"));
       check(`${w.name}: ${sk.name} sunders the target`, sundered, sundered ? "sundered" : "not sundered");
     }
+    if (sk.dazzle || sk.special === "dazzle" || sk.special === "sandstorm") {
+      const dazzled = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Dazzled) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && (x.m.k === "dazzled" || x.m.k === "sunburst"));
+      check(`${w.name}: ${sk.name} dazzles the target`, dazzled, dazzled ? "dazzled" : "not dazzled");
+    }
     if (sk.special === "empower") check(`${w.name}: ${sk.name} empowers`, fx.includes("empower"), fx.join(",") || "no fx");
     if (sk.special === "bloodlust") {
       await idle();

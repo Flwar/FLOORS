@@ -25,9 +25,9 @@ const AUTO_LOOT = new Set(["material", "consumable", "scroll", "key", "artifact"
 /** Marks for each achievement earned. */
 const ACHIEVEMENT_MARKS = 2;
 /** Floor Bosses' chance to carry a legendary scroll. */
-const LEGENDARY_CHANCE: Record<string, number> = { aurelion: 0.03, vaelra: 0.05, ignivar: 0.1, hrimthar: 0.12, nyxara: 0.14, thalassa: 0.15, archon: 0.16 };
+const LEGENDARY_CHANCE: Record<string, number> = { aurelion: 0.03, vaelra: 0.05, ignivar: 0.1, hrimthar: 0.12, nyxara: 0.14, thalassa: 0.15, archon: 0.16, solkaris: 0.17 };
 /** Beating these for the first time always yields a legendary scroll. */
-const FIRST_KILL_LEGENDARY = new Set(["ignivar", "hrimthar", "nyxara", "thalassa", "archon"]);
+const FIRST_KILL_LEGENDARY = new Set(["ignivar", "hrimthar", "nyxara", "thalassa", "archon", "solkaris"]);
 const OWNER_RIGHTS_MS = 60_000;
 const DROP_LIFE_MS = 180_000;
 const BAG_LIFE_MS = 600_000;
@@ -157,7 +157,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
         this.partyTickAt = now + 500;
         this.tickParties();
         this.trades.tick();
-        for (const [sid, ch] of this.chars) if (ch.expireMeal()) this.clients.getById(sid)?.send("notice", { text: "The good meal has worn off.", kind: "info" });
+        for (const [sid, ch] of this.chars) if (ch.expireDrink()) this.clients.getById(sid)?.send("notice", { text: "Your drink has worn off.", kind: "info" });
       }
       if (now - this.lastSave > SAVE_EVERY_MS) {
         this.lastSave = now;
@@ -1010,7 +1010,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       const pd = this.sim.players.get(sid);
       if (!ch || !pd || credited.has(sid)) return;
       credited.add(sid);
-      let xp = Math.round(killXp(baseXp, e.level, ch.data.level) * share * (1 + (ch.meal()?.xpPct ?? 0)));
+      let xp = Math.round(killXp(baseXp, e.level, ch.data.level) * share * (1 + (ch.drink()?.xpPct ?? 0)));
       // Rested: double, until the pool runs dry.
       const rested = Math.min(ch.data.rested ?? 0, xp);
       if (rested > 0) {
