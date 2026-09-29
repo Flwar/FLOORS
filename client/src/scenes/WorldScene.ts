@@ -211,6 +211,8 @@ export class WorldScene extends Phaser.Scene {
       this.objects.destroy();
       this.ambient.destroy();
       this.tutorial?.destroy();
+      this.controls.destroy();
+      this.scale.off("resize", fit);
       window.removeEventListener("keydown", onKey);
       offSettings();
     });

@@ -476,8 +476,14 @@ export class HumanoidRig {
         cape.setPosition(this.upper.x + sideX, this.upper.y - 20);
       }
     }
-    this.upper.removeAll(false);
-    this.upper.add(order);
+    // Re-parenting is not free: only rebuild the stack when the layering actually changed.
+    const list = this.upper.list;
+    let same = list.length === order.length;
+    for (let i = 0; same && i < order.length; i++) same = list[i] === order[i];
+    if (!same) {
+      this.upper.removeAll(false);
+      this.upper.add(order);
+    }
   }
 
   destroy() {

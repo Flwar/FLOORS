@@ -87,7 +87,9 @@ export class Sky {
       img.setPosition(300 + i * 900, 200 + ((i * 373) % 700));
       this.islands.push(img);
     }
-    scene.scale.on("resize", () => this.resize());
+    const onResize = () => this.resize();
+    scene.scale.on("resize", onResize);
+    scene.events.once("shutdown", () => scene.scale.off("resize", onResize));
   }
 
   private resize() {

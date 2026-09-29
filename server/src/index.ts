@@ -33,7 +33,17 @@ const server = defineServer({
         app.get("/health", (_req, res) => {
           res.json({ ok: true });
         });
-        app.use(express.static(clientDist, { index: "index.html", maxAge: "1h" }));
+        // Assets are content-hashed and cache for an hour; the page itself always revalidates, so a
+        // refresh after an update picks up the new build.
+        app.use(
+          express.static(clientDist, {
+            index: "index.html",
+            maxAge: "1h",
+            setHeaders: (res, path) => {
+              if (path.endsWith(".html")) res.setHeader("Cache-Control", "no-cache");
+            },
+          }),
+        );
       }
     : undefined,
 });

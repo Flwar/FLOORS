@@ -303,7 +303,8 @@ export class Fx {
       f.life -= dtMs;
       if (f.life <= 0) {
         f.text.setVisible(false);
-        this.pool.push(f.text);
+        if (this.pool.length < 60) this.pool.push(f.text);
+        else f.text.destroy();
         this.floaters.splice(i, 1);
         continue;
       }

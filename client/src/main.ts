@@ -14,7 +14,9 @@ import { settings } from "./settings.ts";
 import { showLogin } from "./ui/login.ts";
 import { GameUI } from "./ui/ui.ts";
 import { installCursors } from "./ui/cursor.ts";
+import { installPhaserFixes } from "./render/phaserFixes.ts";
 
+installPhaserFixes();
 installCursors();
 
 const status = document.querySelector<HTMLElement>("#status")!;
