@@ -449,8 +449,70 @@ export class SkillFx {
       case "phoenix":
       case "howl":
       case "drakeblood":
-        // Played from the server's event.
+      case "hailstorm":
+        // Played from the server's event (or the hazards themselves).
         break;
+      // --- Frost arts ---------------------------------------------------------------
+      case "glacial":
+      case "absolutezero":
+      case "avalanche":
+      case "hailspin":
+      case "frostfang": {
+        const r = m.shape?.kind === "circle" ? m.shape.radius : m.shape?.kind === "arc" ? m.shape.range : 80;
+        const full = m.shape?.kind === "circle";
+        if (full) {
+          fx.ring(x, y - 6, 0xffffff, 10, r, 420, m.vfx === "absolutezero" ? 9 : 6);
+          fx.ring(x, y - 6, c, 10, r * 1.2, 600, 3);
+        } else fx.trail(x, cy, a - 1.7, a + 1.7, r * 0.3, r, c, 360);
+        for (let i = 0; i < (m.vfx === "absolutezero" ? 16 : 9); i++) {
+          const aa = full ? (i / 9) * Math.PI * 2 : a - 1.5 + (i / 8) * 3;
+          this.frostAt(x + Math.cos(aa) * r * 0.75, cy + Math.sin(aa) * r * 0.6, m.vfx === "absolutezero" ? 1.3 : 0.9);
+        }
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(m.vfx === "absolutezero" ? 420 : 220, m.vfx === "absolutezero" ? 0.015 : 0.008);
+        break;
+      }
+      case "verdict":
+      case "icicle":
+      case "shatter": {
+        const e = ahead(shapeLen);
+        fx.streak(x, cy, e.x, e.y, c, 280, m.vfx === "shatter" ? 14 : 10);
+        fx.streak(x, cy, e.x, e.y, 0xffffff, 180, 4);
+        for (let i = 1; i <= 7; i++) this.frostAt(x + (e.x - x) * (i / 7), cy + (e.y - cy) * (i / 7), 0.8);
+        if (m.vfx === "shatter") for (let i = 1; i <= 6; i++) fx.crack(x + (e.x - x) * ((i - 1) / 6), y + (e.y - cy) * ((i - 1) / 6), x + (e.x - x) * (i / 6), y + (e.y - cy) * (i / 6), 0x8fd3ff, 2200, 4);
+        sfx.hit(true, x, y, true, "metal");
+        if (mine) shake(200, 0.008);
+        break;
+      }
+      case "shiver": {
+        const e = ahead(m.lunge || 190);
+        fx.streak(x, cy, e.x, e.y, c, 260, 12);
+        for (let i = 0; i < 6; i++) this.frostAt(x + (e.x - x) * (i / 6), cy + (e.y - cy) * (i / 6), 0.6);
+        break;
+      }
+      case "iceshards":
+      case "icelance":
+        fx.burst(ahead(16).x, ahead(16).y, c, 10, 80, 2.4, 380);
+        break;
+      case "glacialspike": {
+        const off = m.shape?.kind === "circle" ? m.shape.offset : 140;
+        const r = m.shape?.kind === "circle" ? m.shape.radius : 64;
+        const e = { x: x + Math.cos(a) * off, y: y + Math.sin(a) * off * 0.8 };
+        fx.ring(e.x, e.y, 0xeaf6ff, 8, r, 420, 6);
+        fx.streak(e.x, e.y + 10, e.x, e.y - 70, 0xffffff, 380, 16);
+        fx.streak(e.x, e.y + 10, e.x, e.y - 70, c, 520, 26);
+        for (let i = 0; i < 8; i++) this.frostAt(e.x + Math.cos((i / 8) * 6.28) * r * 0.6, e.y + Math.sin((i / 8) * 6.28) * r * 0.4, 1);
+        sfx.hit(true, e.x, e.y, true, "metal");
+        if (mine) shake(240, 0.009);
+        break;
+      }
+      case "prison": {
+        const e = ahead(46);
+        fx.ring(e.x, e.y, 0xffffff, 6, 30, 500, 6);
+        for (let i = 0; i < 6; i++) this.frostAt(e.x + Math.cos((i / 6) * 6.28) * 16, e.y + Math.sin((i / 6) * 6.28) * 12, 0.9);
+        sfx.parry(true, e.x, e.y);
+        break;
+      }
       case "hatchets":
         fx.sparks(ahead(16).x, ahead(16).y, a, 0xdfe5ea, 6, 200, 0.5);
         break;
@@ -532,6 +594,13 @@ export class SkillFx {
     }
   }
 
+  /** A puff of frost and ice crystals. */
+  frostAt(x: number, y: number, size: number) {
+    const fx = this.fx;
+    fx.rise(x, y, Math.random() < 0.5 ? 0xdff4ff : 0x9fd8ff, Math.ceil(4 * size), 8 * size, 30 * size, 640, 2.6 * size);
+    fx.star(x, y - 6 * size, 0xffffff, 5 * size, 420);
+  }
+
   /** A tongue of fire that leaps up and fades. */
   flameAt(x: number, y: number, size: number) {
     const fx = this.fx;
@@ -545,6 +614,11 @@ export class SkillFx {
     switch (k) {
       case "storm":
         fx.ring(x, y - 10, 0x9fd3ff, 10, r, 500, 3);
+        sfx.hit(true, x, y, true, "metal");
+        return true;
+      case "iceburst":
+        fx.burst(x, y - 6, 0xdff4ff, 16, 110, 2.6, 560);
+        this.frostAt(x, y - 6, 0.9);
         sfx.hit(true, x, y, true, "metal");
         return true;
       case "fireburst":

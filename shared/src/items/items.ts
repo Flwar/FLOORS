@@ -184,6 +184,13 @@ export function upgradeCost(it: Item): { gold: number; mats: { key: string; qty:
   const b = itemBase(it.key);
   if (!b || !isEquipment(b)) return undefined;
   const n = it.plus + 1;
+  // Floor 4's own gear (tier 6) is worked with frost materials.
+  if (b.tier >= 6) {
+    const mats = [{ key: "mat_rimeshard", qty: 2 * n }];
+    if (n >= 3) mats.push({ key: "mat_frostpelt", qty: n - 1 });
+    if (n >= 5) mats.push({ key: "mat_glacialheart", qty: 1 });
+    return { gold: Math.round(38 * n * n * (1 + b.tier * 0.5)), mats };
+  }
   // Floor 3's own gear (tier 5) is worked with dragon materials.
   if (b.tier >= 5) {
     const mats = [{ key: "mat_dragonscale", qty: 2 * n }];

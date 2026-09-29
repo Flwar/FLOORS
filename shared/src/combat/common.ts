@@ -3,13 +3,18 @@ import { EFlag, type EnemyAttack } from "../enemies/defs.ts";
 
 export const PLAYER_RADIUS = 9;
 
-export const ProjKind = { Bolt: 0, Arrow: 1, Knife: 2, ShadowBolt: 3, Blade: 4, Reflected: 5, Wave: 6, Javelin: 7, Fireball: 8 } as const;
+export const ProjKind = { Bolt: 0, Arrow: 1, Knife: 2, ShadowBolt: 3, Blade: 4, Reflected: 5, Wave: 6, Javelin: 7, Fireball: 8, IceShard: 9 } as const;
 export const HazardKind = { Hex: 0, Meteor: 1, Sigil: 2, Glyph: 3, Judgement: 4, Frost: 5, Lightning: 6 } as const;
 
 /** Enraged enemies (boss phases, howl) wind up faster. Client and server both apply this. */
 export const ENRAGE_WINDUP = 0.82;
+/** Chilled enemies wind up 20% slower (and move 45% slower). */
+export const CHILL_WINDUP = 1.2;
 export function windupTicks(a: EnemyAttack, flags: number): number {
-  return flags & EFlag.Enraged ? Math.round(a.windup * ENRAGE_WINDUP) : a.windup;
+  let w = a.windup;
+  if (flags & EFlag.Enraged) w *= ENRAGE_WINDUP;
+  if (flags & EFlag.Chilled) w *= CHILL_WINDUP;
+  return Math.round(w);
 }
 export const attackTicks = (a: EnemyAttack, flags: number) => windupTicks(a, flags) + a.active + a.recovery;
 /** Time (ms from action start) at which an enemy attack connects. */

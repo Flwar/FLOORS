@@ -158,8 +158,8 @@ interface ProjData {
   weapon?: number;
   pierce: boolean;
   hits: Set<string>;
-  /** Sets what it hits burning (Fireball). */
-  burn?: boolean;
+  /** The skill's on-hit effect (burn, chill…). */
+  special?: string;
 }
 
 interface HazardData {
@@ -344,7 +344,7 @@ export class Sim {
       pd.hitSeq = p.actSeq;
       pd.hitSet.clear();
     }
-    if (m.special === "meteor" || m.special === "meteors") return; // detonates as hazards
+    if (m.special === "meteor" || m.special === "meteors" || m.special === "hailstorm") return; // detonates as hazards
     const shape = m.shape!;
     const rad = aimToRad(p.actAim);
     const reach = shapeReach(shape) + 40;
@@ -371,7 +371,7 @@ export class Sim {
       const off = pj.count === 1 ? 0 : -pj.spread / 2 + (pj.spread * i) / (pj.count - 1);
       const a = base + off;
       this.spawnProjectile({
-        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
+        kind: pj.look === "wave" ? ProjKind.Wave : pj.look === "javelin" ? ProjKind.Javelin : pj.look === "fire" ? ProjKind.Fireball : pj.look === "ice" ? ProjKind.IceShard : pj.look === "knife" || WEAPONS[p.weapon].key === "daggers" ? ProjKind.Knife : ProjKind.Bolt,
         pierce: pj.look === "wave",
         team: 0,
         owner: pd.sid,
@@ -386,7 +386,7 @@ export class Sim {
         knockback: m.knockback,
         sid: pd.sid,
         weapon: p.weapon,
-        burn: m.special === "burn",
+        special: m.special,
       });
     }
   }
@@ -419,6 +419,21 @@ export class Sim {
           const a = (i / 6) * Math.PI * 2 + Math.random() * 0.8;
           const d = i === 0 ? 0 : shape.radius * (0.35 + Math.random() * 0.5);
           this.spawnHazard({ kind: HazardKind.Meteor, team: 0, x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d * 0.8, radius: 46, delay: 600 + i * 170, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: true, sid: pd.sid, burn: true });
+        }
+        break;
+      }
+      case "hailstorm": {
+        const shape = m.shape as Extract<Shape, { kind: "circle" }>;
+        let cx = p.x + Math.cos(rad) * shape.offset;
+        let cy = p.y + Math.sin(rad) * shape.offset;
+        if (!this.wallClear(p.x, p.y, cx, cy)) {
+          cx = p.x + Math.cos(rad) * shape.offset * 0.4;
+          cy = p.y + Math.sin(rad) * shape.offset * 0.4;
+        }
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + Math.random() * 0.8;
+          const d = i === 0 ? 0 : shape.radius * (0.35 + Math.random() * 0.5);
+          this.spawnHazard({ kind: HazardKind.Frost, team: 0, x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d * 0.8, radius: 46, delay: 550 + i * 160, damage: m.damage * pd.atkMul, poise: m.poise, knockback: m.knockback, heavy: false, sid: pd.sid, frost: true });
         }
         break;
       }
@@ -569,6 +584,7 @@ export class Sim {
       if (pd.p.hp < pd.p.hpMax * 0.35 && pd.ch.hasPerk("lastStand")) dmg *= 1.2;
     }
     if (pd && (m?.special === "burn" || (pd.ch?.hasPerk("emberblood") && Math.random() < 0.15))) this.ignite(ed, pd, base);
+    if (m?.special === "chill" || (pd?.ch?.hasPerk("frostblood") && Math.random() < 0.2)) this.chill(ed);
     if (pd?.ch) dmg *= levelGapDealt(e.level - pd.ch.data.level);
     if (m?.special === "mark" && pd) {
       ed.markUntil = this.now + 6000;
@@ -968,7 +984,7 @@ export class Sim {
 
   spawnProjectile(o: {
     kind: number; team: number; owner: string; x: number; y: number; angle: number; speed: number; range: number; radius: number;
-    damage: number; poise: number; knockback: number; sid?: string; enemyId?: string; atk?: EnemyAttack; weapon?: number; pierce?: boolean; burn?: boolean;
+    damage: number; poise: number; knockback: number; sid?: string; enemyId?: string; atk?: EnemyAttack; weapon?: number; pierce?: boolean; special?: string;
   }) {
     const id = this.id("j");
     const pr = new Projectile();
@@ -984,7 +1000,7 @@ export class Sim {
     pr.born = this.now;
     this.state.projectiles.set(id, pr);
     this.onSpawn?.(pr, o.x, o.y);
-    this.projectiles.set(id, { id, pr, damage: o.damage, poise: o.poise, knockback: o.knockback, atk: o.atk, enemyId: o.enemyId, sid: o.sid, weapon: o.weapon, pierce: !!o.pierce, hits: new Set(), burn: o.burn });
+    this.projectiles.set(id, { id, pr, damage: o.damage, poise: o.poise, knockback: o.knockback, atk: o.atk, enemyId: o.enemyId, sid: o.sid, weapon: o.weapon, pierce: !!o.pierce, hits: new Set(), special: o.special });
   }
 
   projPos(pr: Projectile, t: number): { x: number; y: number } | undefined {
@@ -1000,7 +1016,7 @@ export class Sim {
     this.state.projectiles.delete(id);
   }
 
-  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean }) {
+  spawnHazard(o: { kind: number; team: number; x: number; y: number; radius: number; delay: number; damage: number; poise: number; knockback: number; heavy: boolean; sid?: string; enemyId?: string; safe?: boolean; life?: number; burn?: boolean; frost?: boolean }) {
     const id = this.id("h");
     const hz = new Hazard();
     hz.kind = o.kind;
@@ -1012,7 +1028,7 @@ export class Sim {
     hz.delay = o.delay;
     this.state.hazards.set(id, hz);
     this.onSpawn?.(hz, o.x, o.y);
-    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, lifeUntil: this.now + o.delay + (o.life ?? 600) });
+    this.hazards.set(id, { id, hz, damage: o.damage, poise: o.poise, knockback: o.knockback, heavy: o.heavy, sid: o.sid, enemyId: o.enemyId, resolved: new Set(), safe: o.safe, burn: o.burn, frost: o.frost, lifeUntil: this.now + o.delay + (o.life ?? 600) });
     return id;
   }
 
@@ -1025,7 +1041,17 @@ export class Sim {
     if (pd) ed.contrib.set(pd.sid, (ed.contrib.get(pd.sid) ?? 0) + dealt);
     this.emit("hit", { t: ed.id, d: amount, r: HitResult.Hit, x: e.x, y: e.y, a: pd?.sid, dot: 1 }, e.x, e.y);
     if (pd) this.onDamageDealt?.(pd, ed, dealt);
-    if (e.hp <= 0) this.killEnemy(ed, pd);
+    if (e.hp <= 0) {
+      // Training dummies and the sparring knight can't die, not even to poison or fire.
+      if (ed.def.behavior === "dummy" || ed.def.behavior === "sparring") e.hp = e.hpMax;
+      else this.killEnemy(ed, pd);
+    }
+  }
+
+  /** Chill an enemy: slower to move (and to wind up its attacks) for a few seconds. */
+  chill(ed: EnemyData, ms = 3500) {
+    ed.slowUntil = Math.max(ed.slowUntil, this.now + ms);
+    ed.e.flags |= EFlag.Chilled;
   }
 
   /** Set an enemy burning: an eighth of the blow again, every half second for four seconds. */
@@ -1093,9 +1119,13 @@ export class Sim {
         if (Math.hypot(e.x - pos.x, e.y - 10 - pos.y) > ed.def.radius + pj.pr.radius) continue;
         pj.hits.add(ed.id);
         this.damageEnemy(ed, pd, pj.damage / (pd?.atkMul ?? 1), pj.poise, pj.knockback, pj.pr.angle);
-        if (pj.burn && pd && ed.e.act !== EAct.Dead) {
+        if (pj.special === "burn" && pd && ed.e.act !== EAct.Dead) {
           this.ignite(ed, pd, pj.damage / (pd.atkMul || 1));
           this.emit("fx", { k: "fireburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
+        }
+        if (pj.special === "chill" && ed.e.act !== EAct.Dead) {
+          this.chill(ed);
+          this.emit("fx", { k: "iceburst", x: pos.x, y: pos.y + 10 }, pos.x, pos.y);
         }
         if (!pj.pierce) {
           this.removeProjectile(pj.id);
@@ -1116,6 +1146,7 @@ export class Sim {
           if (e.act === EAct.Dead || Math.hypot(e.x - hz.hz.x, e.y - hz.hz.y) > hz.hz.radius + ed.def.radius) continue;
           this.damageEnemy(ed, pd, hz.damage / (pd?.atkMul ?? 1), hz.poise, hz.knockback, Math.atan2(e.y - hz.hz.y, e.x - hz.hz.x));
           if (hz.burn && pd && ed.e.act !== EAct.Dead) this.ignite(ed, pd, hz.damage / (pd.atkMul || 1));
+          if (hz.frost && ed.e.act !== EAct.Dead) this.chill(ed);
         }
       }
       if (this.now > hz.lifeUntil) {

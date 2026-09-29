@@ -141,6 +141,10 @@ async function trySkill(w: WeaponDef, i: number, sk: MoveDef, dist: number) {
       const burned = msgs.slice(mark).some((x) => x.type === "hit" && x.m.t === dummyId && x.m.dot) || ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Burning) !== 0;
       check(`${w.name}: ${sk.name} sets the target burning`, burned, burned ? "burning" : "no burn");
     }
+    if (sk.special === "chill" || sk.special === "hailstorm") {
+      const chilled = ((room.state.enemies?.get(dummyId)?.flags ?? 0) & EFlag.Chilled) !== 0 || msgs.slice(mark).some((x) => x.type === "fx" && x.m.k === "iceburst");
+      check(`${w.name}: ${sk.name} chills the target`, chilled, chilled ? "chilled" : "not chilled");
+    }
     if (sk.special === "empower") check(`${w.name}: ${sk.name} empowers`, fx.includes("empower"), fx.join(",") || "no fx");
     if (sk.special === "bloodlust") {
       await idle();

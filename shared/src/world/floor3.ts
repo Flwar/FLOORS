@@ -288,7 +288,7 @@ export function buildFloor3(): WorldMap {
   obj({ id: "canyon-chest", kind: "chest", tx: 36, ty: 100, name: "Scale-Buried Chest", gold: 200, loot: [{ key: "mat_dragonscale", qty: 3 }, { key: "tonic", qty: 2 }] });
   obj({ id: "wastes-chest", kind: "chest", tx: 166, ty: 64, name: "Obsidian Coffer", gold: 220, loot: [{ key: "mat_cinder", qty: 4 }] });
   obj({ id: "roost-door", kind: "door", tx: 90, ty: 8, name: "The Roost Gate", requires: "key_roost", text: "Twin doors of blackened bronze, carved with dragons. A sigil-shaped hollow waits between them — Cindermaw wears the sigil.", dest: "roost" });
-  obj({ id: "sealed-stair4", kind: "gate", tx: 97, ty: 11, name: "The Burning Stair", text: "The stair climbs into a sky of smoke and stops. Floor 4 is not ready for you — yet.", dest: "floor4" });
+  obj({ id: "sealed-stair4", kind: "gate", tx: 97, ty: 11, name: "The Frozen Stair", text: "The stair climbs out of the smoke into cold white air. Snow drifts down it.", dest: "floor4" });
 
   // --- Enemies -------------------------------------------------------------------------
   const spawn = (id: string, tx: number, ty: number, enemies: string[], level: number, radius = 48, respawn = 60, elite = 0.07) =>

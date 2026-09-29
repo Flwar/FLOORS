@@ -5,6 +5,8 @@ import { buildFloor2 } from "./world/floor2.ts";
 import { buildStormspire } from "./world/stormspire.ts";
 import { buildFloor3 } from "./world/floor3.ts";
 import { buildRoost } from "./world/roost.ts";
+import { buildFloor4 } from "./world/floor4.ts";
+import { buildGlacier } from "./world/glacier.ts";
 
 /**
  * The tower: every floor, its boss dungeon, and how they connect. Rooms, travel, level caps,
@@ -74,6 +76,14 @@ export const TOWER: FloorDef[] = [
     uncharted: { title: "Nobody who mapped the Roost came back", text: "Up. Always up — toward the heat, and the Tyrant's throne." },
     mapSeller: "Quartermaster Sable sells one in Emberhold, for 90 gold.",
     build: buildFloor3, buildDungeon: buildRoost,
+  },
+  {
+    n: 4, room: "floor4", dungeon: "glacier", title: "The Frostvale", town: "Rimeholt", dungeonName: "The Glacier Throne", levels: [16, 20], levelCap: 20,
+    up: "sealed-stair5", down: "descent4", door: "glacier-door", boss: "hrimthar", arrival: "frostvale",
+    theme: "frost", dungeonTheme: "frost", sky: "frost", dungeonSky: "frost", music: "rimeholt", dungeonMusic: "glacier",
+    uncharted: { title: "The Glacier Throne has no map", text: "Its halls shift as the ice moves. Climb toward the cold at its heart." },
+    mapSeller: "Ottar the Outfitter sells one in Rimeholt, for 120 gold.",
+    build: buildFloor4, buildDungeon: buildGlacier,
   },
 ];
 

@@ -132,8 +132,46 @@ export const FLOOR3_EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 4: the wolves' winter hunt, the white storm, and the wandering merchant. */
+export const FLOOR4_EVENTS: EventDef[] = [
+  {
+    id: "wintermoon",
+    name: "The Winter Moon Hunt",
+    announce: "A winter moon rises over the Snowfields — the rime wolves run in a great pack tonight!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 78, y: 96 }, { x: 108, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "rimewolf", level: 17 }, { key: "rimewolf", level: 17 }, { key: "rimewolf", level: 17 }, { key: "rimewolf", level: 17 },
+      { key: "rimewolf", level: 18, elite: true, hpScale: 1.8 }, { key: "yeti", level: 17 },
+    ],
+    reward: { xp: 1500, gold: 380, loot: true },
+    lootPool: ["mat_frostpelt", "mat_glacialheart", "helm_furhood", "armor_furmantle", "daggers_rime", "spear_rime"],
+  },
+  {
+    id: "whitestorm",
+    name: "The White Storm",
+    announce: "A white storm rolls off the Glacier Peak — ice golems and wraiths walk inside it!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 82, y: 42 }),
+    enemies: [
+      { key: "icegolem", level: 18 }, { key: "icegolem", level: 18 }, { key: "icewraith", level: 18 }, { key: "icewraith", level: 18 },
+      { key: "rimeguard", level: 19, elite: true },
+    ],
+    reward: { xp: 1700, gold: 420, loot: true },
+    lootPool: ["mat_rimeshard", "mat_glacialheart", "armor_frostweave", "staff_rime", "sword_rime", "greatsword_rime"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has stamped the snow off her boots in Rimeholt — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 92, y: 138 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
 /** Each floor's world events. */
-export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS };
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS };
 
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {

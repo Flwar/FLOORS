@@ -31,15 +31,23 @@ export interface SkillEntry {
   scroll: string;
   /** Floor abilities: the floor whose Archivist sells it and whose enemies carry it. */
   floor?: number;
+  /** Ordinary skills: the floor whose Archivist sells it (its enemies and those above drop it too). */
+  from: number;
   move?: MoveDef;
 }
 
 /** Rarity by a weapon's skill index: its first skills are common, its last legendary. */
-const WEAPON_RARITY = [0, 1, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4];
+const WEAPON_RARITY = [0, 1, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 3, 3];
+/** Where a weapon's skills are first found, by skill index (Floor 4 adds two per weapon). */
+const WEAPON_FROM = [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4];
+/** Where ordinary skills of each rarity are sold, unless listed in FROM. */
+const FROM_BY_RARITY = [1, 1, 2, 3, 3];
+const FROM: Record<string, number> = { frostblood: 4, glacialHide: 4 };
 const UNIVERSAL_RARITY: Record<string, number> = {
   "any.kick": 0, "any.knife": 0, "any.secondwind": 1, "any.warcry": 1, "any.blink": 1, "any.ironwill": 2, "any.fireball": 2, "any.winter": 2,
   "any.thunder": 2, "any.bloodrage": 3, "any.star": 3, "any.storm": 3, "any.sunburst": 3, "any.wyrmwrath": 4, "any.phoenix": 4,
   "any.hatchets": 0, "any.snare": 1, "any.howl": 1, "any.gale": 1, "any.windwall": 2, "any.drakeblood": 3, "any.eruption": 3,
+  "any.icelance": 1, "any.prison": 2, "any.hailstorm": 3, "any.absolutezero": 4,
 };
 
 /**
@@ -51,21 +59,22 @@ export const FLOOR_OF: Record<string, number> = {
   "any.hatchets": 1, "any.snare": 1, "any.howl": 1, "any.sunburst": 1,
   "any.gale": 2, "any.windwall": 2, "any.thunder": 2, "any.storm": 2,
   "any.fireball": 3, "any.drakeblood": 3, "any.eruption": 3, "any.wyrmwrath": 3, "any.phoenix": 3,
+  "any.icelance": 4, "any.prison": 4, "any.hailstorm": 4, "any.absolutezero": 4,
 };
-export const FLOOR_NAMES = ["", "Emberwatch", "the Gilded Terraces", "the Ember Reaches"];
+export const FLOOR_NAMES = ["", "Emberwatch", "the Gilded Terraces", "the Ember Reaches", "the Frostvale"];
 const PASSIVE_RARITY: Record<string, number> = {
   fleetfoot: 0, deepLungs: 0, secondWind: 1, ironSkin: 1, wardensGrace: 1, riposteMaster: 2, keenEye: 2, executioner: 2, momentum: 2,
-  scaleguard: 2, lastStand: 2, unbroken: 3, emberblood: 3, wyrmsbane: 3,
+  scaleguard: 2, lastStand: 2, unbroken: 3, emberblood: 3, wyrmsbane: 3, frostblood: 3, glacialHide: 2,
 };
 
 export const scrollKey = (id: string) => `scroll_${id.replace(/\./g, "_")}`;
 
 export const SKILLBOOK: SkillEntry[] = [
   ...WEAPONS.flatMap((w) =>
-    w.skills.map((m, i): SkillEntry => ({ id: m.id!, name: m.name, desc: m.desc ?? "", kind: "skill", weapon: w.key, index: i, rarity: WEAPON_RARITY[i] ?? 2, scroll: scrollKey(m.id!), move: m })),
+    w.skills.map((m, i): SkillEntry => ({ id: m.id!, name: m.name, desc: m.desc ?? "", kind: "skill", weapon: w.key, index: i, rarity: WEAPON_RARITY[i] ?? 2, from: WEAPON_FROM[i] ?? 3, scroll: scrollKey(m.id!), move: m })),
   ),
-  ...UNIVERSAL_SKILLS.map((m, i): SkillEntry => ({ id: m.id!, name: m.name, desc: m.desc ?? "", kind: "skill", index: UNIVERSAL_BASE + i, rarity: UNIVERSAL_RARITY[m.id!] ?? 2, scroll: scrollKey(m.id!), move: m, floor: FLOOR_OF[m.id!] })),
-  ...PERK_CHOICES.flatMap((c) => c.options).map((p): SkillEntry => ({ id: p.id, name: p.name, desc: p.desc, kind: "passive", rarity: PASSIVE_RARITY[p.id] ?? 2, scroll: scrollKey(p.id) })),
+  ...UNIVERSAL_SKILLS.map((m, i): SkillEntry => ({ id: m.id!, name: m.name, desc: m.desc ?? "", kind: "skill", index: UNIVERSAL_BASE + i, rarity: UNIVERSAL_RARITY[m.id!] ?? 2, from: FROM[m.id!] ?? FROM_BY_RARITY[UNIVERSAL_RARITY[m.id!] ?? 2], scroll: scrollKey(m.id!), move: m, floor: FLOOR_OF[m.id!] })),
+  ...PERK_CHOICES.flatMap((c) => c.options).map((p): SkillEntry => ({ id: p.id, name: p.name, desc: p.desc, kind: "passive", rarity: PASSIVE_RARITY[p.id] ?? 2, from: FROM[p.id] ?? FROM_BY_RARITY[PASSIVE_RARITY[p.id] ?? 2], scroll: scrollKey(p.id) })),
 ];
 
 const BY_ID = new Map(SKILLBOOK.map((e) => [e.id, e]));
@@ -140,19 +149,19 @@ export function scrollSource(e: SkillEntry) {
   return SCROLL_SOURCES[e.rarity];
 }
 
-/** An Archivist's stock: every ordinary scroll of these rarities, then the floor's own abilities. */
-export function scrollShop(rarities: number[], floor: number): { key: string; price: number; marks: number }[] {
-  return SKILLBOOK.filter((e) => (e.floor ? e.floor === floor : rarities.includes(e.rarity)) && e.rarity < SCROLL_PRICE.length)
+/** An Archivist's stock: the ordinary scrolls first found on this floor, then the floor's own abilities. */
+export function scrollShop(floor: number): { key: string; price: number; marks: number }[] {
+  return SKILLBOOK.filter((e) => (e.floor ? e.floor === floor : e.from === floor) && e.rarity < SCROLL_PRICE.length)
     .sort((a, b) => (a.floor ? 1 : 0) - (b.floor ? 1 : 0) || a.rarity - b.rarity || (a.kind === b.kind ? 0 : a.kind === "skill" ? -1 : 1) || (a.weapon ?? "~").localeCompare(b.weapon ?? "~"))
     .sort((a, b) => a.rarity - b.rarity || (a.kind === b.kind ? 0 : a.kind === "skill" ? -1 : 1) || (a.weapon ?? "~").localeCompare(b.weapon ?? "~"))
     .map((e) => ({ key: e.scroll, price: SCROLL_PRICE[e.rarity].gold, marks: SCROLL_PRICE[e.rarity].marks }));
 }
 
-// The Archivists: Floor 1 sells common and uncommon scrolls, Floor 2 rare, Floor 3 epic.
-Object.assign(SHOPS, { scrolls1: scrollShop([0, 1], 1), scrolls2: scrollShop([2], 2), scrolls3: scrollShop([3], 3) });
+// The Archivists: Floor 1 sells common and uncommon scrolls, Floor 2 rare, Floor 3 and up epic.
+for (let f = 1; f <= 4; f++) SHOPS[`scrolls${f}`] = scrollShop(f);
 
 /** The floor an enemy of this level belongs to. */
-const floorOfLevel = (level: number) => (level <= 8 ? 1 : level <= 12 ? 2 : 3);
+const floorOfLevel = (level: number) => (level <= 8 ? 1 : level <= 12 ? 2 : level <= 16 ? 3 : 4);
 
 /**
  * A scroll dropped by a kill, if any. Ordinary enemies almost never carry one; elites
@@ -181,8 +190,8 @@ export function rollScroll(level: number, kind: "normal" | "elite" | "mini" | "b
   return randomScroll(rarity, rnd, floor);
 }
 
-/** Any scroll of this rarity (floor abilities only from their own floor). */
-export function randomScroll(rarity: number, rnd: () => number = Math.random, floor?: number): string | undefined {
-  const pool = SKILLBOOK.filter((e) => e.rarity === rarity && (!e.floor || e.floor === floor));
+/** Any scroll of this rarity found on this floor (floor abilities only from their own floor). */
+export function randomScroll(rarity: number, rnd: () => number = Math.random, floor = 99): string | undefined {
+  const pool = SKILLBOOK.filter((e) => e.rarity === rarity && (e.floor ? e.floor === floor : e.from <= floor));
   return pool[Math.floor(rnd() * pool.length)]?.scroll;
 }

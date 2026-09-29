@@ -4,13 +4,14 @@ import { defineRoom, defineServer } from "colyseus";
 import express from "express";
 import { SERVER_PORT, TOWER } from "@floors/shared";
 import { DungeonRoom } from "./rooms/DungeonRoom.ts";
+import { GlacierRoom } from "./rooms/GlacierRoom.ts";
 import type { InstanceRoom } from "./rooms/InstanceRoom.ts";
 import { RoostRoom } from "./rooms/RoostRoom.ts";
 import { StormspireRoom } from "./rooms/StormspireRoom.ts";
 import { floorRoom, WorldRoom } from "./rooms/WorldRoom.ts";
 
 /** Each floor's boss dungeon: its own encounters and puzzles. */
-const DUNGEONS: Record<string, new (...args: any[]) => InstanceRoom> = { dungeon: DungeonRoom, stormspire: StormspireRoom, roost: RoostRoom };
+const DUNGEONS: Record<string, new (...args: any[]) => InstanceRoom> = { dungeon: DungeonRoom, stormspire: StormspireRoom, roost: RoostRoom, glacier: GlacierRoom };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each room is its own class
 const rooms: Record<string, any> = {};
 for (const f of TOWER) {

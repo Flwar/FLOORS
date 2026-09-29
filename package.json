@@ -26,6 +26,7 @@
     "reach": "tsx tools/reach.ts",
     "floor2": "tsx tools/floor2.ts",
     "floor3": "tsx tools/floor3.ts",
+    "floor4": "tsx tools/floor4.ts",
     "party": "tsx tools/party.ts",
     "worldfloor": "tsx tools/worldfloor.ts",
     "social": "tsx tools/social.ts",

@@ -21,9 +21,9 @@ const GOLD_MAGNET = 30;
 /** Marks for each achievement earned. */
 const ACHIEVEMENT_MARKS = 2;
 /** Floor Bosses' chance to carry a legendary scroll. */
-const LEGENDARY_CHANCE: Record<string, number> = { aurelion: 0.03, vaelra: 0.05, ignivar: 0.1 };
+const LEGENDARY_CHANCE: Record<string, number> = { aurelion: 0.03, vaelra: 0.05, ignivar: 0.1, hrimthar: 0.12 };
 /** Beating these for the first time always yields a legendary scroll. */
-const FIRST_KILL_LEGENDARY = new Set(["ignivar"]);
+const FIRST_KILL_LEGENDARY = new Set(["ignivar", "hrimthar"]);
 const OWNER_RIGHTS_MS = 60_000;
 const DROP_LIFE_MS = 180_000;
 const BAG_LIFE_MS = 600_000;
@@ -1019,7 +1019,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     // Skill scrolls: rare from ordinary enemies, likelier from elites, minibosses and bosses.
     const boss = ed.def.boss;
     const kind = boss ? (boss.music === "miniboss" ? "mini" : "boss") : elite ? "elite" : "normal";
-    const scroll = first && FIRST_KILL_LEGENDARY.has(ed.def.key) ? randomScroll(4, Math.random, 3) : rollScroll(ed.e.level, kind, LEGENDARY_CHANCE[ed.def.key] ?? 0);
+    const scroll = first && FIRST_KILL_LEGENDARY.has(ed.def.key) ? randomScroll(4, Math.random, floorOfRoom(this.kind)?.n ?? 3) : rollScroll(ed.e.level, kind, LEGENDARY_CHANCE[ed.def.key] ?? 0);
     if (scroll) loot.items.push(makeItem(scroll, undefined, 1));
     const scatter = () => ({ x: ed.e.x + (Math.random() - 0.5) * 40, y: ed.e.y + (Math.random() - 0.5) * 28 });
     if (loot.gold > 0) {

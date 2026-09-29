@@ -20,7 +20,7 @@ export interface MoveDef {
   poise: number;
   knockback: number;
   shape?: Shape;
-  projectile?: { count: number; spread: number; speed: number; range: number; radius: number; look?: "wave" | "javelin" | "knife" | "fire" };
+  projectile?: { count: number; spread: number; speed: number; range: number; radius: number; look?: "wave" | "javelin" | "knife" | "fire" | "ice" };
   /** Forward travel (px) spread over the startup + active ticks. */
   lunge: number;
   stamina: number;
@@ -34,7 +34,7 @@ export interface MoveDef {
   impact: number;
   cooldown?: number;
   /** Special behaviour hook for skills. */
-  special?: "counterStance" | "warcry" | "frost" | "meteor" | "shadowstep" | "vault" | "rally" | "ironskin" | "venom" | "bloodlust" | "drain" | "mark" | "burn" | "meteors" | "storm" | "phoenix" | "empower";
+  special?: "counterStance" | "warcry" | "frost" | "meteor" | "shadowstep" | "vault" | "rally" | "ironskin" | "venom" | "bloodlust" | "drain" | "mark" | "burn" | "meteors" | "storm" | "phoenix" | "empower" | "chill" | "hailstorm";
   /** Empower: the damage bonus it grants (0.15 = +15%). */
   power?: number;
   /** Damage multiplier against staggered enemies. */
@@ -137,6 +137,9 @@ const SWORD: WeaponDef = {
     // Dragon-slaying arts (levels 14 and 16).
     move({ id: "sword.dragonfang", name: "Dragon Fang", anim: "thrust", startup: 8, active: 6, recovery: 16, damage: 30, poise: 36, lunge: 110, stamina: 18, knockback: 120, hitstop: 90, impact: 0.55, cooldown: 600, iframes: [0, 8], special: "burn", shape: { kind: "line", length: 64, width: 26 }, desc: "Lunge through your foe with a burning edge: whatever you cut burns for 4 seconds.", vfx: "dragonfang", color: 0xff8a3a }),
     move({ id: "sword.wyrmslayer", name: "Wyrmslayer", anim: "heavySlash", startup: 18, active: 6, recovery: 24, damage: 56, poise: 100, lunge: 24, stamina: 28, knockback: 220, hitstop: 150, impact: 1, cooldown: 1200, superArmor: true, vsStagger: 1.5, special: "burn", shape: { kind: "arc", range: 92, arc: deg(240) }, desc: "The dragon-killer's cut: a vast arc of fire that sets everything it touches burning. Devastating against the staggered.", vfx: "wyrmslayer", color: 0xffb040 }),
+    // Floor 4: the arts of the Frostvale.
+    move({ id: "sword.glacial", name: "Glacial Cleave", anim: "heavySlash", startup: 16, active: 6, recovery: 22, damage: 42, poise: 70, lunge: 18, stamina: 22, knockback: 170, hitstop: 110, impact: 0.7, cooldown: 660, superArmor: true, special: "chill", shape: { kind: "arc", range: 84, arc: deg(200) }, desc: "A wide cut trailing frost: everything it touches is chilled — slower to move and to strike.", vfx: "glacial", color: 0x9fd8ff }),
+    move({ id: "sword.verdict", name: "Winter's Verdict", anim: "thrust", startup: 18, active: 6, recovery: 24, damage: 58, poise: 90, lunge: 50, stamina: 26, knockback: 200, hitstop: 150, impact: 0.9, cooldown: 1080, superArmor: true, vsStagger: 1.7, special: "chill", shape: { kind: "line", length: 180, width: 26 }, desc: "A thrust of blue steel that freezes the air along its length. Devastating against the staggered.", vfx: "verdict", color: 0xdff4ff }),
   ],
   parry: { window: 14, perfect: 6, recovery: 20, stamina: 8 },
   dodge: { distance: 96, ticks: 16, iStart: 2, iEnd: 12, recovery: 6, stamina: 20, attackFrom: 12 },
@@ -171,6 +174,9 @@ const GREATSWORD: WeaponDef = {
     // Dragon-slaying arts (levels 14 and 16).
     move({ id: "gs.magma", name: "Magma Cleave", anim: "overhead", startup: 20, active: 6, recovery: 26, damage: 36, poise: 70, lunge: 10, stamina: 22, knockback: 170, hitstop: 120, impact: 0.75, cooldown: 660, superArmor: true, special: "burn", shape: { kind: "line", length: 170, width: 38 }, desc: "Split the ground with a molten fissure: everything along it burns for 4 seconds.", vfx: "magma", color: 0xff6a2a }),
     move({ id: "gs.cataclysm", name: "Cataclysm", anim: "leap", startup: 28, active: 6, recovery: 32, damage: 64, poise: 130, lunge: 140, stamina: 32, knockback: 260, hitstop: 170, impact: 1, cooldown: 1260, superArmor: true, special: "burn", shape: { kind: "circle", radius: 100, offset: 0 }, desc: "Leap and bring the mountain down: a burning shockwave flattens and ignites everything around you.", vfx: "cataclysm", color: 0xff5a1a }),
+    // Floor 4: the arts of the Frostvale.
+    move({ id: "gs.avalanche", name: "Avalanche Smash", anim: "overhead", startup: 24, active: 6, recovery: 28, damage: 56, poise: 120, lunge: 12, stamina: 28, knockback: 240, hitstop: 150, impact: 1, cooldown: 900, superArmor: true, special: "chill", shape: { kind: "circle", radius: 92, offset: 0 }, desc: "Bring the mountain's snow down around you: everything nearby is struck and chilled.", vfx: "avalanche", color: 0xbfe6ff }),
+    move({ id: "gs.shatter", name: "Glacier Breaker", anim: "overhead", startup: 22, active: 6, recovery: 26, damage: 60, poise: 110, lunge: 10, stamina: 26, knockback: 200, hitstop: 140, impact: 0.9, cooldown: 1080, superArmor: true, special: "chill", shape: { kind: "line", length: 210, width: 44 }, desc: "Split the ice in a long line ahead of you: everything along the crack is struck and chilled.", vfx: "shatter", color: 0x8fd3ff }),
   ],
   parry: { window: 11, perfect: 5, recovery: 26, stamina: 12 },
   dodge: { distance: 84, ticks: 18, iStart: 2, iEnd: 11, recovery: 8, stamina: 24, attackFrom: 14 },
@@ -207,6 +213,9 @@ const DAGGERS: WeaponDef = {
     // Dragon-slaying arts (levels 14 and 16).
     move({ id: "dg.ember", name: "Ember Dance", anim: "spin", startup: 4, active: 12, recovery: 12, damage: 16, poise: 16, stamina: 16, knockback: 90, hitstop: 50, impact: 0.3, cooldown: 540, iframes: [0, 12], special: "burn", shape: { kind: "circle", radius: 56, offset: 0 }, desc: "Whirl through a ring of fire, untouchable: everything around you burns for 4 seconds.", vfx: "emberdance", color: 0xff7a30 }),
     move({ id: "dg.wyvern", name: "Wyvern Strike", anim: "thrust", startup: 4, active: 10, recovery: 14, damage: 40, poise: 34, lunge: 180, stamina: 22, knockback: 110, hitstop: 120, impact: 0.7, cooldown: 900, iframes: [0, 16], special: "mark", vsStagger: 1.8, shape: { kind: "line", length: 50, width: 30 }, desc: "Dart forward like a striking wyvern, untouchable, and drive both blades home: the target is Death-Marked for 6 seconds.", vfx: "wyvern", color: 0x6fe0b0 }),
+    // Floor 4: the arts of the Frostvale.
+    move({ id: "dg.frostfang", name: "Frostfang Flurry", anim: "twin", startup: 5, active: 14, recovery: 12, damage: 22, poise: 20, lunge: 20, stamina: 18, knockback: 70, hitstop: 50, impact: 0.3, cooldown: 540, iframes: [0, 10], special: "chill", shape: { kind: "arc", range: 50, arc: deg(250) }, desc: "A blur of frozen blades all around you, untouchable for a moment. Everything cut is chilled.", vfx: "frostfang", color: 0xbfe6ff }),
+    move({ id: "dg.shiver", name: "Shiver Step", anim: "vanish", startup: 3, active: 12, recovery: 12, damage: 36, poise: 30, lunge: 190, stamina: 20, knockback: 90, hitstop: 100, impact: 0.6, cooldown: 780, iframes: [0, 16], vsStagger: 1.6, special: "chill", shape: { kind: "line", length: 40, width: 32 }, desc: "Become a gust of snow: dart far ahead, untouchable, and leave your target chilled.", vfx: "shiver", color: 0x9fb8ff }),
   ],
   parry: { window: 12, perfect: 6, recovery: 16, stamina: 6 },
   dodge: { distance: 108, ticks: 14, iStart: 1, iEnd: 11, recovery: 4, stamina: 15, attackFrom: 10 },
@@ -241,6 +250,9 @@ const SPEAR: WeaponDef = {
     // Dragon-slaying arts (levels 14 and 16).
     move({ id: "sp.dragoon", name: "Dragoon Dive", anim: "leap", startup: 20, active: 6, recovery: 24, damage: 40, poise: 80, lunge: 170, stamina: 24, knockback: 200, hitstop: 130, impact: 0.9, cooldown: 720, iframes: [0, 22], superArmor: true, shape: { kind: "circle", radius: 64, offset: 0 }, desc: "Leap high out of reach and dive spear-first onto your foes. Untouchable in the air.", vfx: "dragoon", color: 0x9fc8ff }),
     move({ id: "sp.wyrmfang", name: "Wyrmfang", anim: "thrust", startup: 16, active: 6, recovery: 22, damage: 50, poise: 80, lunge: 40, stamina: 26, knockback: 200, hitstop: 140, impact: 0.9, cooldown: 1080, superArmor: true, vsStagger: 1.6, special: "burn", shape: { kind: "line", length: 200, width: 30 }, desc: "A thrust wreathed in dragonfire that reaches farther than any other blow: everything it pierces burns.", vfx: "wyrmfang", color: 0xff9a40 }),
+    // Floor 4: the arts of the Frostvale.
+    move({ id: "sp.icicle", name: "Icicle Lance", anim: "thrust", startup: 12, active: 5, recovery: 20, damage: 44, poise: 60, lunge: 30, stamina: 22, knockback: 170, hitstop: 120, impact: 0.7, cooldown: 720, special: "chill", shape: { kind: "line", length: 190, width: 22 }, desc: "A thrust that grows a spear of ice through a whole line of enemies, chilling them.", vfx: "icicle", color: 0xdff4ff }),
+    move({ id: "sp.hailspin", name: "Hailstorm Spin", anim: "spin", startup: 8, active: 14, recovery: 18, damage: 34, poise: 50, stamina: 22, knockback: 180, hitstop: 80, impact: 0.6, cooldown: 780, iframes: [0, 12], superArmor: true, special: "chill", shape: { kind: "circle", radius: 88, offset: 0 }, desc: "Whirl the spear through a storm of hail: everything around you is struck and chilled.", vfx: "hailspin", color: 0xbfe6ff }),
   ],
   parry: { window: 13, perfect: 5, recovery: 20, stamina: 8 },
   dodge: { distance: 96, ticks: 16, iStart: 2, iEnd: 12, recovery: 6, stamina: 20, attackFrom: 12 },
@@ -275,6 +287,9 @@ const STAFF: WeaponDef = {
     // Dragon-slaying arts (levels 14 and 16).
     move({ id: "st.breath", name: "Dragon's Breath", anim: "cast", startup: 12, active: 8, recovery: 18, damage: 24, poise: 24, stamina: 20, knockback: 80, hitstop: 60, impact: 0.4, cooldown: 600, special: "burn", shape: { kind: "arc", range: 120, arc: deg(70) }, desc: "Breathe fire like a dragon: a cone of flame that sets everything in it burning.", vfx: "breath", color: 0xff7a2a }),
     move({ id: "st.meteors", name: "Meteor Storm", anim: "cast", startup: 24, active: 4, recovery: 26, damage: 34, poise: 60, stamina: 34, knockback: 180, hitstop: 120, impact: 0.9, cooldown: 1500, special: "meteors", shape: { kind: "circle", radius: 110, offset: 150 }, desc: "Tear open the sky where you aim: six burning meteors rain down across the ground.", vfx: "meteors", color: 0xff5a2a }),
+    // Floor 4: the arts of the Frostvale.
+    move({ id: "st.shards", name: "Ice Shard Volley", anim: "cast", startup: 10, active: 1, recovery: 18, damage: 15, poise: 16, stamina: 20, knockback: 60, hitstop: 50, impact: 0.2, cooldown: 600, special: "chill", projectile: { count: 5, spread: 0.6, speed: 480, range: 300, radius: 8, look: "ice" }, desc: "Five shards of ice in a fan. Whatever they hit is chilled.", vfx: "iceshards", color: 0x9fd8ff }),
+    move({ id: "st.spike", name: "Glacial Spike", anim: "cast", startup: 18, active: 4, recovery: 22, damage: 52, poise: 90, stamina: 26, knockback: 220, hitstop: 120, impact: 0.9, cooldown: 900, special: "chill", shape: { kind: "circle", radius: 64, offset: 140 }, desc: "A spire of ice bursts from the ground where you aim, chilling everything around it.", vfx: "glacialspike", color: 0xdff4ff }),
   ],
   parry: { window: 12, perfect: 5, recovery: 22, stamina: 8 },
   dodge: { distance: 112, ticks: 10, iStart: 0, iEnd: 9, recovery: 8, stamina: 22, attackFrom: 10 },
@@ -312,6 +327,11 @@ export const UNIVERSAL_SKILLS: MoveDef[] = [
   move({ id: "any.drakeblood", name: "Drakeblood", anim: "roar", startup: 10, active: 4, recovery: 14, damage: 0, poise: 0, stamina: 12, hitstop: 0, impact: 0.4, cooldown: 1500, special: "empower", power: 0.3, desc: "Drink the fire in a drake's blood: your blows land 30% harder for 6 seconds.", vfx: "drakeblood", color: 0xff5a2a }),
   move({ id: "any.eruption", name: "Eruption", anim: "cast", startup: 16, active: 4, recovery: 20, damage: 38, poise: 70, stamina: 24, knockback: 200, hitstop: 110, impact: 0.8, cooldown: 900, special: "burn", shape: { kind: "circle", radius: 70, offset: 130 }, desc: "The ground bursts open where you aim: magma erupts and sets everything there burning.", vfx: "eruption", color: 0xff6a1a }),
   move({ id: "any.phoenix", name: "Phoenix Rite", anim: "nova", startup: 14, active: 4, recovery: 16, damage: 0, poise: 0, stamina: 10, hitstop: 0, impact: 0.4, cooldown: 2400, special: "phoenix", desc: "Rise in fire: heal 50% of your health (allies nearby 25%) and take half damage for 4 seconds.", vfx: "phoenix", color: 0xffa040 }),
+  // Floor 4: the Frostvale's own. (New universal skills always go at the end: loadouts store their index.)
+  move({ id: "any.icelance", name: "Ice Lance", anim: "cast", startup: 10, active: 1, recovery: 14, damage: 24, poise: 24, stamina: 14, knockback: 90, hitstop: 60, impact: 0.3, cooldown: 420, special: "chill", projectile: { count: 1, spread: 0, speed: 560, range: 340, radius: 9, look: "ice" }, desc: "A lance of ice thrown the way Rimeholt's hunters do: it chills what it hits.", vfx: "icelance", color: 0xbfe6ff }),
+  move({ id: "any.prison", name: "Glacial Prison", anim: "thrust", startup: 10, active: 5, recovery: 16, damage: 20, poise: 220, lunge: 24, stamina: 18, knockback: 20, hitstop: 120, impact: 0.6, cooldown: 1080, special: "chill", shape: { kind: "line", length: 60, width: 40 }, desc: "Encase a foe in ice: it staggers, and stays chilled long after.", vfx: "prison", color: 0x8fd3ff }),
+  move({ id: "any.hailstorm", name: "Hailstorm", anim: "cast", startup: 22, active: 4, recovery: 24, damage: 30, poise: 50, stamina: 30, knockback: 150, hitstop: 100, impact: 0.8, cooldown: 1500, special: "hailstorm", shape: { kind: "circle", radius: 110, offset: 150 }, desc: "Call the Frostvale's sky down where you aim: six blasts of hail, each chilling what it strikes.", vfx: "hailstorm", color: 0xdff4ff }),
+  move({ id: "any.absolutezero", name: "Absolute Zero", anim: "nova", startup: 20, active: 6, recovery: 26, damage: 70, poise: 240, stamina: 32, knockback: 260, hitstop: 170, impact: 1, cooldown: 1800, superArmor: true, special: "chill", shape: { kind: "circle", radius: 150, offset: 0 }, desc: "The Winter King's last word: the air itself freezes around you, staggering and chilling everything nearby.", vfx: "absolutezero", color: 0xeaf6ff }),
 ];
 /** Loadout index of the first universal skill (weapon skills sit below it). */
 export const UNIVERSAL_BASE = 64;

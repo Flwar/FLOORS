@@ -28,6 +28,10 @@ const LORE = ["lore:lore-rim", "lore:lore-scout", "lore:lore-library", "lore:lor
 const WAYSTONES = ["ws:ws-town", "ws:ws-forest", "ws:ws-ruins", "ws:ws-caves"];
 const SKY_CHESTS = ["chest:aviary-chest", "chest:causeway-chest", "chest:heights-chest"];
 const SKY_WAYSTONES = ["ws:ws-landing", "ws:ws-terraces", "ws:ws-gardens", "ws:ws-causeway", "ws:ws-heights"];
+const EMBER_CHESTS = ["chest:hoard-chest", "chest:canyon-chest", "chest:wastes-chest"];
+const EMBER_WAYSTONES = ["ws:ws-emberhold", "ws:ws-slopes", "ws:ws-canyon", "ws:ws-wastes", "ws:ws-caldera"];
+const FROST_CHESTS = ["chest:cache-chest", "chest:lake-chest", "chest:pine-chest"];
+const FROST_WAYSTONES = ["ws:ws-rimeholt", "ws:ws-snowfields", "ws:ws-lake", "ws:ws-pinewood", "ws:ws-peak"];
 const has = (c: AchievementContext, list: string[]) => list.every((k) => c.discovered.includes(k));
 
 const DEFS: Def[] = [
@@ -51,6 +55,23 @@ const DEFS: Def[] = [
   { id: "thunder-breaker", name: "Thunder Breaker", desc: "Topple the Storm Colossus.", test: (c) => c.bossKills.includes("colossus") },
   { id: "last-watch", name: "The Last Watch", desc: "Defeat Kael, the Stormwarden.", test: (c) => c.bossKills.includes("stormwarden") },
   { id: "storm-breaks", name: "The Storm Breaks", desc: "Defeat Vaelra, Keeper of the Storm.", test: (c) => c.bossKills.includes("vaelra") },
+  // Floor 3
+  { id: "ember-reaches", name: "Into the Fire", desc: "Set foot on Floor 3.", test: (c) => c.discovered.includes("zone:ember-reaches") },
+  { id: "dragons-hoard", name: "Hoard Finder", desc: "Find the Dragon's Hoard on Floor 3.", test: (c) => c.discovered.includes("zone:dragons-hoard") },
+  { id: "ember-treasure", name: "Scorched Plunder", desc: "Open every chest on Floor 3.", test: (c) => has(c, EMBER_CHESTS) },
+  { id: "ember-roads", name: "Ashen Roads", desc: "Attune every waystone on Floor 3.", test: (c) => has(c, EMBER_WAYSTONES) },
+  { id: "red-wyrm", name: "Wyrmslayer", desc: "Defeat Cindermaw, the Red Wyrm.", test: (c) => c.bossKills.includes("cindermaw") },
+  { id: "dragonsworn", name: "Oathbreaker", desc: "Defeat Vyrmak the Dragonsworn.", test: (c) => c.bossKills.includes("vyrmak") },
+  { id: "tyrant", name: "The Tyrant Falls", desc: "Defeat Ignivar, Tyrant of the Ember Sky.", test: (c) => c.bossKills.includes("ignivar") },
+  // Floor 4
+  { id: "frostvale", name: "Out of the Fire", desc: "Set foot on Floor 4.", test: (c) => c.discovered.includes("zone:frostvale") },
+  { id: "hunters-cache", name: "Lost and Found", desc: "Find the Hunters' Cache on Floor 4.", test: (c) => c.discovered.includes("zone:hunters-cache") },
+  { id: "frost-treasure", name: "Frozen Plunder", desc: "Open every chest on Floor 4.", test: (c) => has(c, FROST_CHESTS) },
+  { id: "frost-roads", name: "Snowbound Roads", desc: "Attune every waystone on Floor 4.", test: (c) => has(c, FROST_WAYSTONES) },
+  { id: "white-wyrm", name: "Whitefang", desc: "Defeat Glacierfang, the White Wyrm.", test: (c) => c.bossKills.includes("glacierfang") },
+  { id: "giant", name: "Giantfeller", desc: "Defeat Jarnhild the Frost Giant.", test: (c) => c.bossKills.includes("jarnhild") },
+  { id: "winter-breaks", name: "Winter Breaks", desc: "Defeat Hrimthar, the Winter King.", test: (c) => c.bossKills.includes("hrimthar") },
+  { id: "veteran", name: "Veteran", desc: "Reach level 16.", test: (c) => c.level >= 16 },
   { id: "master-of-arms", name: "Master of Arms", desc: "Reach mastery 10 with a weapon.", test: (c) => c.maxMastery >= 10 },
   { id: "seasoned", name: "Seasoned", desc: "Reach level 8.", test: (c) => c.level >= 8 },
   { id: "hoarder", name: "Deep Pockets", desc: "Carry 1,000 gold.", test: (c) => c.gold >= 1000 },

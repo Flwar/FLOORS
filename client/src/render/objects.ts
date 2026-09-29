@@ -222,7 +222,7 @@ function markerFor(npc: string, inv?: InvView): string {
 }
 
 /** Levers whose lit state is synced in the gate mask: the Stormspire's conduits and the Roost's flame seals. */
-const isConduit = (o: WorldObject) => o.kind === "lever" && (o.name.endsWith("Conduit") || o.name.startsWith("Seal of"));
+const isConduit = (o: WorldObject) => o.kind === "lever" && (o.name.endsWith("Conduit") || o.name.startsWith("Seal of") || o.name.startsWith("Rune of"));
 const isSeal = (o: WorldObject) => o.kind === "lever" && o.name.startsWith("Seal of");
 
 function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates: number): string {
@@ -267,6 +267,7 @@ function objLabel(o: WorldObject, state: string, here: number): string {
       return `Rest at ${o.name}`;
     case "lever":
       if (isSeal(o)) return state === "lit" ? `${o.name} (burning)` : `Light the ${o.name}`;
+      if (o.name.startsWith("Rune of")) return state === "lit" ? `${o.name} (ringing)` : `Strike the ${o.name}`;
       return isConduit(o) ? (state === "lit" ? `${o.name} (awake)` : `Wake the ${o.name}`) : `Pull the ${o.name}`;
   }
 }

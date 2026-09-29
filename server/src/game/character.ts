@@ -274,9 +274,11 @@ export class Character {
     if (effects.has("longDodge")) mods |= Mod.LongDodge;
     if (this.hasPerk("ironSkin")) defense += 12;
     if (this.hasPerk("scaleguard")) defense += 20;
+    if (this.hasPerk("glacialHide")) defense += 25;
     if (this.hasPerk("deepLungs")) stamina += 15;
     let hpMax = baseHp(d.level) + hp;
     if (this.hasPerk("wardensGrace")) hpMax = Math.round(hpMax * 1.1);
+    if (this.hasPerk("glacialHide")) hpMax = Math.round(hpMax * 1.08);
     this.derived = {
       atkMul: (power / 100) * (1 + (d.level - 1) * 0.04),
       defense,

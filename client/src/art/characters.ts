@@ -4,7 +4,7 @@ import type { ArmorStyle, WeaponArtKey } from "@floors/shared";
 /** Textures are painted at RES× their world size and displayed at 1/RES scale. */
 export const RES = 2;
 
-export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet";
+export type HelmKind = "none" | "hood" | "helm" | "cap" | "crown" | "horns" | "iron" | "circlet" | "horned" | "keeper" | "bandana" | "wizard" | "kettle" | "greathelm" | "winged" | "stormcrown" | "coif" | "templar" | "suncrown" | "dragonhelm" | "embercirclet" | "rimecrown" | "furhood";
 
 export interface CharLook {
   key: string;
@@ -114,6 +114,7 @@ export const ARMOR_BULK: Record<ArmorStyle, number> = {
   gilded: 1.14, skyguard: 1.08, stormweave: 1.04,
   hide: 1.04, ringmail: 1.06, templar: 1.12, windrunner: 1.03, sunforged: 1.16, mystic: 1.04,
   dragonscale: 1.15, drakehide: 1.05, emberweave: 1.04,
+  rimeplate: 1.15, furmantle: 1.08, frostweave: 1.04,
 };
 
 function outfit(look: CharLook): Outfit {
@@ -170,6 +171,13 @@ function outfit(look: CharLook): Outfit {
       return { finish: "leather", base: "#5e3a2a", trim: "#ff9a4a", belt: "#2e1a12", sleeve: "#4e2e20", hand: "#3a2218", leg: "#3e2a20", boot: "#22140e", cape: "#6b2a1a", capeTrim: "#ff9a4a", straps: true, rune: "#ffb060" };
     case "emberweave":
       return { finish: "robe", base: "#3a1612", trim: "#ff8a3a", belt: "#ffb060", sleeve: "#3a1612", hand: look.skin, leg: "#2a0f0c", boot: "#160806", rune: "#ffb060" };
+    // Floor 4: the Frostforged set — blue steel under ice, white furs, rime-thread robes.
+    case "rimeplate":
+      return { finish: "plate", base: "#9fbad4", trim: "#eaf6ff", belt: "#2e4a6a", sleeve: "#8aa6c0", hand: "#7a94ae", leg: "#96b0ca", boot: "#4a6480", pauldron: "#c9deef", cape: "#dfeaf4", capeTrim: "#8fd3ff", rune: "#bfe6ff" };
+    case "furmantle":
+      return { finish: "leather", base: "#e8eef2", trim: "#8fd3ff", belt: "#5a4a3a", sleeve: "#d6dfe6", hand: "#8a6a4a", leg: "#6a7a8a", boot: "#4a3a2a", cape: "#f4f8fb", capeTrim: "#b8c8d6", straps: true };
+    case "frostweave":
+      return { finish: "robe", base: "#dfeaf4", trim: "#6fb8ff", belt: "#8fd3ff", sleeve: "#dfeaf4", hand: look.skin, leg: "#b8c8d6", boot: "#5a6a7a", rune: "#8fd3ff" };
     default:
       return { finish: "cloth", base: look.cloth, trim: look.trim, belt: look.trim, sleeve: look.cloth, hand: look.skin, leg: shade(look.cloth, -55), boot: "#4a3526" };
   }
@@ -972,6 +980,76 @@ export function drawHead(g: CanvasRenderingContext2D, look: CharLook, view: View
       }
       break;
     }
+    case "rimecrown": {
+      // Blue steel with a crown of icicles.
+      drawDome(g, cx, cy, "#dfeaf4", "#5a7a9a");
+      g.fillStyle = "#eaf6ff";
+      g.fillRect(cx - 12, cy - 2.4, 24, 2.4);
+      if (view !== "back") {
+        const spikes: [number, number, number][] = view === "front" ? [[cx - 8, cy - 8, 5], [cx - 3, cy - 10, 8], [cx + 3, cy - 10, 8], [cx + 8, cy - 8, 5]] : [[cx + 2, cy - 10, 7], [cx + 8, cy - 8, 5]];
+        glow(g, "#bfe6ff", 5);
+        for (const [sx, sy, len] of spikes) {
+          g.fillStyle = OUTLINE;
+          g.beginPath();
+          g.moveTo(sx - 2.6, sy + 1);
+          g.lineTo(sx, sy - len - 1.5);
+          g.lineTo(sx + 2.6, sy + 1);
+          g.fill();
+          g.fillStyle = "#eaf6ff";
+          g.beginPath();
+          g.moveTo(sx - 1.4, sy);
+          g.lineTo(sx, sy - len);
+          g.lineTo(sx + 1.4, sy);
+          g.fill();
+        }
+        noGlow(g);
+        g.fillStyle = OUTLINE;
+        g.fillRect(view === "side" ? cx + 2 : cx - 8, cy - 1, view === "side" ? 10 : 16, 3);
+      }
+      break;
+    }
+    case "furhood": {
+      // White fur, with a wolf's head worn as a crown.
+      g.fillStyle = OUTLINE;
+      blob(g, cx, cy - 1, 14.5, 14);
+      g.fill();
+      const fg = g.createRadialGradient(cx - 4, cy - 7, 2, cx, cy, 14);
+      fg.addColorStop(0, "#ffffff");
+      fg.addColorStop(1, "#b8c8d6");
+      g.fillStyle = fg;
+      blob(g, cx, cy - 1, 12.8, 12.4);
+      g.fill();
+      // Ears.
+      for (const sx of view === "side" ? [cx - 3] : [cx - 7, cx + 7]) {
+        g.fillStyle = OUTLINE;
+        g.beginPath();
+        g.moveTo(sx - 4, cy - 9);
+        g.lineTo(sx, cy - 17);
+        g.lineTo(sx + 4, cy - 9);
+        g.fill();
+        g.fillStyle = "#e8eef2";
+        g.beginPath();
+        g.moveTo(sx - 2.6, cy - 9.5);
+        g.lineTo(sx, cy - 15);
+        g.lineTo(sx + 2.6, cy - 9.5);
+        g.fill();
+      }
+      if (view !== "back") {
+        const fx = view === "side" ? cx + 5 : cx;
+        g.fillStyle = OUTLINE;
+        blob(g, fx, cy + 2, view === "side" ? 5.5 : 8.5, 8);
+        g.fill();
+        g.fillStyle = look.skin;
+        blob(g, fx, cy + 2.5, view === "side" ? 4.2 : 7, 6.8);
+        g.fill();
+        g.fillStyle = OUTLINE;
+        for (const ex of view === "side" ? [fx + 2] : [fx - 3, fx + 3]) {
+          blob(g, ex, cy + 1.5, 1.1, 1.3);
+          g.fill();
+        }
+      }
+      break;
+    }
     case "embercirclet": {
       // A band of dark gold with tongues of flame rising from it, and an ember at the brow.
       g.beginPath();
@@ -1588,6 +1666,12 @@ export function weaponTrail(kind: WeaponArt): number {
     case "sp_dragon":
     case "st_dragon":
       return 0xff9a4a;
+    case "sword_rime":
+    case "gs_rime":
+    case "dg_rime":
+    case "sp_rime":
+    case "st_rime":
+      return 0xdff4ff;
     case "gs_moon":
       return 0xd8d0ff;
     case "gs_gilded":
@@ -1670,6 +1754,11 @@ const WEAPON_SIZE: Record<WeaponArt, [number, number, number]> = {
   dg_dragon: [38, 16, 7],
   sp_dragon: [112, 28, 22],
   st_dragon: [84, 36, 10],
+  sword_rime: [66, 22, 9],
+  gs_rime: [98, 34, 14],
+  dg_rime: [40, 16, 7],
+  sp_rime: [112, 28, 22],
+  st_rime: [84, 36, 10],
 };
 
 export function weaponSize(kind: WeaponArt) {
@@ -2463,6 +2552,89 @@ export function drawWeapon(g: CanvasRenderingContext2D, kind: WeaponArt, rarity 
       sg.addColorStop(1, "#e8a030");
       g.fillStyle = sg;
       blob(g, ox, cy, 7, 7);
+      g.fill();
+      break;
+    }
+    // --- Floor 4: the Frostforged set ----------------------------------------------
+    case "sword_rime":
+    case "gs_rime":
+    case "dg_rime": {
+      const big = kind === "gs_rime";
+      const small = kind === "dg_rime";
+      straightBlade(g, w, h, grip, {
+        width: big ? 12 : small ? 4.4 : 7.4, hi: "#ffffff", mid: "#bcd8ee", lo: "#5a82aa", guard: "#dfeaf4", guardW: big ? 28 : small ? 12 : 20,
+        grip: "#2e4a6a", edge: "#f4fbff", edgeGlow: "#8fd3ff", pommel: "#8fd3ff",
+      });
+      // Frost creeping up the blade.
+      glow(g, "#dff4ff", 5);
+      g.fillStyle = rarity >= 3 ? accent : "#ffffff";
+      const x0 = grip + 12;
+      const x1 = w - (big ? 16 : 11);
+      for (let x = x0; x < x1; x += big ? 9 : 6) {
+        g.beginPath();
+        g.moveTo(x, cy);
+        g.lineTo(x + 2, cy - (big ? 3 : 1.6));
+        g.lineTo(x + 4, cy);
+        g.lineTo(x + 2, cy + (big ? 3 : 1.6));
+        g.closePath();
+        g.fill();
+      }
+      noGlow(g);
+      break;
+    }
+    case "sp_rime": {
+      shaft(g, 0, w - 26, cy, "#dfe6ec", 3.4);
+      g.fillStyle = "#2e4a6a";
+      for (const x of [grip, grip + 30, w - 32]) g.fillRect(x, cy - 3, 2.6, 6);
+      // A spire of ice for a head.
+      const head = (inset: number) => {
+        g.beginPath();
+        g.moveTo(w - 30 + inset, cy - 5 + inset);
+        g.lineTo(w - 1 - inset, cy);
+        g.lineTo(w - 30 + inset, cy + 5 - inset);
+        g.lineTo(w - 26, cy);
+        g.closePath();
+      };
+      glow(g, "#8fd3ff", 8);
+      g.fillStyle = OUTLINE;
+      head(-1.5);
+      g.fill();
+      noGlow(g);
+      const hg = g.createLinearGradient(0, cy - 6, 0, cy + 6);
+      hg.addColorStop(0, "#ffffff");
+      hg.addColorStop(0.5, "#cfe8ff");
+      hg.addColorStop(1, "#6f9fd0");
+      g.fillStyle = hg;
+      head(0.4);
+      g.fill();
+      g.strokeStyle = rarity >= 3 ? accent : "#ffffff";
+      g.lineWidth = 1;
+      line(g, w - 26, cy, w - 4, cy);
+      break;
+    }
+    case "st_rime": {
+      shaft(g, 0, w - 20, cy, "#e8e0d0", 3.8);
+      g.fillStyle = "#2e4a6a";
+      for (const x of [6, grip + 12, w - 34]) g.fillRect(x, cy - 3, 2.6, 6);
+      // Birch branches cradling a glacial heart.
+      for (const sgn of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(w - 26, cy);
+        g.quadraticCurveTo(w - 20, cy + sgn * 15, w - 7, cy + sgn * 12);
+        inked(g, "#e8e0d0", 2);
+      }
+      const ox = w - 13;
+      glow(g, "#8fd3ff", 12);
+      g.fillStyle = OUTLINE;
+      blob(g, ox, cy, 9.4, 9.4);
+      g.fill();
+      noGlow(g);
+      const og = g.createRadialGradient(ox - 3, cy - 3, 1, ox, cy, 8.4);
+      og.addColorStop(0, "#ffffff");
+      og.addColorStop(0.5, "#bfe6ff");
+      og.addColorStop(1, "#3f78b8");
+      g.fillStyle = og;
+      blob(g, ox, cy, 8, 8);
       g.fill();
       break;
     }

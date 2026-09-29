@@ -49,6 +49,131 @@ export function itemIcon(key: string, rarity = 0): string {
   } else if (key.startsWith("map_")) {
     drawMap(g);
   } else switch (base?.kind === "consumable" || base?.kind === "material" || base?.kind === "artifact" || base?.kind === "key" ? key : base?.kind) {
+    case "mat_rimeshard": {
+      // A long shard of blue-white ice.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(30, 4); g.lineTo(46, 22); g.lineTo(40, 60); g.lineTo(22, 56); g.lineTo(18, 24);
+      g.closePath();
+      g.fill();
+      const rg = g.createLinearGradient(18, 6, 46, 58);
+      rg.addColorStop(0, "#ffffff");
+      rg.addColorStop(0.5, "#cfe8f8");
+      rg.addColorStop(1, "#6f9fcf");
+      g.fillStyle = rg;
+      g.beginPath();
+      g.moveTo(30, 9); g.lineTo(42, 23); g.lineTo(37, 56); g.lineTo(25, 53); g.lineTo(22, 25);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.9)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(30, 14); g.lineTo(28, 48);
+      g.stroke();
+      break;
+    }
+    case "mat_frostpelt": {
+      // A white pelt with a pale blue sheen.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.moveTo(10, 22); g.quadraticCurveTo(20, 10, 32, 14); g.quadraticCurveTo(44, 10, 54, 22);
+      g.lineTo(50, 44); g.quadraticCurveTo(32, 58, 14, 44);
+      g.closePath();
+      g.fill();
+      const pg = g.createLinearGradient(0, 12, 0, 52);
+      pg.addColorStop(0, "#ffffff");
+      pg.addColorStop(1, "#b8c8d6");
+      g.fillStyle = pg;
+      g.beginPath();
+      g.moveTo(14, 23); g.quadraticCurveTo(22, 14, 32, 18); g.quadraticCurveTo(42, 14, 50, 23);
+      g.lineTo(47, 42); g.quadraticCurveTo(32, 53, 17, 42);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = "rgba(111,184,255,0.55)";
+      g.lineWidth = 1.5;
+      for (const x of [22, 30, 38]) {
+        g.beginPath();
+        g.moveTo(x, 24); g.lineTo(x + 2, 42);
+        g.stroke();
+      }
+      break;
+    }
+    case "mat_glacialheart":
+    case "art_wintercrown": {
+      const crown = key === "art_wintercrown";
+      const halo = g.createRadialGradient(32, 34, 4, 32, 34, 30);
+      halo.addColorStop(0, "rgba(191,230,255,0.9)");
+      halo.addColorStop(1, "rgba(111,184,255,0)");
+      g.fillStyle = halo;
+      g.fillRect(0, 0, S, S);
+      if (crown) {
+        // A crown of icicles on a band of blue steel.
+        g.fillStyle = outline;
+        g.beginPath();
+        g.moveTo(10, 46); g.lineTo(12, 22); g.lineTo(20, 34); g.lineTo(26, 12); g.lineTo(32, 30); g.lineTo(38, 12); g.lineTo(44, 34); g.lineTo(52, 22); g.lineTo(54, 46);
+        g.closePath();
+        g.fill();
+        const cg = g.createLinearGradient(0, 12, 0, 46);
+        cg.addColorStop(0, "#ffffff");
+        cg.addColorStop(1, "#8fb8dc");
+        g.fillStyle = cg;
+        g.beginPath();
+        g.moveTo(13, 43); g.lineTo(14, 27); g.lineTo(20, 37); g.lineTo(26, 18); g.lineTo(32, 34); g.lineTo(38, 18); g.lineTo(44, 37); g.lineTo(50, 27); g.lineTo(51, 43);
+        g.closePath();
+        g.fill();
+        g.fillStyle = "#6fb8ff";
+        g.beginPath();
+        g.arc(32, 40, 3.5, 0, Math.PI * 2);
+        g.fill();
+      } else {
+        // A heart of beating blue ice.
+        g.fillStyle = outline;
+        g.beginPath();
+        g.moveTo(32, 54);
+        g.bezierCurveTo(8, 38, 12, 14, 26, 16);
+        g.quadraticCurveTo(32, 18, 32, 24);
+        g.quadraticCurveTo(32, 18, 38, 16);
+        g.bezierCurveTo(52, 14, 56, 38, 32, 54);
+        g.fill();
+        const hg = g.createRadialGradient(28, 28, 2, 32, 34, 22);
+        hg.addColorStop(0, "#ffffff");
+        hg.addColorStop(0.45, "#9fd8ff");
+        hg.addColorStop(1, "#2e5a8a");
+        g.fillStyle = hg;
+        g.beginPath();
+        g.moveTo(32, 50);
+        g.bezierCurveTo(12, 36, 15, 18, 26, 19);
+        g.quadraticCurveTo(31, 21, 32, 27);
+        g.quadraticCurveTo(33, 21, 38, 19);
+        g.bezierCurveTo(49, 18, 52, 36, 32, 50);
+        g.fill();
+      }
+      break;
+    }
+    case "key_glacier": {
+      // The Rime Seal: a disc of ice holding a snowflake.
+      g.fillStyle = outline;
+      g.beginPath();
+      g.arc(32, 32, 22, 0, Math.PI * 2);
+      g.fill();
+      const sg = g.createRadialGradient(26, 24, 2, 32, 32, 20);
+      sg.addColorStop(0, "#ffffff");
+      sg.addColorStop(1, "#6f9fcf");
+      g.fillStyle = sg;
+      g.beginPath();
+      g.arc(32, 32, 19, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "#1e3a5a";
+      g.lineWidth = 2.5;
+      for (let i = 0; i < 3; i++) {
+        const an = (i * Math.PI) / 3;
+        g.beginPath();
+        g.moveTo(32 - Math.cos(an) * 12, 32 - Math.sin(an) * 12);
+        g.lineTo(32 + Math.cos(an) * 12, 32 + Math.sin(an) * 12);
+        g.stroke();
+      }
+      break;
+    }
     case "mat_cinder": {
       // A lump of black stone, glowing through its cracks.
       g.fillStyle = outline;

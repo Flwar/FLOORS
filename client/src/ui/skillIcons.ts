@@ -404,6 +404,134 @@ const GLYPH: Record<string, (g: G, c: string) => void> = {
       fillInk(g, "#ffb347", 2);
     }
   },
+  glacial: (g, c) => {
+    GLYPH.sunder(g, c);
+    flake(g, 32, 44, 9, "#ffffff");
+  },
+  verdict: (g, c) => {
+    GLYPH.pierce(g, c);
+    flake(g, 46, 18, 8, "#ffffff");
+  },
+  avalanche: (g, c) => {
+    GLYPH.quake(g, c);
+    flake(g, 20, 18, 7, "#ffffff");
+    flake(g, 44, 16, 6, "#ffffff");
+  },
+  shatter: (g, c) => {
+    GLYPH.fissure(g, c);
+    flake(g, 48, 18, 7, "#ffffff");
+  },
+  frostfang: (g, c) => {
+    GLYPH.cuts(g, c);
+    flake(g, 32, 32, 7, "#ffffff");
+  },
+  shiver: (g, c) => {
+    GLYPH.phantom(g, c);
+    flake(g, 48, 44, 7, "#ffffff");
+  },
+  icicle: (g, c) => {
+    g.beginPath();
+    g.moveTo(8, 50);
+    g.lineTo(34, 32);
+    ink(g, "#5a3b24", 4);
+    g.beginPath();
+    g.moveTo(30, 30);
+    g.lineTo(58, 8);
+    g.lineTo(38, 38);
+    g.closePath();
+    const gr = g.createLinearGradient(30, 38, 58, 8);
+    gr.addColorStop(0, c);
+    gr.addColorStop(1, "#ffffff");
+    fillInk(g, gr, 3);
+  },
+  hailspin: (g, c) => {
+    GLYPH.whirlspear(g, c);
+    for (const [x, y] of [[14, 14], [50, 14], [50, 50]] as const) {
+      g.beginPath();
+      g.arc(x, y, 4, 0, Math.PI * 2);
+      fillInk(g, "#ffffff", 2);
+    }
+  },
+  iceshards: (g, c) => {
+    for (const [a, len] of [[-0.5, 22], [-0.25, 26], [0, 28], [0.25, 26], [0.5, 22]] as const) {
+      const x0 = 12;
+      const y0 = 32;
+      const x1 = x0 + Math.cos(a) * (len + 18);
+      const y1 = y0 + Math.sin(a) * (len + 18);
+      g.beginPath();
+      g.moveTo(x1, y1);
+      g.lineTo(x1 - Math.cos(a + 0.3) * 12, y1 - Math.sin(a + 0.3) * 12);
+      g.lineTo(x1 - Math.cos(a - 0.3) * 12, y1 - Math.sin(a - 0.3) * 12);
+      g.closePath();
+      fillInk(g, c, 2);
+    }
+  },
+  glacialspike: (g, c) => {
+    g.beginPath();
+    g.moveTo(10, 54);
+    g.lineTo(54, 54);
+    ink(g, "#8a98a8", 4);
+    for (const [x, h, w] of [[32, 44, 9], [20, 26, 6], [44, 30, 6]] as const) {
+      g.beginPath();
+      g.moveTo(x - w, 54);
+      g.lineTo(x, 54 - h);
+      g.lineTo(x + w, 54);
+      g.closePath();
+      const gr = g.createLinearGradient(0, 54 - h, 0, 54);
+      gr.addColorStop(0, "#ffffff");
+      gr.addColorStop(1, c);
+      fillInk(g, gr, 2.5);
+    }
+  },
+  icelance: (g, c) => {
+    g.beginPath();
+    g.moveTo(8, 56);
+    g.lineTo(46, 18);
+    ink(g, c, 5);
+    g.beginPath();
+    g.moveTo(58, 6);
+    g.lineTo(40, 18);
+    g.lineTo(46, 24);
+    g.closePath();
+    fillInk(g, "#ffffff", 2.5);
+    flake(g, 18, 20, 7, "#ffffff");
+  },
+  prison: (g, c) => {
+    g.beginPath();
+    g.roundRect(14, 12, 36, 42, 6);
+    const gr = g.createLinearGradient(14, 12, 50, 54);
+    gr.addColorStop(0, "rgba(255,255,255,0.9)");
+    gr.addColorStop(1, c);
+    fillInk(g, gr, 3);
+    g.fillStyle = "#1d1a17";
+    g.beginPath();
+    g.arc(32, 28, 6, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(26, 34, 12, 14);
+    for (const x of [22, 32, 42]) {
+      g.beginPath();
+      g.moveTo(x, 12);
+      g.lineTo(x, 54);
+      ink(g, "rgba(255,255,255,0.8)", 1.5);
+    }
+  },
+  hailstorm: (g) => {
+    g.beginPath();
+    g.ellipse(32, 16, 22, 10, 0, 0, Math.PI * 2);
+    fillInk(g, "#8a9aae");
+    for (const [x, y] of [[18, 34], [30, 42], [44, 34], [24, 52], [40, 50]] as const) {
+      g.beginPath();
+      g.arc(x, y, 4.5, 0, Math.PI * 2);
+      fillInk(g, "#eaf6ff", 2);
+    }
+  },
+  absolutezero: (g, c) => {
+    flake(g, 32, 32, 24, c);
+    flake(g, 32, 32, 12, "#ffffff");
+    g.beginPath();
+    g.arc(32, 32, 5, 0, Math.PI * 2);
+    fillInk(g, "#ffffff", 2);
+  },
   passive: (g, c) => {
     g.beginPath();
     g.moveTo(32, 8);
@@ -1011,7 +1139,7 @@ export function drawSkillIcon(g: G, vfx: string, color: number) {
 /** Colours for passive skills, so each reads differently at a glance. */
 const PASSIVE_COLOR: Record<string, number> = {
   fleetfoot: 0x8fe0c0, deepLungs: 0x9fd3ff, secondWind: 0x9fe08a, ironSkin: 0xc9d3dd, wardensGrace: 0xffe08a, riposteMaster: 0xffc27a, keenEye: 0xdfe8ff,
-  executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b,
+  executioner: 0xff7a6a, momentum: 0xffb040, scaleguard: 0xd8a060, lastStand: 0xff5a4a, unbroken: 0xb77af2, emberblood: 0xff7a2a, wyrmsbane: 0xf2a93b, frostblood: 0x8fd3ff, glacialHide: 0xdfeaf4,
 };
 
 /** A passive skill's icon (shield and star in its colour). */

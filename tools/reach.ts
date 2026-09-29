@@ -5,7 +5,7 @@
  * are raised at runtime, so here every gate counts as open: the check is "reachable once solved".
  * Building doors count as paths: walking up to one takes you inside (and back out).
  */
-import { applyGates, buildFloor1, buildFloor2, buildFloor3, buildRoost, buildStormspire, buildUndercroft, TILE, type GateDef, type WorldMap } from "@floors/shared";
+import { applyGates, TILE, TOWER, type GateDef, type WorldMap } from "@floors/shared";
 
 let failures = 0;
 let total = 0;
@@ -78,11 +78,9 @@ function reach(label: string, m: WorldMap) {
   total += n;
 }
 
-reach("Floor 1", buildFloor1());
-reach("The Undercroft", buildUndercroft());
-reach("Floor 2", buildFloor2());
-reach("The Stormspire", buildStormspire());
-reach("Floor 3", buildFloor3());
-reach("The Dragon's Roost", buildRoost());
+for (const f of TOWER) {
+  reach(`Floor ${f.n}`, f.build());
+  reach(f.dungeonName, f.buildDungeon());
+}
 console.log(failures ? `\n${failures} of ${total} places unreachable` : `\nall ${total} NPCs, objects and spawns are reachable on every map`);
 process.exit(failures ? 1 : 0);

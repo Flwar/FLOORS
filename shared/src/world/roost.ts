@@ -144,7 +144,7 @@ export function buildRoost(): WorldMap & { gates: GateDef[]; traps: { x: number;
   obj({ id: "seal-tablet", kind: "lore", tx: 42, ty: 77, name: "The Seal Stone", text: `"Three seals bar the Tyrant's stair. Light them all while the first still burns — ${SEAL_WINDOW} heartbeats, no more. The brood answers the flame."` });
   obj({ id: "hatchery-egg", kind: "lore", tx: 42, ty: 96, name: "Cracked Egg", text: "Still warm. The shell is as thick as a shield, and something clawed its way out of it very recently." });
   obj({ id: "lore-ante", kind: "lore", tx: 38, ty: 31, name: "Ignivar's Decree", text: "\"The tower is mine from this floor to the sky. Climb, little one. Climb to me, and burn.\"" });
-  obj({ id: "ascent", kind: "gate", tx: 42, ty: 2, dest: "floor4", name: "The Burning Stair", text: "A stair of black glass climbs into smoke and stops. Floor 4 is not open yet." });
+  obj({ id: "ascent", kind: "gate", tx: 42, ty: 2, dest: "floor4", name: "The Frozen Stair", text: "A stair of black glass climbs out of the smoke into falling snow. It will not open while Ignivar lives." });
 
   m.spawns.push({ id: "warden", x: px(42), y: px(44), radius: 0, enemies: ["vyrmak"], respawn: 0, elite: 0, level: 15 });
   m.spawns.push({ id: "boss", x: px(42), y: px(10), radius: 0, enemies: ["ignivar"], respawn: 0, elite: 0, level: 16 });

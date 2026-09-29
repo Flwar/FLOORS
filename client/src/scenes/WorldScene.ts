@@ -431,15 +431,21 @@ export class WorldScene extends Phaser.Scene {
         const s = v.def.look.scale;
         this.fx.rise(x + (Math.random() - 0.5) * 16 * s, y - 10 - Math.random() * 20 * s, Math.random() < 0.5 ? 0xff7a2a : 0xffc04a, 1, 4, 34, 520, 2.6);
       }
-      // Dragonfire pours from the jaws.
+      if (e.flags & EFlag.Chilled && Math.random() < delta / 110) {
+        const s = v.def.look.scale;
+        this.fx.rise(x + (Math.random() - 0.5) * 18 * s, y - 6 - Math.random() * 22 * s, Math.random() < 0.5 ? 0xdff4ff : 0x8fd3ff, 1, 3, 10, 700, 2.4);
+      }
+      // Dragons breathe: fire, or (frost dragons) a blast of cold.
       if (v.fire) {
         const f = v.fire;
         const s = v.def.look.scale;
+        const frost = v.def.look.element === "frost";
+        const palette = frost ? [0xffffff, 0xbfe6ff, 0x6fb8ff] : [0xffe08a, 0xff7a2a, 0xd8402c];
         for (let i = 0; i < Math.ceil(delta / 12); i++) {
           const spread = (Math.random() - 0.5) * 0.9;
-          this.fx.sparks(f.x, f.y, f.a + spread, Math.random() < 0.4 ? 0xffe08a : Math.random() < 0.5 ? 0xff7a2a : 0xd8402c, 2, 180 + 120 * s, 0.25);
+          this.fx.sparks(f.x, f.y, f.a + spread, Math.random() < 0.4 ? palette[0] : Math.random() < 0.5 ? palette[1] : palette[2], 2, 180 + 120 * s, 0.25);
         }
-        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, 0xff9a3a, 4, 50, 3.4, 420);
+        if (Math.random() < delta / 40) this.fx.burst(f.x + Math.cos(f.a) * 30 * s, f.y + Math.sin(f.a) * 30 * s, frost ? 0xdff4ff : 0xff9a3a, 4, 50, 3.4, 420);
         if (Math.random() < delta / 200) sfx.boom(false, f.x, f.y);
       }
       this.enemyTelegraph(id, e, v, x, y, view);
@@ -1281,7 +1287,7 @@ export class WorldScene extends Phaser.Scene {
           break;
         default: {
           if (t > h.delay + 250) return;
-          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : 0xd8402c;
+          const color = h.kind === HazardKind.Meteor ? 0xffa040 : h.kind === HazardKind.Sigil ? 0xc070ff : h.kind === HazardKind.Lightning ? 0x9fd3ff : h.kind === HazardKind.Frost ? 0xbfe6ff : 0xd8402c;
           g.fillStyle(color, 0.08 + 0.2 * k);
           g.fillEllipse(h.x, h.y, h.radius * 2, h.radius * 1.6);
           g.fillStyle(color, 0.35);
@@ -1294,6 +1300,12 @@ export class WorldScene extends Phaser.Scene {
             this.fx.bolt(h.x + (Math.random() - 0.5) * 30, h.y - 150, h.x, h.y - 4, 0xeaf6ff, 160, 3, 18);
             this.fx.sparks(h.x, h.y - 6, -Math.PI / 2, 0xeaf6ff, 14, 240, Math.PI * 2);
             this.fx.crack(h.x - 8, h.y, h.x + 8, h.y + 3, 0x2a2a3a, 900, 3);
+            sfx.hit(true, h.x, h.y, true, "metal");
+          } else if (t >= h.delay && t < h.delay + 40 && h.kind === HazardKind.Frost) {
+            // Hail and icicles: shards of ice from above.
+            this.fx.streak(h.x + (Math.random() - 0.5) * 20, h.y - 140, h.x, h.y - 6, 0xeaf6ff, 140, 5);
+            this.fx.burst(h.x, h.y - 6, 0xdff4ff, 22, 150, 2.8, 650);
+            this.fx.ring(h.x, h.y, 0x8fd3ff, 6, h.radius, 380, 3);
             sfx.hit(true, h.x, h.y, true, "metal");
           } else if (t >= h.delay && t < h.delay + 40) {
             this.fx.burst(h.x, h.y - 6, color, 24, 160, 3, 600);
@@ -1316,6 +1328,15 @@ export class WorldScene extends Phaser.Scene {
       const y = pr.y0 + Math.sin(pr.angle) * d;
       const tx = x - Math.cos(pr.angle) * Math.min(d, 18);
       const ty = y - Math.sin(pr.angle) * Math.min(d, 18);
+      if (pr.kind === ProjKind.IceShard) {
+        const g2 = this.fx.ground;
+        g2.fillStyle(0x8fd3ff, 0.3);
+        g2.fillCircle(x, y, pr.radius * 1.5);
+        g2.fillStyle(0xeaf6ff, 1);
+        g2.fillTriangle(x + Math.cos(pr.angle) * pr.radius * 1.6, y + Math.sin(pr.angle) * pr.radius * 1.6, x + Math.cos(pr.angle + 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle + 2.4) * pr.radius * 0.8, x + Math.cos(pr.angle - 2.4) * pr.radius * 0.8, y + Math.sin(pr.angle - 2.4) * pr.radius * 0.8);
+        if (Math.random() < 0.5) this.fx.rise(tx, ty, 0xdff4ff, 1, 3, 8, 300, 2);
+        return;
+      }
       if (pr.kind === ProjKind.Fireball) {
         const g2 = this.fx.ground;
         g2.fillStyle(0xff5a1a, 0.35);
@@ -1506,7 +1527,7 @@ export class WorldScene extends Phaser.Scene {
       this.hud.zone(zone);
       const mood = zone.music ?? (this.map.theme === "cave" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
-      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember" };
+      const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember", rimeholt: "frost", glacier: "frost" };
       const theme = this.map.theme;
       ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
       sfx.setRoom(this.map.theme === "cave" || zone.dark || zone.indoor ? "cave" : zone.safe ? "town" : "open");

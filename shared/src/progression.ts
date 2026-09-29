@@ -1,7 +1,7 @@
 import { WEAPONS, type WeaponKey } from "./combat/weapons.ts";
 import { Mod } from "./sim/player.ts";
 
-export const MAX_LEVEL = 16;
+export const MAX_LEVEL = 20;
 /** XP needed to go from `level` to `level + 1`. */
 export const xpToNext = (level: number) => Math.round(85 * Math.pow(level, 1.55));
 export const baseHp = (level: number) => 100 + (level - 1) * 10;
@@ -64,6 +64,13 @@ export const PERK_CHOICES: { level: number; options: [PerkDef, PerkDef] }[] = [
     options: [
       { id: "wyrmsbane", name: "Wyrmsbane", desc: "+15% damage against bosses and minibosses." },
       { id: "lastStand", name: "Last Stand", desc: "+20% damage while below 35% health." },
+    ],
+  },
+  {
+    level: 17,
+    options: [
+      { id: "frostblood", name: "Frostblood", desc: "Your blows have a 20% chance to chill enemies: slower to move and to strike." },
+      { id: "glacialHide", name: "Glacial Hide", desc: "+25 defense and +8% maximum health." },
     ],
   },
 ];

@@ -25,4 +25,13 @@ export const RUMOURS: Record<number, string[]> = {
   "They say Ignivar has never lost a fight. They also say nobody has ever reached him. Both can't stay true forever.",
   "The Archivist in the Keep sells scrolls you won't find anywhere else. Bring Marks. Lots of Marks.",
   ],
+  4: [
+    "Rime wolves hunt in threes and circle before they bite. Keep your back to a rock and your blade out.",
+    "The Seer says something sleeps under the Frozen Lake. The Seer says a lot of things. This one, I believe.",
+    "There's an old ice bridge west of the lake, behind the rocks on the north shore. Hunters used it, once.",
+    "Glacierfang breathes cold, not fire — it'll slow you, and slow is dead. Step out of it, not through it.",
+    "In the Glacier Throne, the echoes tell you the runes. Every stone says one. Read them all before you touch anything.",
+    "Halla at the Runeforge can carve the cold into steel. Bring her rime shards and pelts.",
+    "The Winter King says every fire goes out. He's been saying it for three hundred years. Someone should make him stop.",
+  ],
 };

@@ -26,6 +26,8 @@ const FOREST: Palette = { grass: "#4f8c45", grassDark: "#3f7438", grassLight: "#
 const GILDED: Palette = { grass: "#9db85a", grassDark: "#86a04a", grassLight: "#b6cc6e" };
 /** Floor 3: ash over black rock. */
 const EMBER: Palette = { grass: "#5c534b", grassDark: "#463e38", grassLight: "#746a61" };
+/** Floor 4: deep snow. */
+const SNOW: Palette = { grass: "#e4ecf2", grassDark: "#c6d4e0", grassLight: "#f7fbfe" };
 let PATH = "#cfae72";
 const COBBLE = "#9b968b";
 const WATER = "#3f86c0";
@@ -77,8 +79,10 @@ export class Terrain {
     STONE = map.theme === "gilded" || map.theme === "storm" ? "#e2cd92" : "#a89f8c";
     this.gilded = map.theme === "gilded";
     this.ember = map.theme === "ember";
+    this.frost = map.theme === "frost";
     if (this.ember) STONE = "#6a625c";
-    PATH = this.ember ? "#8a7866" : "#cfae72";
+    if (this.frost) STONE = "#a3b2c0";
+    PATH = this.ember ? "#8a7866" : this.frost ? "#c3ced8" : "#cfae72";
     paintSprites(scene, map);
     scene.events.once("shutdown", () => {
       for (const [k, c] of [...this.chunks]) this.unload(k, c);
@@ -140,10 +144,13 @@ export class Terrain {
   private gilded = false;
   /** Floor 3: ash for grass, lava for water, charred trees. */
   private ember = false;
+  /** Floor 4: snow for grass, ice for water, snowy pines. */
+  private frost = false;
 
   private palette(tx: number, ty: number): Palette {
     if (this.gilded) return GILDED;
     if (this.ember) return EMBER;
+    if (this.frost) return SNOW;
     const f = this.forestRect;
     if (f && tx >= f.x0 && tx < f.x1 && ty >= f.y0 && ty < f.y1) {
       const edge = Math.min(tx - f.x0, ty - f.y0, f.x1 - tx, f.y1 - ty);
@@ -170,7 +177,7 @@ export class Terrain {
         switch (id) {
           case Tile.Tree: {
             const forest = this.palette(tx, ty) === FOREST;
-            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.ember ? 9 : this.gilded ? 6 : forest ? 3 : 0);
+            const variant = Math.floor(hash(tx, ty, 3) * 3) + (this.frost ? 12 : this.ember ? 9 : this.gilded ? 6 : forest ? 3 : 0);
             add(tx * TILE + TILE / 2 + (hash(tx, ty, 4) - 0.5) * 8, bottom - 3, `tree${variant}`, 0.5, 0.94, 0.9 + hash(tx, ty, 5) * 0.35);
             tall.push(decor[decor.length - 1] as Phaser.GameObjects.Image);
             break;
@@ -301,7 +308,7 @@ export class Terrain {
         case Tile.CaveFloor:
         case Tile.Rock:
         case Tile.Crystal:
-          color = this.ember ? "#3a3230" : ROCK;
+          color = this.ember ? "#3a3230" : this.frost ? "#7d8c9c" : ROCK;
           break;
         case Tile.Cliff:
           color = "#8a6e52";
@@ -390,7 +397,7 @@ export class Terrain {
         }
         if (hash(tx, ty, 27) < 0.3) {
           // Moss on old flagstones; soot and a live cinder in the Ember Reaches.
-          g.fillStyle = this.ember ? (hash(tx, ty, 31) < 0.25 ? "rgba(255,120,40,0.45)" : "rgba(30,22,18,0.45)") : "rgba(90,140,70,0.55)";
+          g.fillStyle = this.ember ? (hash(tx, ty, 31) < 0.25 ? "rgba(255,120,40,0.45)" : "rgba(30,22,18,0.45)") : this.frost ? "rgba(255,255,255,0.7)" : "rgba(90,140,70,0.55)";
           g.beginPath();
           g.arc(x + hash(tx, ty, 28) * T, y + hash(tx, ty, 29) * T, 5 + hash(tx, ty, 30) * 6, 0, Math.PI * 2);
           g.fill();
@@ -587,11 +594,11 @@ export class Terrain {
       if (paved) {
         disc(tx, ty, 0.95, "#1d1a17");
         disc(tx, ty, 0.88, "#c9c0ad");
-      } else disc(tx, ty, 0.82, this.ember ? "#2a1410" : "#d9ecf0");
+      } else disc(tx, ty, 0.82, this.ember ? "#2a1410" : this.frost ? "#f4f8fb" : "#d9ecf0");
     });
-    const water = this.ember ? "#e0501a" : WATER;
+    const water = this.ember ? "#e0501a" : this.frost ? "#9cc9e6" : WATER;
     range((tx, ty) => {
-      if (is(tx, ty, Tile.Water)) disc(tx, ty, 0.72, this.ember ? "#ffb347" : shade(WATER, 28));
+      if (is(tx, ty, Tile.Water)) disc(tx, ty, 0.72, this.ember ? "#ffb347" : this.frost ? "#cfe6f4" : shade(WATER, 28));
     });
     range((tx, ty) => {
       if (!is(tx, ty, Tile.Water)) return;
@@ -599,7 +606,26 @@ export class Terrain {
       g.fillStyle = water;
       if (is(tx + 1, ty, Tile.Water)) g.fillRect(px(tx) + T / 2, py(ty) + T * 0.2, T, T * 0.6);
       if (is(tx, ty + 1, Tile.Water)) g.fillRect(px(tx) + T * 0.2, py(ty) + T / 2, T * 0.6, T);
-      if (this.ember) {
+      if (this.frost) {
+        // Ice: pale cracks, and the odd glint.
+        g.strokeStyle = "rgba(255,255,255,0.75)";
+        g.lineWidth = 1.6;
+        if (hash(tx, ty, 12) < 0.55) {
+          const cx0 = px(tx) + hash(tx, ty, 13) * T;
+          const cy0 = py(ty) + hash(tx, ty, 14) * T;
+          g.beginPath();
+          g.moveTo(cx0, cy0);
+          g.lineTo(cx0 + (hash(tx, ty, 15) - 0.5) * T, cy0 + (hash(tx, ty, 16) - 0.5) * T * 0.6);
+          g.lineTo(cx0 + (hash(tx, ty, 17) - 0.5) * T * 1.2, cy0 + (hash(tx, ty, 18) - 0.5) * T);
+          g.stroke();
+        }
+        if (hash(tx, ty, 19) < 0.2) {
+          g.fillStyle = "rgba(255,255,255,0.9)";
+          g.beginPath();
+          g.arc(px(tx) + hash(tx, ty, 20) * T, py(ty) + hash(tx, ty, 21) * T, 2.5, 0, Math.PI * 2);
+          g.fill();
+        }
+      } else if (this.ember) {
         // Molten crust: dark plates floating on the fire, and bright seams between.
         if (hash(tx, ty, 12) < 0.45) {
           g.fillStyle = "rgba(60,20,10,0.55)";
@@ -656,8 +682,8 @@ export class Terrain {
       }
       if (southOpen) {
         const fg = g.createLinearGradient(0, y + T * 0.35, 0, y + T);
-        fg.addColorStop(0, this.ember ? "#4a3a32" : "#9a7a5a");
-        fg.addColorStop(1, this.ember ? "#2a1e18" : "#6b5440");
+        fg.addColorStop(0, this.ember ? "#4a3a32" : this.frost ? "#a8bccc" : "#9a7a5a");
+        fg.addColorStop(1, this.ember ? "#2a1e18" : this.frost ? "#6a7e90" : "#6b5440");
         g.fillStyle = fg;
         g.fillRect(x, y + T * 0.35, T, T * 0.65);
         g.fillStyle = "rgba(0,0,0,0.18)";
@@ -672,7 +698,7 @@ export class Terrain {
     range((tx, ty) => {
       if (!is(tx, ty, Tile.Rock, Tile.Crystal)) return;
       for (let i = 0; i < 3; i++) {
-        g.fillStyle = this.ember ? (hash(tx, ty, 60 + i) < 0.5 ? "#2e2826" : "#4a403c") : hash(tx, ty, 60 + i) < 0.5 ? "#50545d" : "#666a74";
+        g.fillStyle = this.ember ? (hash(tx, ty, 60 + i) < 0.5 ? "#2e2826" : "#4a403c") : this.frost ? (hash(tx, ty, 60 + i) < 0.5 ? "#8e9cac" : "#dfe8f0") : hash(tx, ty, 60 + i) < 0.5 ? "#50545d" : "#666a74";
         g.beginPath();
         g.arc(px(tx) + hash(tx, ty, 63 + i) * T, py(ty) + hash(tx, ty, 66 + i) * T, 6 + hash(tx, ty, 69 + i) * 10, 0, Math.PI * 2);
         g.fill();
@@ -721,7 +747,7 @@ export class Terrain {
           g.stroke();
         }
         if (t === Tile.Flowers) {
-          const colors = this.ember ? ["#ff7a2a", "#ffb347", "#ff5a1a"] : ["#f6d860", "#f59bb7", "#ffffff", "#b99af5", "#ff9a6b"];
+          const colors = this.ember ? ["#ff7a2a", "#ffb347", "#ff5a1a"] : this.frost ? ["#dff4ff", "#bfe6ff", "#ffffff"] : ["#f6d860", "#f59bb7", "#ffffff", "#b99af5", "#ff9a6b"];
           for (let i = 0; i < 7; i++) {
             const fx = x + 6 + hash(tx, ty, 60 + i) * (T - 12);
             const fy = y + 6 + hash(tx, ty, 70 + i) * (T - 12);
@@ -813,6 +839,57 @@ function paintSprites(scene: Phaser.Scene, map: WorldMap) {
       }
     });
   });
+
+  for (let v = 0; v < 3; v++) {
+    make(`tree${12 + v}`, 110, 160, (g) => {
+      const cx = 55;
+      const h = 160;
+      const shadow = g.createRadialGradient(cx, h - 10, 4, cx, h - 10, 34);
+      shadow.addColorStop(0, "rgba(40,60,90,0.35)");
+      shadow.addColorStop(1, "rgba(40,60,90,0)");
+      g.fillStyle = shadow;
+      g.beginPath();
+      g.ellipse(cx, h - 10, 34, 11, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#1d1a17";
+      g.fillRect(cx - 7, h - 40, 14, 32);
+      g.fillStyle = "#5a3e26";
+      g.fillRect(cx - 4, h - 40, 8, 30);
+      const tiers = 3 + (v === 2 ? 1 : 0);
+      const green = ["#1f4a3a", "#24543f", "#1b4436"][v];
+      for (let i = 0; i < tiers; i++) {
+        const w = 44 - i * 9;
+        const y0 = h - 30 - i * 26;
+        const tier = (inset: number) => {
+          g.beginPath();
+          g.moveTo(cx - w + inset, y0 - inset * 0.3);
+          g.lineTo(cx, y0 - 44 + inset);
+          g.lineTo(cx + w - inset, y0 - inset * 0.3);
+          g.quadraticCurveTo(cx, y0 + 8 - inset, cx - w + inset, y0 - inset * 0.3);
+          g.closePath();
+        };
+        g.fillStyle = "#1d1a17";
+        tier(-3);
+        g.fill();
+        const tg = g.createLinearGradient(cx - w, 0, cx + w, 0);
+        tg.addColorStop(0, shade(green, 18));
+        tg.addColorStop(1, shade(green, -16));
+        g.fillStyle = tg;
+        tier(0);
+        g.fill();
+        // Snow on the tier.
+        g.fillStyle = "#f4f9fc";
+        g.beginPath();
+        g.moveTo(cx - w * 0.8, y0 - 10);
+        g.lineTo(cx, y0 - 42);
+        g.lineTo(cx + w * 0.7, y0 - 12);
+        g.quadraticCurveTo(cx + w * 0.3, y0 - 20, cx + w * 0.1, y0 - 14);
+        g.quadraticCurveTo(cx - w * 0.3, y0 - 22, cx - w * 0.8, y0 - 10);
+        g.closePath();
+        g.fill();
+      }
+    });
+  }
 
   const block = (key: string, top: [string, string], face: [string, string], moss: boolean, seed: number) =>
     make(key, T, T + 36, (g) => {

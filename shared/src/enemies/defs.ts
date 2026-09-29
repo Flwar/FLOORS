@@ -52,6 +52,8 @@ export interface EnemyLook {
   ears?: boolean;
   horns?: boolean;
   glow?: string;
+  /** Dragons: what they breathe (fire by default). */
+  element?: "fire" | "frost" | "shadow";
 }
 
 export interface EnemyDef {

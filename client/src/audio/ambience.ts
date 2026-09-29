@@ -19,6 +19,7 @@ const PROFILES: Record<string, Profile> = {
   skyreach: { bed: { type: "highpass", freq: 1500, q: 0.4, level: 0.03, wobble: 0.6 }, events: [{ kind: "chime", every: [5, 11], level: 0.04 }] },
   inn: { bed: { type: "lowpass", freq: 320, q: 0.6, level: 0.04, wobble: 0.25 }, events: [{ kind: "creak", every: [8, 18], level: 0.035 }] },
   ember: { bed: { type: "lowpass", freq: 120, q: 0.9, level: 0.1, wobble: 0.5 }, events: [{ kind: "creak", every: [7, 16], level: 0.05 }] },
+  frost: { bed: { type: "highpass", freq: 900, q: 0.5, level: 0.06, wobble: 0.85 }, events: [{ kind: "chime", every: [9, 18], level: 0.03 }] },
   storm: { bed: { type: "bandpass", freq: 420, q: 0.5, level: 0.075, wobble: 0.9 }, events: [{ kind: "creak", every: [6, 14], level: 0.06 }, { kind: "chime", every: [12, 24], level: 0.03 }] },
 };
 

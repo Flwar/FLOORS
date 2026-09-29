@@ -6,7 +6,7 @@ export type QuestStage =
   | { kind: "parry"; count: number; text: string }
   | { kind: "visit"; zone: string; text: string }
   /** Enter a boss dungeon; `dungeon` is its room kind ("dungeon" is the Undercroft). */
-  | { kind: "dungeon"; text: string; dungeon: "dungeon" | "stormspire" | "roost" };
+  | { kind: "dungeon"; text: string; dungeon: string };
 
 export interface QuestDef {
   id: string;
@@ -452,6 +452,148 @@ export const QUESTS: QuestDef[] = [
   mission("m3_drakes", "board3", 3, "Bounty: Drake Hunt", "The canyon drakes are raiding Emberhold's herds. Five of them.", { kind: "kill", enemy: ["drake"], count: 5, text: "Slay 5 drakes" }, 1200, 340, 5),
   mission("m3_golems", "board3", 3, "Bounty: Black Glass", "The obsidian golems are walking toward the road. Stop them.", { kind: "kill", enemy: ["obsidian"], count: 4, text: "Shatter 4 obsidian golems" }, 1100, 320, 5),
   mission("m3_scales", "board3", 3, "Contract: Dragonscale", "The Dragonforge always needs scales.", { kind: "collect", item: "mat_dragonscale", count: 6, consume: true, text: "Hand in 6 Dragonscales at the board" }, 1000, 380, 4),
+  // --- Floor 4: the Frostvale ------------------------------------------------------------------
+  {
+    id: "f4_arrival",
+    name: "Into the Frostvale",
+    giver: "jarl",
+    main: true,
+    floor: 4,
+    requires: "f3_roost",
+    pitch: "You came up out of the fire into the snow. Good — you'll appreciate it for about an hour. The rime wolves have been circling the Snowfields for weeks. Thin the packs, and learn how the cold fights.",
+    thanks: "Not bad, for someone who smells of smoke. The lake is next — the Seer has been asking for someone foolish enough.",
+    stages: [
+      { kind: "visit", zone: "snowfields", text: "Walk out onto the Snowfields" },
+      { kind: "kill", enemy: ["rimewolf"], count: 8, text: "Thin the rime wolf packs" },
+      { kind: "talk", npc: "jarl", text: "Report to Jarl Sigrun in Rimeholt" },
+    ],
+    rewards: { xp: 2600, gold: 520, items: [{ key: "tonic", qty: 4 }] },
+  },
+  {
+    id: "f4_lake",
+    name: "The Frozen Lake",
+    giver: "jarl",
+    main: true,
+    floor: 4,
+    requires: "f4_arrival",
+    pitch: "West, past the rocks, the Frozen Lake. Ice wraiths have come up out of it, and the Seer says there's a shrine on its northern shore that knows why. Read it. Put down the wraiths you find.",
+    thanks: "Something enormous, asleep under the ice. Wonderful. Go and tell Ylva — she'll be delighted, which is worse.",
+    stages: [
+      { kind: "visit", zone: "frozen-lake", text: "Reach the Frozen Lake" },
+      { kind: "interact", objects: ["lake-shrine"], text: "Read the Shrine of the Still Water" },
+      { kind: "kill", enemy: ["icewraith"], count: 4, text: "Banish 4 ice wraiths" },
+      { kind: "talk", npc: "seer", text: "Tell Seer Ylva what the shrine said" },
+    ],
+    rewards: { xp: 3200, gold: 620, marks: 5, items: [{ key: "scroll_any_icelance" }] },
+  },
+  {
+    id: "f4_pines",
+    name: "Tracks in the Pinewood",
+    giver: "seer",
+    main: true,
+    floor: 4,
+    requires: "f4_lake",
+    pitch: "The hunters in the Pinewood stopped sending word. Their post is in the east wood, past the creek. Find it — and whatever is leaving tracks that size, find that too.",
+    thanks: "Yetis. Three of them, and you walked back. The Jarl will want to hear it from you.",
+    stages: [
+      { kind: "visit", zone: "pinewood", text: "Enter the Pinewood" },
+      { kind: "interact", objects: ["hunters-post"], text: "Find the Hunters' Post" },
+      { kind: "kill", enemy: ["yeti"], count: 3, text: "Bring down 3 yetis" },
+      { kind: "talk", npc: "jarl", text: "Report to Jarl Sigrun" },
+    ],
+    rewards: { xp: 3400, gold: 680 },
+  },
+  {
+    id: "f4_wyrm",
+    name: "Glacierfang",
+    giver: "jarl",
+    main: true,
+    floor: 4,
+    requires: "f4_pines",
+    pitch: "The Winter King sits in a throne of ice at the top of the Peak, behind a gate that answers only to the seal the white wyrm Glacierfang wears. It sleeps in the White Ring, north-east on the Peak. Wake it. Take the seal.",
+    thanks: "The Rime Seal. Ylva needs to see it before you go in — there are things about Hrimthar she only says once.",
+    stages: [
+      { kind: "visit", zone: "glacier-peak", text: "Climb the Glacier Peak" },
+      { kind: "interact", objects: ["kings-oath"], text: "Find the King's Oath" },
+      { kind: "kill", enemy: ["glacierfang"], count: 1, text: "Defeat Glacierfang in the White Ring" },
+      { kind: "talk", npc: "seer", text: "Bring the Rime Seal to Seer Ylva" },
+    ],
+    rewards: { xp: 4400, gold: 900, marks: 6 },
+  },
+  {
+    id: "f4_throne",
+    name: "The Winter King",
+    giver: "seer",
+    main: true,
+    floor: 4,
+    requires: "f4_wyrm",
+    pitch: "The Glacier Throne. The mirrors will try to be you; the echoes will tell you the runes, if you listen; Jarnhild guards the last hall. And then him. Every fire goes out, he says. Prove him wrong.",
+    thanks: "The snow stopped. For the first time in my life, the snow stopped. Look up, climber — the stair above is waiting.",
+    stages: [
+      { kind: "dungeon", dungeon: "glacier", text: "Enter the Glacier Throne" },
+      { kind: "kill", enemy: ["hrimthar"], count: 1, text: "Defeat Hrimthar, the Winter King" },
+      { kind: "talk", npc: "jarl", text: "Return to Jarl Sigrun" },
+    ],
+    rewards: { xp: 7600, gold: 1800, marks: 10 },
+  },
+  {
+    id: "f4_pelts",
+    name: "Warm Enough to Live",
+    giver: "quarter4",
+    floor: 4,
+    requires: "f3_roost",
+    pitch: "Six frost pelts. The wolves and the drakes wear them. I'll make you a hood that makes the wind give up.",
+    thanks: "There. Pull it down over your ears — yes, like that. Try not to die in it.",
+    stages: [{ kind: "collect", item: "mat_frostpelt", count: 6, consume: true, text: "Bring Ottar 6 Frost Pelts" }],
+    rewards: { xp: 1600, gold: 300, items: [{ key: "helm_furhood", rarity: 1 }] },
+  },
+  {
+    id: "f4_flagon",
+    name: "Yetis at the Woodpile",
+    giver: "innkeep4",
+    floor: 4,
+    requires: "f3_roost",
+    pitch: "Three yetis have been raiding the woodpile north of the Snowfields. No wood, no fire. No fire, no Flagon. You see the problem.",
+    thanks: "The fire stays lit. First round's on me — and the second, if you tell the story right.",
+    stages: [
+      { kind: "kill", enemy: ["yeti"], count: 3, text: "Drive off 3 yetis" },
+      { kind: "talk", npc: "innkeep4", text: "Tell Old Magnus at the Frozen Flagon" },
+    ],
+    rewards: { xp: 1800, gold: 420, items: [{ key: "tonic", qty: 5 }] },
+  },
+  {
+    id: "f4_cache",
+    name: "The Lost Sled",
+    giver: "seer",
+    floor: 4,
+    requires: "f4_lake",
+    pitch: "Hunters went missing west of the lake years ago, hauling something heavy. The snow says they're still out there, behind the rocks where the old ice bridge was. Find what they left.",
+    thanks: "A sled, a cache, and no hunters. The snow keeps what it takes. Take this — they'd want it used.",
+    stages: [
+      { kind: "interact", objects: ["cache-sled"], text: "Find the hunters' sled beyond the Frozen Lake" },
+      { kind: "talk", npc: "seer", text: "Tell Seer Ylva what you found" },
+    ],
+    rewards: { xp: 2000, gold: 520, marks: 4, items: [{ key: "mat_glacialheart", qty: 1 }] },
+  },
+  {
+    id: "f4_golems",
+    name: "Hearts of Ice",
+    giver: "runesmith",
+    floor: 4,
+    requires: "f3_roost",
+    pitch: "The ice golems on the Peak are built around shards older than Rimeholt. Break four and bring me what's inside.",
+    thanks: "Look at the grain in that. I'll carve runes into it for a month.",
+    stages: [
+      { kind: "kill", enemy: ["icegolem"], count: 4, text: "Break 4 ice golems" },
+      { kind: "talk", npc: "runesmith", text: "Report to Halla the Runesmith" },
+    ],
+    rewards: { xp: 1900, gold: 460, items: [{ key: "mat_rimeshard", qty: 5 }] },
+  },
+  // Floor 4 (Rimeholt)
+  mission("m4_wolves", "board4", 4, "Bounty: Rime Wolves", "The packs are back at the Snowfields' edge. Twelve pelts' worth.", { kind: "kill", enemy: ["rimewolf"], count: 12, text: "Hunt 12 rime wolves" }, 1500, 380, 4),
+  mission("m4_wraiths", "board4", 4, "Bounty: Lake Wraiths", "Ice wraiths are drifting up off the Frozen Lake at night.", { kind: "kill", enemy: ["icewraith"], count: 8, text: "Banish 8 ice wraiths" }, 1800, 440, 5),
+  mission("m4_yetis", "board4", 4, "Bounty: Yetis", "Yetis in the Pinewood again. Five of them, and the woodcutters want their axes back.", { kind: "kill", enemy: ["yeti"], count: 5, text: "Bring down 5 yetis" }, 2000, 480, 5),
+  mission("m4_pelts", "board4", 4, "Contract: Frost Pelts", "The Outfitter needs pelts for the winter coats.", { kind: "collect", item: "mat_frostpelt", count: 6, consume: true, text: "Hand in 6 Frost Pelts at the board" }, 1600, 520, 4),
 ];
 
 export const questDef = (id: string) => QUESTS.find((q) => q.id === id);
