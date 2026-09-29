@@ -37,6 +37,7 @@ export function buildFloor2(): WorldMap {
   const H = 140;
   const m = new WorldMap(W, H);
   m.name = "Floor 2 — The Gilded Terraces";
+  m.theme = "gilded";
   m.fill(0, 0, W, H, Tile.Void);
   const protect = new Uint8Array(W * H);
   const P = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && protect[y * W + x] === 1;

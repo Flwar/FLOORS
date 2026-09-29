@@ -36,6 +36,7 @@ export function buildRoost(): WorldMap & { gates: GateDef[]; traps: { x: number;
   const H = ROOST_H;
   const m = new WorldMap(W, H) as WorldMap & { gates: GateDef[]; traps: { x: number; y: number; row: number }[] };
   m.name = "The Dragon's Roost";
+  m.theme = "ember";
   m.gates = [];
   m.traps = [];
   m.fill(0, 0, W, H, Tile.Void);

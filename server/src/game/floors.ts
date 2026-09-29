@@ -1,3 +1,4 @@
+import { TOWER } from "@floors/shared";
 import { db } from "../db.ts";
 import { isAdminName } from "./admin.ts";
 import { broadcastAll, online, sendToKey } from "./registry.ts";
@@ -13,15 +14,14 @@ export interface FloorRecord {
 }
 
 /** Floors that exist so far: nothing opens past this. */
-export const TOP_FLOOR = 3;
+export const TOP_FLOOR = TOWER.length;
 
 /** Which boss guards the way up from each floor. */
-const FLOOR_BOSS: Record<number, string> = { 2: "aurelion", 3: "vaelra" };
-
+const FLOOR_BOSS: Record<number, string> = Object.fromEntries(TOWER.slice(0, -1).map((f) => [f.n + 1, f.boss]));
 /** Rooms that belong to each floor (the floor itself and its dungeon). */
-const ROOMS_ON: Record<number, string[]> = { 1: ["world", "dungeon"], 2: ["floor2", "stormspire"], 3: ["floor3", "roost"] };
+const ROOMS_ON: Record<number, string[]> = Object.fromEntries(TOWER.map((f) => [f.n, [f.room, f.dungeon]]));
 /** Where someone lands when the floor above them is sealed: the way up on the floor below. */
-const LANDING: Record<number, { room: string; via: string }> = { 1: { room: "world", via: "ascent-gate" }, 2: { room: "floor2", via: "sealed-stair" } };
+const LANDING: Record<number, { room: string; via: string }> = Object.fromEntries(TOWER.map((f) => [f.n, { room: f.room, via: f.up }]));
 
 /**
  * The saved record. A server from before floors opened for everyone starts with Floor 2

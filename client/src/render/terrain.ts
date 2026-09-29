@@ -74,9 +74,9 @@ export class Terrain {
       this.propsByChunk.get(k)!.push(pr);
     }
     this.forestRect = map.zones.find((z) => z.id === "whisperwood");
-    STONE = map.name.startsWith("Floor 2") || map.name.includes("Stormspire") ? "#e2cd92" : "#a89f8c";
-    this.gilded = map.name.startsWith("Floor 2");
-    this.ember = map.name.startsWith("Floor 3") || map.name === "The Dragon's Roost";
+    STONE = map.theme === "gilded" || map.theme === "storm" ? "#e2cd92" : "#a89f8c";
+    this.gilded = map.theme === "gilded";
+    this.ember = map.theme === "ember";
     if (this.ember) STONE = "#6a625c";
     PATH = this.ember ? "#8a7866" : "#cfae72";
     paintSprites(scene, map);

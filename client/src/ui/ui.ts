@@ -1,6 +1,6 @@
 import {
   ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, itemMasteryLevel, MAX_LEVEL, questDef, QUESTS, RARITY_COLORS,
-  RARITY_NAMES, scrollSkill, SCROLL_SOURCES, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
+  RARITY_NAMES, roomLabel, scrollSkill, SCROLL_SOURCES, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
   masteryProgress, weaponMasteryDamage,
 } from "@floors/shared";
 import type { Room } from "@colyseus/sdk";
@@ -1114,9 +1114,7 @@ export class GameUI {
 }
 
 export function roomName(room?: string) {
-  if (room === "floor3") return "Floor 3";
-  if (room === "roost") return "the Dragon's Roost";
-  return room === "dungeon" ? "Undercroft" : room === "stormspire" ? "Stormspire" : room === "floor2" ? "Floor 2" : "Floor 1";
+  return roomLabel(room ?? "world");
 }
 
 void questDef;

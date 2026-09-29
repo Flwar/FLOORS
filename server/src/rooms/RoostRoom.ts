@@ -1,8 +1,5 @@
 import type { Client } from "colyseus";
-import { buildRoost, HazardKind, RG, RG_SEAL_BIT, ROOST_ROOMS as R, SEAL_WINDOW, TILE, type WorldMap, type WorldObject } from "@floors/shared";
-import type { Character } from "../game/character.ts";
-import type { EnemyData } from "../game/sim.ts";
-import { openFloor } from "../game/floors.ts";
+import { HazardKind, RG, RG_SEAL_BIT, ROOST_ROOMS as R, SEAL_WINDOW, TILE, type WorldObject } from "@floors/shared";
 import { InstanceRoom, inRect, type BossArena, type MinibossHall } from "./InstanceRoom.ts";
 
 const SEALS = ["Ash", "Flame", "Cinder"];
@@ -24,19 +21,6 @@ export class RoostRoom extends InstanceRoom {
   private hatchEnemies = new Set<string>();
   private lit = new Set<number>();
   private sealsUntil = 0;
-
-  protected buildMap(): WorldMap {
-    return buildRoost();
-  }
-
-  protected title() {
-    return { name: "The Dragon's Roost", sub: "Floor 3 — Boss Dungeon" };
-  }
-
-  /** Leaving puts you back outside the Roost Gate. */
-  protected exitPos(_ch: Character) {
-    return { room: "floor3", x: 0, y: 0, via: "roost-door" };
-  }
 
   protected hall(): MinibossHall {
     return {
@@ -72,12 +56,6 @@ export class RoostRoom extends InstanceRoom {
   protected tickInstance(now: number) {
     this.hatchery();
     this.seals(now);
-  }
-
-  /** The Floor Boss of Floor 3 is dead: the next floor would open here (when it exists). */
-  protected onCleared(boss: EnemyData) {
-    const by = this.climbers();
-    if (by.length) openFloor(4, by, boss.def.name);
   }
 
   // --- The Hatchery ---------------------------------------------------------------
@@ -144,10 +122,6 @@ export class RoostRoom extends InstanceRoom {
   }
 
   protected useObject(client: Client, obj: WorldObject) {
-    if (obj.kind === "gate" && obj.id === "ascent") {
-      client.send("lore", { name: obj.name, text: obj.text ?? "" });
-      return;
-    }
     if (obj.kind !== "lever") return;
     const idx = Number(obj.id.split("-")[1]);
     if (this.lit.has(idx) || this.open & (1 << RG.sealsNorth)) return;

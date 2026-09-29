@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { ENEMIES, LOOT, QUESTS, questOpen, TILE, type QuestDef, type QuestStage, type WorldMap, type Zone, routeVia } from "@floors/shared";
+import { ENEMIES, LOOT, QUESTS, questOpen, TILE, type QuestDef, type QuestStage, type WorldMap, type Zone, routeVia, floorDef, mapFloorNumber } from "@floors/shared";
 import type { InvView } from "../ui/ui.ts";
 
 /** A quest shown in the tracker: the one you are on, or (for the main story) the next to pick up. */
@@ -122,8 +122,8 @@ function rawTarget(map: WorldMap, inv: InvView, t: Tracked, px: number, py: numb
   const here = mapFloor(map);
   const want = t.quest.floor ?? 1;
   if (here && want !== here) {
-    const up = map.objects.find((o) => o.kind === "gate" && (o.id === "ascent-gate" || o.dest === `floor${here + 1}`));
-    const down = map.objects.find((o) => o.kind === "gate" && o.dest === (here === 2 ? "world" : `floor${here - 1}`));
+    const up = map.object(floorDef(here).up);
+    const down = floorDef(here).down ? map.object(floorDef(here).down!) : undefined;
     const gate = want > here ? up : down;
     return gate ? { ...at(gate.x, gate.y), area: want > here ? `the way up (${gate.name})` : `the way down (${gate.name})` } : undefined;
   }
@@ -150,7 +150,7 @@ function rawTarget(map: WorldMap, inv: InvView, t: Tracked, px: number, py: numb
       return z ? { x: ((z.x0 + z.x1) / 2) * TILE, y: ((z.y0 + z.y1) / 2) * TILE, person: false, area: z.secret ? undefined : z.name } : undefined;
     }
     case "dungeon": {
-      const d = map.objects.find((ob) => ob.kind === "door" && ob.id !== "exit" && (stage.dungeon === "dungeon" ? ob.dest !== "stormspire" && ob.dest !== "roost" : ob.dest === stage.dungeon));
+      const d = map.objects.find((ob) => ob.kind === "door" && ob.id !== "exit" && ob.dest === stage.dungeon);
       return d ? at(d.x, d.y) : doorTarget;
     }
     default:
@@ -160,7 +160,7 @@ function rawTarget(map: WorldMap, inv: InvView, t: Tracked, px: number, py: numb
 
 /** Which floor a map is (0 for dungeons). */
 export function mapFloor(map: WorldMap) {
-  return map.name.startsWith("Floor 3") ? 3 : map.name.startsWith("Floor 2") ? 2 : map.name.startsWith("Floor 1") ? 1 : 0;
+  return mapFloorNumber(map.name);
 }
 
 export const MAIN_COLOR = 0xf2d27a;

@@ -1,8 +1,5 @@
 import type { Client } from "colyseus";
-import { buildStormspire, HazardKind, SS_CONDUIT_BIT, SS_GATE, STORMSPIRE_ROOMS as R, TILE, type WorldMap, type WorldObject } from "@floors/shared";
-import type { Character } from "../game/character.ts";
-import type { EnemyData } from "../game/sim.ts";
-import { openFloor } from "../game/floors.ts";
+import { HazardKind, SS_CONDUIT_BIT, SS_GATE, STORMSPIRE_ROOMS as R, TILE, type WorldObject } from "@floors/shared";
 import { InstanceRoom, inRect, type BossArena, type MinibossHall } from "./InstanceRoom.ts";
 
 const CONDUITS = ["West", "High", "East"];
@@ -16,19 +13,6 @@ export class StormspireRoom extends InstanceRoom {
   private galleryState: "idle" | "wave1" | "wave2" | "done" = "idle";
   private galleryEnemies = new Set<string>();
   private conduits = new Set<number>();
-
-  protected buildMap(): WorldMap {
-    return buildStormspire();
-  }
-
-  protected title() {
-    return { name: "The Stormspire", sub: "Floor 2 — Boss Dungeon" };
-  }
-
-  /** Leaving puts you back outside the Stormspire Gate. */
-  protected exitPos(_ch: Character) {
-    return { room: "floor2", x: 0, y: 0, via: "stormspire-door" };
-  }
 
   protected hall(): MinibossHall {
     return {
@@ -53,12 +37,6 @@ export class StormspireRoom extends InstanceRoom {
   /** Lightning rakes the bridge: pale circles, then the bolt. */
   protected trapHazard() {
     return { kind: HazardKind.Lightning, damage: 18, knockback: 90, radius: 16 };
-  }
-
-  /** Vaelra is dead: Floor 3 opens for everyone. */
-  protected onCleared(boss: EnemyData) {
-    const by = this.climbers();
-    if (by.length) openFloor(3, by, boss.def.name);
   }
 
   protected setupInstance() {
@@ -120,11 +98,6 @@ export class StormspireRoom extends InstanceRoom {
   }
 
   protected useObject(client: Client, obj: WorldObject) {
-    if (obj.kind === "gate" && obj.id === "ascent") {
-      if (this.cleared) client.send("travel", { room: "floor3" });
-      else client.send("lore", { name: obj.name, text: obj.text ?? "" });
-      return;
-    }
     if (obj.kind !== "lever") return;
     const idx = Number(obj.id.split("-")[1]);
     if (this.conduits.has(idx) || this.open & (1 << SS_GATE.conduitsNorth)) return;

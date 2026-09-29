@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import type { Sky as SkyKind } from "@floors/shared";
 
 /**
  * The world floats: behind the island is open sky with parallax cloud banks and
@@ -9,8 +10,12 @@ export class Sky {
   private bg: Phaser.GameObjects.Graphics;
   private islands: Phaser.GameObjects.Image[] = [];
 
-  constructor(private scene: Phaser.Scene, tint: "day" | "dusk" | "gold" | "storm" | "ember" = "day") {
-    const colors = tint === "ember" ? [0x6a2414, 0x1a0806] : tint === "gold" ? [0xf7dca0, 0xa9c6e8] : tint === "storm" ? [0x5a6a86, 0x2a3350] : tint === "dusk" ? [0x2a3350, 0x0e1320] : [0x8fc2e6, 0xd8ecf6];
+  constructor(private scene: Phaser.Scene, tint: SkyKind = "day") {
+    const COLORS: Record<SkyKind, [number, number]> = {
+      day: [0x8fc2e6, 0xd8ecf6], dusk: [0x2a3350, 0x0e1320], gold: [0xf7dca0, 0xa9c6e8], storm: [0x5a6a86, 0x2a3350],
+      ember: [0x6a2414, 0x1a0806], frost: [0xb8d4ea, 0xeef6fb], void: [0x1a0f2e, 0x05030c],
+    };
+    const colors = COLORS[tint];
     this.bg = scene.add.graphics().setScrollFactor(0).setDepth(-100);
     this.bg.fillGradientStyle(colors[0], colors[0], colors[1], colors[1], 1);
     this.bg.fillRect(0, 0, 4000, 3000);
@@ -23,6 +28,7 @@ export class Sky {
       img.tilePositionY = y * 512;
       // The Ember Reaches: the clouds are smoke, lit from below.
       if (tint === "ember") img.setTint(0x7a3a2a);
+      if (tint === "void") img.setTint(0x4a3a6a).setAlpha(alpha * 0.6);
       this.layers.push({ img, speed, parallax });
     }
     if (tint === "ember") {
@@ -33,9 +39,25 @@ export class Sky {
         this.layers.push({ img, speed: 3, parallax, rise });
       }
     }
+    if (tint === "frost") {
+      // Snow drifting down past the isles (in front of the world, too, but faint).
+      paintSnow(scene);
+      for (const [parallax, fall, alpha, depth] of [[0.2, -26, 0.9, -88], [0.5, -48, 0.55, 5e5]] as const) {
+        const img = scene.add.tileSprite(0, 0, w * 2, h * 2, "skySnow").setOrigin(0).setScrollFactor(0).setDepth(depth).setAlpha(alpha);
+        this.layers.push({ img, speed: 8, parallax, rise: fall });
+      }
+    }
+    if (tint === "void") {
+      // Stars, and the slow shimmer of something vast beyond them.
+      paintStars(scene);
+      const img = scene.add.tileSprite(0, 0, w * 2, h * 2, "skyStars").setOrigin(0).setScrollFactor(0).setDepth(-89).setAlpha(0.9);
+      this.layers.push({ img, speed: 1, parallax: 0.05 });
+    }
     for (let i = 0; i < 5; i++) {
       const img = scene.add.image(0, 0, "farIsland").setScrollFactor(0.08 + i * 0.02).setDepth(-95).setAlpha(0.55 - i * 0.05).setScale(0.35 + (i % 3) * 0.12);
       if (tint === "ember") img.setTint(0x5a2a20);
+      if (tint === "frost") img.setTint(0xdfeaf4);
+      if (tint === "void") img.setTint(0x3a2a5a);
       img.setPosition(300 + i * 900, 200 + ((i * 373) % 700));
       this.islands.push(img);
     }
@@ -53,6 +75,42 @@ export class Sky {
       l.img.setScale(1 / cam.zoom);
     }
   }
+}
+
+function paintSnow(scene: Phaser.Scene) {
+  if (scene.textures.exists("skySnow")) return;
+  const tex = scene.textures.createCanvas("skySnow", 512, 512)!;
+  const g = tex.getContext();
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 140; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 512;
+    const r = 0.8 + rnd() * 2;
+    g.fillStyle = `rgba(255,255,255,${0.55 + rnd() * 0.45})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  tex.refresh();
+}
+
+function paintStars(scene: Phaser.Scene) {
+  if (scene.textures.exists("skyStars")) return;
+  const tex = scene.textures.createCanvas("skyStars", 512, 512)!;
+  const g = tex.getContext();
+  let seed = 23;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 160; i++) {
+    const x = rnd() * 512;
+    const y = rnd() * 512;
+    const r = 0.4 + rnd() * 1.4;
+    g.fillStyle = rnd() < 0.2 ? "rgba(200,170,255,0.9)" : "rgba(255,255,255,0.85)";
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  tex.refresh();
 }
 
 function paintEmbers(scene: Phaser.Scene) {

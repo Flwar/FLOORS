@@ -1,60 +1,57 @@
 import { matchMaker, type Client } from "colyseus";
 import {
-  Act, buildFloor1, itemBase, makeItem, questDef, SKILLBOOK, sellPrice, SHOPS, TILE, upgradeCost, WEAPONS,
-  type NpcDef, type WorldMap, type WorldObject,
+  Act, floorDef, floorOfRoom, itemBase, makeItem, questDef, SKILLBOOK, sellPrice, SHOPS, TILE, TOWER, upgradeCost, WEAPONS,
+  type FloorDef, type NpcDef, type WorldMap, type WorldObject,
 } from "@floors/shared";
 import { BANK_SIZE, type Character } from "../game/character.ts";
 import { accept, offers, questEvent, turnIns, type QuestEvent } from "../game/quests.ts";
 import { Spawners } from "../game/spawners.ts";
 import type { EnemyData } from "../game/sim.ts";
 import { GameRoom } from "./GameRoom.ts";
-import { FLOOR1_EVENTS, WorldEvents, type EventDef } from "../game/events.ts";
+import { FLOOR_EVENTS, WorldEvents, type EventDef } from "../game/events.ts";
+import { RUMOURS } from "../game/lore.ts";
 import { partyMembers } from "../game/parties.ts";
 import { online } from "../game/registry.ts";
 
 const TALK_RANGE = 60;
 
-const RUMOURS = [
-  "They say a shrine hides where Whisperwood meets the rim, north-west. Only one gap in the trees leads there.",
-  "Foxes nest in a hollow south-east of the fields, behind a wall of trees. Where there's a fox, there's a hoard.",
-  "A scholar swore the ruins held a library. The east wall's got a crack you could squeeze through.",
-  "Miners won't go past the crystals in the deep caves. Something pale moves down there.",
-  "When the Keeper raises his blade high, it's a trick — don't parry too early. Wait for the light.",
-  "Waystones remember you once you've touched them. Saves a lot of walking.",
-];
-
 /**
- * A persistent floor everyone shares (Floor 1 here; Floor 2 extends it): NPCs, quests,
- * shops, the smith, storage, waystones, chests, gates, spawners and world events.
+ * A floor everyone shares: NPCs, quests, shops, the smith, storage, waystones, chests,
+ * gates, spawners and world events. Which floor it is comes from the tower (`kind` is the
+ * floor's room); Floor 1 is this class itself, the others are made by `floorRoom`.
  */
 export class WorldRoom extends GameRoom {
-  readonly kind: "world" | "floor2" | "floor3" = "world";
+  readonly kind: string = "world";
   spawners!: Spawners;
   events!: WorldEvents;
   private zoneCheckAt = 0;
   private lastZone = new Map<string, string>();
 
+  /** This floor, from the tower. */
+  protected get floor(): FloorDef {
+    return floorOfRoom(this.kind)!;
+  }
+
   protected buildMap(): WorldMap {
-    return buildFloor1();
+    return this.floor.build();
   }
 
   /** This floor's world events. */
   protected eventDefs(): EventDef[] {
-    return FLOOR1_EVENTS;
+    return FLOOR_EVENTS[this.floor.n] ?? [];
   }
 
   /** What the innkeeper hears. */
   protected rumours(): string[] {
-    return RUMOURS;
+    return RUMOURS[this.floor.n] ?? RUMOURS[1];
   }
 
   protected spawnPoint(ch: Character, respawn: boolean) {
     const pos = ch.data.pos;
     // Coming down from a floor above (e.g. an admin sealed it): step out by the way up.
-    const above: Record<string, [string[], string]> = { world: [["floor2", "stormspire", "floor3", "roost"], "ascent-gate"], floor2: [["floor3", "roost"], "sealed-stair"] };
-    const down = above[this.kind];
-    if (!respawn && down && pos && down[0].includes(pos.room)) {
-      const gate = this.map.object(down[1]);
+    const from = pos ? floorOfRoom(pos.room) : undefined;
+    if (!respawn && from && from.n > this.floor.n) {
+      const gate = this.map.object(this.floor.up);
       if (gate) return { x: gate.x, y: gate.y + 44 };
     }
     if (!respawn && pos?.room === this.kind) {
@@ -78,7 +75,7 @@ export class WorldRoom extends GameRoom {
   protected setup() {
     this.autoDispose = false;
     // Monsters rise to meet stronger players, up to this floor's cap.
-    this.sim.levelCap = this.kind === "floor3" ? 16 : this.kind === "floor2" ? 12 : 8;
+    this.sim.levelCap = this.floor.levelCap;
     this.spawners = new Spawners(this.sim, this.map.spawns);
     this.sim.onEnemyRemoved = (ed) => {
       this.spawners.onRemoved(ed);
@@ -103,12 +100,28 @@ export class WorldRoom extends GameRoom {
     }
   }
 
-  /** Back where you left off: a character last seen on Floor 2 goes straight up. */
+  /**
+   * Arriving. Everyone logs in on Floor 1 and goes straight back up to the floor they were
+   * last on; a higher floor turns away anyone it isn't open to, and announces itself once.
+   */
   protected onPlayerJoined(sid: string, ch: Character) {
     const pos = ch.data.pos;
-    if (this.kind !== "world") return;
-    if (pos?.room === "floor2" && ch.data.floor >= 2) this.travel(sid, ch, "floor2", undefined, pos);
-    else if (pos?.room === "floor3" && ch.data.floor >= 3) this.travel(sid, ch, "floor3", undefined, pos);
+    const n = this.floor.n;
+    if (n === 1) {
+      const last = pos ? floorOfRoom(pos.room) : undefined;
+      if (last && last.n > 1 && last.room === pos!.room && ch.data.floor >= last.n) this.travel(sid, ch, last.room, undefined, pos);
+      return;
+    }
+    if (ch.data.floor < n && !this.admins.has(sid)) {
+      this.travel(sid, ch, floorDef(n - 1).room);
+      return;
+    }
+    const tag = `zone:${this.floor.arrival}`;
+    if (!ch.data.discovered.includes(tag)) {
+      ch.data.discovered.push(tag);
+      ch.dirty = true;
+      this.clients.getById(sid)?.send("discover", { name: `Floor ${n}`, secret: false, sub: this.floor.title });
+    }
   }
 
   /** Leaving through a gate: remember where to appear on the other side. */
@@ -120,7 +133,7 @@ export class WorldRoom extends GameRoom {
   }
 
   /** Send a character to another floor, arriving by `via` (a gate) or at `pos`. */
-  protected travel(sid: string, ch: Character, room: "world" | "floor2" | "floor3", via?: string, pos?: Character["data"]["pos"]) {
+  protected travel(sid: string, ch: Character, room: string, via?: string, pos?: Character["data"]["pos"]) {
     ch.travelTo = { room, via: via ?? "", pos };
     this.clients.getById(sid)?.send("travel", { room });
   }
@@ -388,7 +401,7 @@ export class WorldRoom extends GameRoom {
       }
       case "door": {
         if (obj.requires && !ch.owns(obj.requires)) return this.notify(client, obj.text ?? "It's sealed.", "error");
-        void this.openDungeon(client, ch, obj.dest === "stormspire" || obj.dest === "roost" ? obj.dest : "dungeon");
+        void this.openDungeon(client, ch, obj.dest ?? this.floor.dungeon);
         return;
       }
       case "entry": {
@@ -402,24 +415,20 @@ export class WorldRoom extends GameRoom {
         return;
       }
       case "gate": {
-        const dest = obj.dest ?? (obj.id === "ascent-gate" ? "floor2" : undefined);
-        if (dest === "floor2" && this.kind === "floor3") return this.travel(client.sessionId, ch, "floor2", "sealed-stair");
-        if (dest === "floor2") {
-          if (ch.data.floor < 2) return client.send("lore", { name: obj.name, text: `${obj.text} It is sealed. Something below the ruins holds it shut.` });
-          return this.travel(client.sessionId, ch, "floor2", "descent");
+        // Up or down the tower: arrive by the other floor's way down (or up).
+        const to = obj.dest ? floorOfRoom(obj.dest) : undefined;
+        if (to && to.room === obj.dest && to.n > this.floor.n) {
+          if (ch.data.floor < to.n) return client.send("lore", { name: obj.name, text: `${obj.text ?? ""} It is sealed. Something in ${this.floor.dungeonName} holds it shut.` });
+          return this.travel(client.sessionId, ch, to.room, to.down);
         }
-        if (dest === "floor3") {
-          if (ch.data.floor < 3) return client.send("lore", { name: obj.name, text: `${obj.text} Something in the Stormspire holds it shut.` });
-          return this.travel(client.sessionId, ch, "floor3", "descent3");
-        }
-        if (dest === "world") return this.travel(client.sessionId, ch, "world", "ascent-gate");
+        if (to && to.room === obj.dest && to.n < this.floor.n) return this.travel(client.sessionId, ch, to.room, to.up);
         return client.send("lore", { name: obj.name, text: obj.text ?? "" });
       }
     }
   }
 
   /** Create a dungeon instance for this player (and their party, when grouped). */
-  protected async openDungeon(client: Client, ch: Character, kind: "dungeon" | "stormspire" | "roost" = "dungeon") {
+  protected async openDungeon(client: Client, ch: Character, kind: string) {
     const key = this.keys.get(client.sessionId)!;
     const members = this.partyKeys(key);
     const room = await matchMaker.createRoom(kind, { allowed: members, leader: key });
@@ -516,7 +525,7 @@ export class WorldRoom extends GameRoom {
     this.onDev("dev:floor", (client, n: number) => {
       const me = this.player(client);
       if (!me) return;
-      me.ch.data.floor = Math.max(1, Math.min(3, Math.round(Number(n) || 1)));
+      me.ch.data.floor = Math.max(1, Math.min(TOWER.length, Math.round(Number(n) || 1)));
       me.ch.dirty = true;
     });
     this.onDev("dev:questdone", (client, id: string) => {
@@ -534,3 +543,11 @@ export class WorldRoom extends GameRoom {
 }
 
 void BANK_SIZE;
+
+/** The world room class for floor `n` (Floor 1 is WorldRoom itself). */
+export function floorRoom(n: number): typeof WorldRoom {
+  const room = floorDef(n).room;
+  return class extends WorldRoom {
+    readonly kind = room;
+  };
+}

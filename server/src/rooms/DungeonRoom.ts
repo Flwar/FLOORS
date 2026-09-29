@@ -1,8 +1,7 @@
 import type { Client } from "colyseus";
-import { buildUndercroft, GATE, TILE, UNDERCROFT_ROOMS as R, type WorldMap, type WorldObject } from "@floors/shared";
+import { GATE, TILE, UNDERCROFT_ROOMS as R, type WorldObject } from "@floors/shared";
 import type { Character } from "../game/character.ts";
 import type { EnemyData } from "../game/sim.ts";
-import { openFloor } from "../game/floors.ts";
 import { InstanceRoom, inRect, type BossArena, type MinibossHall } from "./InstanceRoom.ts";
 
 const LEVER_NAMES = ["Sun", "Moon", "Star"];
@@ -16,14 +15,6 @@ export class DungeonRoom extends InstanceRoom {
   private leverProgress = 0;
   private hallState: "idle" | "wave1" | "wave2" | "done" = "idle";
   private hallEnemies = new Set<string>();
-
-  protected buildMap(): WorldMap {
-    return buildUndercroft();
-  }
-
-  protected title() {
-    return { name: "The Undercroft", sub: "Floor 1 — Boss Dungeon" };
-  }
 
   /** Leaving the dungeon always returns you to the ruins' court. */
   protected exitPos(_ch: Character) {
@@ -64,11 +55,6 @@ export class DungeonRoom extends InstanceRoom {
   }
 
   /** Aurelion falls: Floor 2 opens for the whole server, not just this party. */
-  protected onCleared(boss: EnemyData) {
-    const by = this.climbers();
-    if (by.length) openFloor(2, by, boss.def.name);
-  }
-
   protected tickInstance() {
     this.hallEncounter();
   }
@@ -123,10 +109,6 @@ export class DungeonRoom extends InstanceRoom {
   }
 
   protected useObject(client: Client, obj: WorldObject) {
-    if (obj.kind === "gate" && obj.id === "ascent" && this.cleared) {
-      client.send("travel", { room: "floor2" });
-      return;
-    }
     if (obj.kind !== "lever") return;
     const idx = Number(obj.id.split("-")[1]);
     if (this.open & (1 << GATE.puzzleNorth)) return;

@@ -6,7 +6,7 @@ export type QuestEvent =
   | { kind: "interact"; object: string }
   | { kind: "parry" }
   | { kind: "visit"; zone: string }
-  | { kind: "dungeon"; dungeon: "dungeon" | "stormspire" | "roost" }
+  | { kind: "dungeon"; dungeon: string }
   | { kind: "talk"; npc: string };
 
 export interface QuestUpdate {

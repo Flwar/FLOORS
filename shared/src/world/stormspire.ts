@@ -33,6 +33,7 @@ export function buildStormspire(): WorldMap & { gates: GateDef[]; traps: { x: nu
   const H = STORMSPIRE_H;
   const m = new WorldMap(W, H) as WorldMap & { gates: GateDef[]; traps: { x: number; y: number; row: number }[] };
   m.name = "The Stormspire";
+  m.theme = "storm";
   m.gates = [];
   m.traps = [];
   m.fill(0, 0, W, H, Tile.Void);

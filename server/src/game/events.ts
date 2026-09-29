@@ -1,4 +1,4 @@
-import { makeItem, rollRarity, TILE, randomScroll, itemBase } from "@floors/shared";
+import { makeItem, rollRarity, TILE, randomScroll, itemBase, floorOfRoom } from "@floors/shared";
 import type { WorldRoom } from "../rooms/WorldRoom.ts";
 import type { EnemyData } from "./sim.ts";
 
@@ -132,6 +132,9 @@ export const FLOOR3_EVENTS: EventDef[] = [
   },
 ];
 
+/** Each floor's world events. */
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS };
+
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {
   private active?: { def: EventDef; until: number; enemies: Set<string>; contributors: Set<string> };
@@ -177,7 +180,7 @@ export class WorldEvents {
         { key: ["armor_ranger", "armor_robes", "helm_horned"][Math.floor(Math.random() * 3)], rarity: rollRarity(0.7, 2), price: 380 },
       ];
       // The caravan sometimes carries a skill scroll, for gold alone (no Marks) — at a price.
-      const scroll = Math.random() < 0.6 ? randomScroll(Math.random() < 0.25 ? 2 : 1, Math.random, this.room.kind === "floor3" ? 3 : this.room.kind === "floor2" ? 2 : 1) : undefined;
+      const scroll = Math.random() < 0.6 ? randomScroll(Math.random() < 0.25 ? 2 : 1, Math.random, floorOfRoom(this.room.kind)?.n ?? 1) : undefined;
       if (scroll) this.merchantStock.push({ key: scroll, rarity: itemBase(scroll)?.rarity ?? 1, price: itemBase(scroll)?.rarity === 2 ? 1500 : 600 });
     }
     this.active = { def, until: now + def.durationMs, enemies, contributors: new Set() };

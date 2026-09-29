@@ -41,6 +41,7 @@ export function buildFloor3(): WorldMap {
   const H = 150;
   const m = new WorldMap(W, H);
   m.name = "Floor 3 — The Ember Reaches";
+  m.theme = "ember";
   m.fill(0, 0, W, H, Tile.Void);
   const protect = new Uint8Array(W * H);
   const P = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && protect[y * W + x] === 1;

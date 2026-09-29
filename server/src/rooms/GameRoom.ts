@@ -1,7 +1,7 @@
 import { Room, ServerError, type AuthContext, type Client } from "colyseus";
 import { StateView } from "@colyseus/schema";
 import {
-  Act, EMOTES, isEmote, SEAT_PROPS, seatPoint, Sit, EAct, EFlag, enemyXp, EQUIP_SLOTS, itemBase, killXp, makeItem, masteryWorth, MAX_LEVEL, newAchievements, QUESTS, randomScroll, rollScroll, SKILLBOOK, WEAPONS, PATCH_RATE, rollLoot, sanitizeSettings, TICK_RATE, TILE, type EquipSlot, type Item, type PlayerSim, type WorldMap,
+  Act, EMOTES, isEmote, SEAT_PROPS, seatPoint, Sit, EAct, EFlag, enemyXp, EQUIP_SLOTS, itemBase, killXp, makeItem, masteryWorth, MAX_LEVEL, newAchievements, QUESTS, floorOfRoom, isWorldRoom, roomLabel, randomScroll, rollScroll, SKILLBOOK, WEAPONS, PATCH_RATE, rollLoot, sanitizeSettings, TICK_RATE, TILE, type EquipSlot, type Item, type PlayerSim, type WorldMap,
 } from "@floors/shared";
 import { db } from "../db.ts";
 import { Character, newCharacter, type CharacterData } from "../game/character.ts";
@@ -86,7 +86,8 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
   private lastSave = 0;
   private partyTickAt = 0;
   private reviving = new Map<string, { by: string; until: number }>();
-  abstract readonly kind: "world" | "dungeon" | "floor2" | "stormspire" | "floor3" | "roost";
+  /** This room's kind (a floor's world room or dungeon, from the tower). */
+  abstract readonly kind: string;
 
   protected abstract buildMap(options: Record<string, unknown>): WorldMap;
   /** Where a character appears when joining / respawning. */
@@ -293,7 +294,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     const pd = this.sim.players.get(sid);
     // Leaving mid-fight doesn't save you: the body stays in the world for a few seconds.
     // (Not in instances: an empty instance is disposed, and its timers with it.)
-    if (pd && !entry?.superseded && pd.combatUntil > this.sim.now && pd.p.act !== Act.Dead && (this.kind === "world" || this.kind === "floor2" || this.kind === "floor3")) {
+    if (pd && !entry?.superseded && pd.combatUntil > this.sim.now && pd.p.act !== Act.Dead && isWorldRoom(this.kind)) {
       const timer = this.clock.setTimeout(() => {
         this.linkdead.delete(sid);
         this.finalizeLeave(sid);
@@ -460,7 +461,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       // On another floor: travel there and step out beside them. Dungeon instances are
       // private to their party, so those wait until the player comes out.
       const st = online.get(String(key))?.status?.();
-      const open = (k: string) => k === "world" || k === "floor2" || k === "floor3";
+      const open = (k: string) => isWorldRoom(k);
       if (!st || !open(st.room) || !open(this.kind)) return this.notify(c, "They're inside a dungeon. Wait for them to come out.", "error");
       me.ch.travelTo = { room: st.room, via: "", pos: { room: st.room, x: st.x + 30, y: st.y, hp: me.p.hp } };
       c.send("travel", { room: st.room });
@@ -529,7 +530,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       const d = me.ch.data;
       for (const z of this.map.zones) if (!d.discovered.includes(`zone:${z.id}`)) d.discovered.push(`zone:${z.id}`);
       for (const o of this.map.objects) if (o.kind === "waystone" && !d.discovered.includes(`ws:${o.id}`)) d.discovered.push(`ws:${o.id}`);
-      const map = this.kind === "floor3" ? "map:floor3" : this.kind === "floor2" ? "map:floor2" : "map:floor1";
+      const map = `map:floor${floorOfRoom(this.kind)?.n ?? 1}`;
       if (!d.discovered.includes(map)) d.discovered.push(map);
     });
     // The tower: open or seal a floor for the whole server.
@@ -769,8 +770,7 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
       return nearby("chat", { from: "", text: `${me.p.name} rolls ${roll} (1–100).`, channel: "say" });
     }
     if (cmd === "who") {
-      const where: Record<string, string> = { world: "Floor 1", floor2: "Floor 2", floor3: "Floor 3", dungeon: "the Undercroft", stormspire: "the Stormspire", roost: "the Dragon's Roost" };
-      const list = [...online.values()].map((o) => `${o.ch.data.name} (L${o.ch.data.level}, ${where[o.status?.().room ?? "world"] ?? "?"})`);
+            const list = [...online.values()].map((o) => `${o.ch.data.name} (L${o.ch.data.level}, ${roomLabel(o.status?.().room ?? "world")})`);
       return this.notify(client, `${list.length} online: ${list.slice(0, 20).join(", ")}${list.length > 20 ? "…" : ""}`, "info");
     }
     if (isEmote(cmd)) {

@@ -135,6 +135,8 @@ export class WorldMap {
   name = "";
   /** Rows below this hold building interiors, out of sight of the world (see interiors.ts). */
   outdoorHeight: number;
+  /** How the ground, trees and water are painted ("meadow", "gilded", "ember", "frost"…). */
+  theme = "meadow";
 
   constructor(readonly width: number, public height: number) {
     this.tiles = new Uint8Array(width * height);

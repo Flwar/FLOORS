@@ -23,3 +23,4 @@ export * from "./content/floor2.ts";
 export * from "./content/floor3.ts";
 export * from "./world/stormspire.ts";
 export * from "./social.ts";
+export * from "./tower.ts";

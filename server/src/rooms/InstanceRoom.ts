@@ -1,5 +1,6 @@
 import type { Client } from "colyseus";
-import { Act, applyGates, EAct, EFlag, HazardKind, TILE, type GateDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { Act, applyGates, EAct, EFlag, floorDef, floorOfRoom, HazardKind, TILE, type FloorDef, type GateDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { openFloor } from "../game/floors.ts";
 import type { Character } from "../game/character.ts";
 import { questEvent } from "../game/quests.ts";
 import type { EnemyData } from "../game/sim.ts";
@@ -38,7 +39,7 @@ export interface BossArena {
  * Subclasses add their own encounters and puzzles.
  */
 export abstract class InstanceRoom extends GameRoom {
-  abstract readonly kind: "dungeon" | "stormspire" | "roost";
+  abstract readonly kind: string;
   protected allowed = new Set<string>();
   protected checkpoint = "brazier-0";
   protected open = 0;
@@ -50,9 +51,20 @@ export abstract class InstanceRoom extends GameRoom {
   private bossWipeAt = 0;
   private trapAt = [400, 1200, 2000];
 
-  protected abstract title(): { name: string; sub: string };
-  /** Where leaving the instance puts you. */
-  protected abstract exitPos(ch: Character): NonNullable<Character["data"]["pos"]>;
+  /** The floor this dungeon belongs to. */
+  protected get floor(): FloorDef {
+    return floorOfRoom(this.kind)!;
+  }
+  protected buildMap(): WorldMap {
+    return this.floor.buildDungeon();
+  }
+  protected title() {
+    return { name: this.floor.dungeonName, sub: `Floor ${this.floor.n} — Boss Dungeon` };
+  }
+  /** Where leaving the instance puts you: outside the dungeon's door. */
+  protected exitPos(_ch: Character): NonNullable<Character["data"]["pos"]> {
+    return { room: this.floor.room, x: 0, y: 0, via: this.floor.door };
+  }
   protected abstract hall(): MinibossHall;
   protected abstract arena(): BossArena;
   /** Instance-specific setup (starting gates, puzzles). */
@@ -155,8 +167,11 @@ export abstract class InstanceRoom extends GameRoom {
     return !!ed.def.boss;
   }
 
-  /** The Floor Boss is dead (once per run). */
-  protected onCleared(_boss: EnemyData) {}
+  /** The Floor Boss is dead (once per run): the next floor opens for everyone. */
+  protected onCleared(boss: EnemyData) {
+    const by = this.climbers();
+    if (by.length) openFloor(this.floor.n + 1, by, boss.def.name);
+  }
 
   /** Names of the registered climbers in this run (dev guests don't open floors for the world). */
   protected climbers() {
@@ -368,6 +383,16 @@ export abstract class InstanceRoom extends GameRoom {
         return;
       case "lore":
         client.send("lore", { name: obj.name, text: obj.text });
+        return;
+      case "gate":
+        // The stair up: open once the Floor Boss is dead (and the floor above exists).
+        if (obj.id === "ascent") {
+          const next = floorDef(this.floor.n + 1);
+          if (this.cleared && next) client.send("travel", { room: next.room });
+          else client.send("lore", { name: obj.name, text: obj.text ?? "" });
+          return;
+        }
+        this.useObject(client, obj);
         return;
       case "door":
         if (obj.id === "exit") {

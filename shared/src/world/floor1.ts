@@ -386,8 +386,8 @@ export function buildFloor1(): WorldMap {
     const { tx, ty, ...rest } = o;
     m.objects.push({ ...rest, x: px(tx), y: px(ty) });
   };
-  obj({ id: "ascent-gate", kind: "gate", tx: 38, ty: 68, name: "The Ascent Gate", text: "A great stone arch. Light pours upward through it — when it's open." });
-  obj({ id: "undercroft-door", kind: "door", tx: 170, ty: 59, name: "Sealed Undercroft Door", requires: "key_ruins", text: "Iron bands and old sigils. There's a keyhole shaped like a bandit's trophy." });
+  obj({ id: "ascent-gate", kind: "gate", tx: 38, ty: 68, name: "The Ascent Gate", text: "A great stone arch. Light pours upward through it — when it's open.", dest: "floor2" });
+  obj({ id: "undercroft-door", kind: "door", tx: 170, ty: 59, dest: "dungeon", name: "Sealed Undercroft Door", requires: "key_ruins", text: "Iron bands and old sigils. There's a keyhole shaped like a bandit's trophy." });
   obj({ id: "ws-town", kind: "waystone", tx: 42, ty: 83, name: "Emberwatch Waystone" });
   obj({ id: "ws-forest", kind: "waystone", tx: 62, ty: 27, name: "Whisperwood Waystone" });
   obj({ id: "ws-ruins", kind: "waystone", tx: 146, ty: 66, name: "Ruins Waystone" });

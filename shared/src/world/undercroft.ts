@@ -33,6 +33,7 @@ export function buildUndercroft(): WorldMap & { gates: GateDef[]; traps: { x: nu
   const H = UNDERCROFT_H;
   const m = new WorldMap(W, H) as WorldMap & { gates: GateDef[]; traps: { x: number; y: number; row: number }[] };
   m.name = "The Undercroft";
+  m.theme = "cave";
   m.gates = [];
   m.traps = [];
   m.fill(0, 0, W, H, Tile.Rock);
@@ -104,7 +105,7 @@ export function buildUndercroft(): WorldMap & { gates: GateDef[]; traps: { x: nu
   obj({ id: "lever-2", kind: "lever", tx: 56, ty: 70, name: "Star Lever" });
   obj({ id: "rune-tablet", kind: "lore", tx: 45, ty: 76, name: "Rune Tablet" });
   obj({ id: "lore-ante", kind: "lore", tx: 41, ty: 28, name: "Keeper's Oath", text: "\"I hold the First Gate until one learns me. When the light gathers on my blade, meet it.\"" });
-  obj({ id: "ascent", kind: "gate", tx: 45, ty: 13, name: "The Ascent" });
+  obj({ id: "ascent", kind: "gate", tx: 45, ty: 13, name: "The Ascent", dest: "floor2" });
 
   m.spawns.push({ id: "warden", x: px(45), y: px(42), radius: 0, enemies: ["warden"], respawn: 0, elite: 0, level: 7 });
   m.spawns.push({ id: "aurelion", x: px(45), y: px(9), radius: 0, enemies: ["aurelion"], respawn: 0, elite: 0, level: 8 });

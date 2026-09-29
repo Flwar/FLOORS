@@ -1,7 +1,7 @@
 import * as Phaser from "phaser";
 import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from "@colyseus/sdk";
 import {
-  Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, buildFloor1, buildFloor2, buildFloor3, buildRoost, buildStormspire, buildUndercroft, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
+  Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
   isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, skillEntry, skillMove, streetPoint, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
   WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone,
 } from "@floors/shared";
@@ -117,10 +117,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create() {
-    const maps: Record<RoomKind, () => WorldMap> = { world: buildFloor1, dungeon: buildUndercroft, floor2: buildFloor2, stormspire: buildStormspire, floor3: buildFloor3, roost: buildRoost };
-    this.map = maps[this.kind]();
-    const skies: Record<RoomKind, "day" | "dusk" | "gold" | "storm" | "ember"> = { world: "day", dungeon: "dusk", floor2: "gold", stormspire: "storm", floor3: "ember", roost: "ember" };
-    this.sky = new Sky(this, skies[this.kind]);
+    const floor = floorOfRoom(this.kind) ?? TOWER[0];
+    const inDungeon = floor.dungeon === this.kind;
+    this.map = inDungeon ? floor.buildDungeon() : floor.build();
+    this.sky = new Sky(this, inDungeon ? floor.dungeonSky : floor.sky);
     this.terrain = new Terrain(this, this.map);
     this.objects = new WorldObjects(this, this.map);
     this.ambient = new Ambient(this, this.map);
@@ -214,8 +214,7 @@ export class WorldScene extends Phaser.Scene {
       offSettings();
     });
     document.getElementById("respawn-now")!.onclick = () => this.room.send("respawnNow");
-    const tunes: Record<RoomKind, string> = { world: "town", dungeon: "dungeon", floor2: "skyreach", stormspire: "storm", floor3: "emberhold", roost: "dragon" };
-    music.play(tunes[this.kind]);
+    music.play(inDungeon ? floor.dungeonMusic : floor.music);
     if (import.meta.env.DEV) (window as unknown as { __floors: unknown }).__floors = this;
   }
 
@@ -694,7 +693,7 @@ export class WorldScene extends Phaser.Scene {
     r.onMessage("trade", (m) => ui.setTrade(m));
     r.onMessage("travel", (m: { room: RoomKind; roomId?: string; leader?: string }) => {
       if (m.roomId && m.leader && m.leader !== this.myPlayer?.name) {
-        const where = m.room === "stormspire" ? "opened the Stormspire" : m.room === "roost" ? "broken into the Dragon's Roost" : "unsealed the Undercroft";
+        const where = `opened ${roomLabel(m.room)}`;
         if (!confirm(`${m.leader} has ${where}. Join your party inside?`)) return;
       }
       void this.travelTo(m.room, m.roomId);
@@ -835,17 +834,11 @@ export class WorldScene extends Phaser.Scene {
   /** Whether this map can be opened: Floor 1 needs a bought map; the Undercroft was never charted. */
   private mapAccess(): { ok: boolean; title?: string; text?: string } {
     if (this.ui.inv?.admin) return { ok: true };
-    if (this.kind === "dungeon") return { ok: false, title: "The Undercroft was never charted", text: "No map covers these halls. Follow your quest markers and the torchlight." };
-    if (this.kind === "stormspire") return { ok: false, title: "The Stormspire was never charted", text: "Climb. Every hall leads upward, toward the eye of the storm." };
-    if (this.kind === "roost") return { ok: false, title: "Nobody who mapped the Roost came back", text: "Up. Always up — toward the heat, and the Tyrant's throne." };
-    if (this.kind === "floor3" && !this.ui.inv?.discovered.includes("map:floor3")) {
-      return { ok: false, title: "You don't have a map of the Ember Reaches", text: "Quartermaster Sable sells one in Emberhold, for 90 gold. Until then, your quest markers show the way." };
-    }
-    if (this.kind === "world" && !this.ui.inv?.discovered.includes("map:floor1")) {
-      return { ok: false, title: "You don't have a map of this floor", text: "Tilde sells one at the General Store in Emberwatch, for 35 gold. Until then, your quest markers show the way." };
-    }
-    if (this.kind === "floor2" && !this.ui.inv?.discovered.includes("map:floor2")) {
-      return { ok: false, title: "You don't have a map of the Gilded Terraces", text: "Quartermaster Iven sells one at Skyreach Landing, for 60 gold. Until then, your quest markers show the way." };
+    const floor = floorOfRoom(this.kind);
+    if (!floor) return { ok: true };
+    if (floor.dungeon === this.kind) return { ok: false, ...floor.uncharted };
+    if (!this.ui.inv?.discovered.includes(`map:floor${floor.n}`)) {
+      return { ok: false, title: `You don't have a map of ${floor.n === 1 ? "this floor" : floor.title.replace(/^The /, "the ")}`, text: `${floor.mapSeller} Until then, your quest markers show the way.` };
     }
     return { ok: true };
   }
@@ -1511,11 +1504,12 @@ export class WorldScene extends Phaser.Scene {
     if (zone && zone !== this.zone) {
       this.zone = zone;
       this.hud.zone(zone);
-      const mood = zone.music ?? (this.kind === "dungeon" ? "dungeon" : "fields");
+      const mood = zone.music ?? (this.map.theme === "cave" ? "dungeon" : "fields");
       if (!this.room.state.bossActive) music.play(mood);
       const bed: Record<string, string> = { terraces: "fields", gardens: "forest", causeway: "skyreach", storm: "storm", emberhold: "ember", dragon: "ember" };
-      ambience.play(mood === "miniboss" || mood === "boss" ? (this.kind === "dungeon" ? "dungeon" : this.kind === "floor3" || this.kind === "roost" ? "ember" : this.kind === "floor2" || this.kind === "stormspire" ? "storm" : "forest") : bed[mood] ?? mood);
-      sfx.setRoom(this.kind === "dungeon" || zone.dark ? "cave" : zone.indoor ? "cave" : zone.safe ? "town" : "open");
+      const theme = this.map.theme;
+      ambience.play(mood === "miniboss" || mood === "boss" ? (theme === "cave" ? "dungeon" : theme === "ember" ? "ember" : theme === "frost" ? "frost" : theme === "gilded" || theme === "storm" ? "storm" : "forest") : bed[mood] ?? mood);
+      sfx.setRoom(this.map.theme === "cave" || zone.dark || zone.indoor ? "cave" : zone.safe ? "town" : "open");
     }
     // Boss bar for the nearest engaged boss.
     let boss: Enemy | undefined;

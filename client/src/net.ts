@@ -2,7 +2,8 @@ import { Client, type Room } from "@colyseus/sdk";
 import { SERVER_PORT } from "@floors/shared";
 import type { WorldState } from "../../server/src/state.ts";
 
-export type RoomKind = "world" | "dungeon" | "floor2" | "stormspire" | "floor3" | "roost";
+/** A room's kind: a floor's world room or dungeon, from the tower ("world", "floor2", "roost"…). */
+export type RoomKind = string;
 
 const TOKEN_KEY = "floors.session";
 

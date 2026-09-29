@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { itemBase, missionReady, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { floorOfRoom, itemBase, mapFloorNumber, missionReady, QUESTS, questOpen, RARITY_COLORS, SEAT_PROPS, seatPoint, SS_CONDUIT_BIT, type NpcDef, type WorldMap, type WorldObject } from "@floors/shared";
 import type { Drop } from "../../../server/src/state.ts";
 import { RES } from "../art/characters.ts";
 import { itemIconCanvas } from "../ui/icons.ts";
@@ -172,7 +172,7 @@ export class WorldObjects {
     for (const o of this.objs) {
       if (o.def.id === "ascent" && o.state !== "open") continue;
       const d = Math.hypot(o.def.x - x, o.def.y - y);
-      if (d < 56) out.push({ kind: "object", id: o.def.id, x: o.def.x, y: o.def.y - 36, label: objLabel(o.def, o.state), d });
+      if (d < 56) out.push({ kind: "object", id: o.def.id, x: o.def.x, y: o.def.y - 36, label: objLabel(o.def, o.state, mapFloorNumber(this.map.name)), d });
     }
     drops?.forEach((dr, id) => {
       if (dr.kind === 1) return;
@@ -233,11 +233,12 @@ function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates
       return inv?.discovered.includes(`chest:${o.id}`) ? "open" : "";
     case "waystone":
       return inv?.discovered.includes(`ws:${o.id}`) ? "on" : "";
-    case "gate":
-      if (o.dest === "floor4") return ""; // the stair above is not built yet
+    case "gate": {
+      const to = floorOfRoom(o.dest ?? "");
+      if (!to) return ""; // the floor above is not built yet
       if (o.id === "ascent") return stage === "cleared" ? "open" : "";
-      if (o.id === "descent" || o.id === "descent3") return "open";
-      return (inv?.floor ?? 1) >= (o.dest === "floor3" ? 3 : 2) ? "open" : "";
+      return (inv?.floor ?? 1) >= to.n ? "open" : "";
+    }
     case "lore":
       return inv?.discovered.includes(`lore:${o.id}`) ? "read" : "";
     default:
@@ -245,7 +246,7 @@ function objState(o: WorldObject, inv: InvView | undefined, stage: string, gates
   }
 }
 
-function objLabel(o: WorldObject, state: string): string {
+function objLabel(o: WorldObject, state: string, here: number): string {
   switch (o.kind) {
     case "chest":
       return state === "open" ? `${o.name} (empty)` : `Open ${o.name}`;
@@ -255,11 +256,11 @@ function objLabel(o: WorldObject, state: string): string {
       return state === "on" ? `Travel — ${o.name}` : `Attune ${o.name}`;
     case "door":
       return o.id === "exit" ? o.name : `Unseal ${o.name}`;
-    case "gate":
-      if (state !== "open") return `Examine ${o.name}`;
-      if (o.id === "descent") return "Descend to Emberwatch";
-      if (o.id === "descent3") return "Descend to the Gilded Terraces";
-      return `Ascend to Floor ${o.dest === "floor3" ? 3 : 2}`;
+    case "gate": {
+      const to = floorOfRoom(o.dest ?? "");
+      if (state !== "open" || !to) return `Examine ${o.name}`;
+      return to.n > here || o.id === "ascent" ? `Ascend to Floor ${to.n}` : `Descend to ${to.town}`;
+    }
     case "entry":
       return o.id.startsWith("enter-") ? `Enter ${o.name}` : "Step outside";
     case "campfire":

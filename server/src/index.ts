@@ -2,27 +2,28 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineRoom, defineServer } from "colyseus";
 import express from "express";
-import { SERVER_PORT } from "@floors/shared";
+import { SERVER_PORT, TOWER } from "@floors/shared";
 import { DungeonRoom } from "./rooms/DungeonRoom.ts";
-import { Floor2Room } from "./rooms/Floor2Room.ts";
-import { Floor3Room } from "./rooms/Floor3Room.ts";
+import type { InstanceRoom } from "./rooms/InstanceRoom.ts";
 import { RoostRoom } from "./rooms/RoostRoom.ts";
 import { StormspireRoom } from "./rooms/StormspireRoom.ts";
-import { WorldRoom } from "./rooms/WorldRoom.ts";
+import { floorRoom, WorldRoom } from "./rooms/WorldRoom.ts";
+
+/** Each floor's boss dungeon: its own encounters and puzzles. */
+const DUNGEONS: Record<string, new (...args: any[]) => InstanceRoom> = { dungeon: DungeonRoom, stormspire: StormspireRoom, roost: RoostRoom };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each room is its own class
+const rooms: Record<string, any> = {};
+for (const f of TOWER) {
+  rooms[f.room] = defineRoom(f.n === 1 ? WorldRoom : floorRoom(f.n));
+  rooms[f.dungeon] = defineRoom(DUNGEONS[f.dungeon]);
+}
 
 // The built client (npm run build), served from the same port so players need one address.
 const clientDist = fileURLToPath(new URL("../../client/dist", import.meta.url));
 const serveClient = existsSync(clientDist) && process.env.NODE_ENV === "production";
 
 const server = defineServer({
-  rooms: {
-    world: defineRoom(WorldRoom),
-    dungeon: defineRoom(DungeonRoom),
-    floor2: defineRoom(Floor2Room),
-    stormspire: defineRoom(StormspireRoom),
-    floor3: defineRoom(Floor3Room),
-    roost: defineRoom(RoostRoom),
-  },
+  rooms,
   express: serveClient
     ? (app) => {
         app.get("/health", (_req, res) => {
