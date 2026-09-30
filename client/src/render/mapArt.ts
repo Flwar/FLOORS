@@ -22,6 +22,42 @@ const PAINT: Record<number, [number, number, number]> = {
   [Tile.Cliff]: [170, 146, 110], [Tile.Crystal]: [150, 206, 222], [Tile.Gate]: [150, 138, 118], [Tile.Crop]: [206, 184, 110], [Tile.Prop]: [196, 186, 162],
 };
 
+/** How each floor's ground reads on a chart: its grass and its water. */
+const THEME_PAINT: Record<string, { grass: [number, number, number]; water: [number, number, number]; tree: [number, number, number] }> = {
+  gilded: { grass: [196, 204, 120], water: [124, 172, 200], tree: [170, 150, 70] },
+  storm: { grass: [150, 160, 150], water: [100, 130, 170], tree: [110, 130, 110] },
+  ember: { grass: [124, 114, 104], water: [226, 96, 40], tree: [70, 60, 56] },
+  frost: { grass: [230, 238, 244], water: [168, 206, 232], tree: [70, 110, 96] },
+  shadow: { grass: [84, 92, 140], water: [26, 22, 48], tree: [60, 44, 96] },
+  tide: { grass: [150, 206, 164], water: [44, 176, 204], tree: [70, 150, 90] },
+};
+
+/** The floor's outdoor land, one pixel per tile, in the floor's own colours (the minimap). */
+export function landImage(m: WorldMap): HTMLCanvasElement {
+  const c = offscreen(m.width, m.outdoorHeight);
+  const g = c.getContext("2d")!;
+  const img = g.createImageData(m.width, m.outdoorHeight);
+  const theme = THEME_PAINT[m.theme];
+  for (let y = 0; y < m.outdoorHeight; y++) {
+    for (let x = 0; x < m.width; x++) {
+      const t = m.get(x, y);
+      if (t === Tile.Void) continue;
+      const i = (y * m.width + x) * 4;
+      let col = PAINT[t] ?? [180, 170, 150];
+      if (theme && (t === Tile.Grass || t === Tile.TallGrass || t === Tile.Flowers || t === Tile.Cliff)) col = theme.grass;
+      else if (theme && t === Tile.Water) col = theme.water;
+      else if (theme && t === Tile.Tree) col = theme.tree;
+      const n = (hash(x, y, 7) - 0.5) * 9;
+      img.data[i] = col[0] + n;
+      img.data[i + 1] = col[1] + n;
+      img.data[i + 2] = col[2] + n;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
 function hash(x: number, y: number, s = 0) {
   let h = (x * 374761393 + y * 668265263 + s * 1442695041) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -39,7 +75,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   const W = c.width;
   const margin = 26;
   const s = (W - margin * 2) / m.width;
-  c.height = Math.round(m.height * s + margin * 2 + 34);
+  c.height = Math.round(m.outdoorHeight * s + margin * 2 + 34);
   const H = c.height;
   const g = c.getContext("2d")!;
   const ox = margin;
@@ -65,13 +101,13 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   }
 
   // Land colours (1 px per tile), smoothed when scaled up for a painted look.
-  const land = offscreen(m.width, m.height);
-  const mask = offscreen(m.width, m.height);
+  const land = offscreen(m.width, m.outdoorHeight);
+  const mask = offscreen(m.width, m.outdoorHeight);
   const lg = land.getContext("2d")!;
   const mg = mask.getContext("2d")!;
-  const img = lg.createImageData(m.width, m.height);
-  const mimg = mg.createImageData(m.width, m.height);
-  for (let y = 0; y < m.height; y++) {
+  const img = lg.createImageData(m.width, m.outdoorHeight);
+  const mimg = mg.createImageData(m.width, m.outdoorHeight);
+  for (let y = 0; y < m.outdoorHeight; y++) {
     for (let x = 0; x < m.width; x++) {
       const t = m.get(x, y);
       if (t === Tile.Void) continue;
@@ -94,14 +130,14 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   g.imageSmoothingQuality = "high";
   // Drop shadow, inked coast, then the paint.
   g.globalAlpha = 0.25;
-  g.drawImage(mask, ox + 4, oy + 6, m.width * s, m.height * s);
+  g.drawImage(mask, ox + 4, oy + 6, m.width * s, m.outdoorHeight * s);
   g.globalAlpha = 0.9;
-  for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) g.drawImage(mask, ox + dx, oy + dy, m.width * s, m.height * s);
+  for (const [dx, dy] of [[-1.6, 0], [1.6, 0], [0, -1.6], [0, 1.6]]) g.drawImage(mask, ox + dx, oy + dy, m.width * s, m.outdoorHeight * s);
   g.globalAlpha = 1;
-  g.drawImage(land, ox, oy, m.width * s, m.height * s);
+  g.drawImage(land, ox, oy, m.width * s, m.outdoorHeight * s);
 
   // Glyphs: trees in woods, ripples on water, little houses.
-  for (let y = 0; y < m.height; y += 2) {
+  for (let y = 0; y < m.outdoorHeight; y += 2) {
     for (let x = 0; x < m.width; x += 2) {
       if (!seenZone(x, y)) continue;
       const t = m.get(x, y);
@@ -149,7 +185,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   }
 
   // Fog: unexplored land hides under soft parchment clouds.
-  for (let y = 0; y < m.height; y += 3) {
+  for (let y = 0; y < m.outdoorHeight; y += 3) {
     for (let x = 0; x < m.width; x += 3) {
       if (m.get(x + 1, y + 1) === Tile.Void || seenZone(x + 1, y + 1)) continue;
       const cx = X(x + 1.5 + (hash(x, y, 21) - 0.5) * 1.5);
@@ -165,7 +201,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   // Faint swirls in the fog, like an unfinished survey.
   g.strokeStyle = "rgba(120,90,50,0.22)";
   g.lineWidth = 1.2;
-  for (let y = 4; y < m.height; y += 12) {
+  for (let y = 4; y < m.outdoorHeight; y += 12) {
     for (let x = 4; x < m.width; x += 14) {
       if (m.get(x, y) === Tile.Void || seenZone(x, y) || hash(x, y, 24) < 0.4) continue;
       const cx = X(x);
@@ -219,7 +255,7 @@ export function drawParchmentMap(c: HTMLCanvasElement, m: WorldMap, marks: MapMa
   let sy = 0;
   let n = 0;
   if (open) {
-    for (let y = 0; y < m.height; y += 3) {
+    for (let y = 0; y < m.outdoorHeight; y += 3) {
       for (let x = 0; x < m.width; x += 3) {
         if (m.get(x, y) !== Tile.Grass || m.zoneAt(x * TILE + 16, y * TILE + 16) !== open) continue;
         sx += x;

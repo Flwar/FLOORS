@@ -7,7 +7,7 @@
 import type { Shape } from "../combat/shapes.ts";
 import { ENEMIES, type EnemyAttack, type EnemyDef } from "../enemies/defs.ts";
 import { ITEMS, type ItemBase } from "../items/items.ts";
-import { LOOT, SHOPS } from "../items/loot.ts";
+import { LOOT, priceGear, SHOPS } from "../items/loot.ts";
 
 const deg = (d: number) => (d * Math.PI) / 180;
 const atk = (a: Omit<EnemyAttack, "weight"> & { weight?: number }): EnemyAttack => ({ weight: 1, ...a });
@@ -257,11 +257,21 @@ const FLOOR2_ITEMS: ItemBase[] = [
   { key: "armor_skyguard", name: "Skyguard Harness", kind: "armor", defense: 40, hp: 18, stamina: 6, look: 14, value: 540, tier: 4, desc: "Blue coat, steel plates and a sky-blue cape: what the Skyguard wore to hold the bridges." },
   { key: "armor_stormweave", name: "Stormweave Robes", kind: "armor", defense: 22, hp: 36, stamina: 10, look: 15, value: 520, tier: 4, desc: "Cloth woven with stormglass thread. It hums against the skin and turns aside what it can." },
   { key: "helm_winged", name: "Winged Helm", kind: "helm", defense: 20, hp: 14, stamina: 4, look: 11, value: 420, tier: 4, desc: "A gilded helm with galefeather wings. Skyguard captains wore them so the troops could find them." },
+  { key: "greatsword_gilded", name: "Gilded Colossus Blade", kind: "weapon", weapon: "greatsword", art: "gs_gilded", power: 178, value: 620, tier: 4, desc: "Cut from a fallen guardian's own sword. Two hands, and all your weight behind them." },
+  { key: "daggers_gilded", name: "Gilded Fangs", kind: "weapon", weapon: "daggers", art: "dg_gilded", power: 162, value: 540, tier: 4, desc: "Gold over stormglass: the Terraces' old guardians paid their spies well." },
+  { key: "spear_sun", name: "Sunpiercer", kind: "weapon", weapon: "spear", art: "sp_sun", power: 168, value: 580, tier: 4, desc: "A flame-shaped head of gilded steel. At noon it throws its own shadow." },
+  { key: "staff_sun", name: "Sunfire Staff", kind: "weapon", weapon: "staff", art: "st_sun", power: 166, value: 580, tier: 4, desc: "A sun disc held in gilded rays. It is always a little warm." },
+  { key: "armor_sunforged", name: "Sunforged Plate", kind: "armor", defense: 56, hp: 32, stamina: -6, look: 20, value: 700, tier: 4, desc: "White-gold plate and a sun-bright cape. The heaviest armour on the Terraces." },
+  { key: "armor_mystic", name: "Mystic Vestments", kind: "armor", defense: 26, hp: 44, stamina: 12, look: 21, value: 620, tier: 4, desc: "Teal silk stitched with gold runes that shift when you aren't looking." },
+  { key: "helm_suncrown", name: "Sun Crown", kind: "helm", defense: 18, hp: 30, stamina: 6, look: 15, value: 520, tier: 4, desc: "A circlet of gilded rays. It makes its wearer hard to look at." },
   { key: "helm_stormcrown", name: "Storm Diadem", kind: "helm", defense: 11, hp: 28, stamina: 6, look: 12, value: 440, tier: 4, desc: "A thin gold band holding three splinters of stormglass. Storm adepts wear them to hear the weather think." },
 ];
 
 /** Floor 2's own gear: the Stormglass set. */
-const SKY_GEAR = ["sword_storm", "greatsword_storm", "daggers_storm", "spear_storm", "staff_storm", "armor_gilded", "armor_skyguard", "armor_stormweave", "helm_winged", "helm_stormcrown"];
+const SKY_GEAR = [
+  "sword_storm", "greatsword_storm", "daggers_storm", "spear_storm", "staff_storm", "armor_gilded", "armor_skyguard", "armor_stormweave", "helm_winged", "helm_stormcrown",
+  "greatsword_gilded", "daggers_gilded", "spear_sun", "staff_sun", "armor_sunforged", "armor_mystic", "helm_suncrown",
+];
 
 // ---------------------------------------------------------------------------
 // Loot and shops
@@ -282,13 +292,13 @@ function register() {
   const tonic = [{ key: "tonic", w: 1 }];
   Object.assign(LOOT, {
     f2beast: { gold: [2, 6], rolls: [{ chance: 0.45, pool: [{ key: "mat_pelt", w: 2 }, { key: "mat_feather", w: 1 }] }, { chance: 0.07, pool: tonic }, { chance: 0.04, pool: T2 }] },
-    f2soldier: { gold: [9, 18], rolls: [{ chance: 0.4, pool: [{ key: "mat_gilded", w: 1 }] }, { chance: 0.1, pool: tonic }, { chance: 0.06, pool: T3, boost: 0.6 }, { chance: 0.02, pool: SKY }] },
-    f2caster: { gold: [8, 16], rolls: [{ chance: 0.45, pool: [{ key: "mat_stormglass", w: 2 }, { key: "mat_feather", w: 1 }] }, { chance: 0.1, pool: tonic }, { chance: 0.06, pool: T3, boost: 0.6 }, { chance: 0.02, pool: SKY }] },
-    f2construct: { gold: [16, 30], rolls: [{ chance: 0.85, pool: [{ key: "mat_gilded", w: 1 }], qty: [1, 2] }, { chance: 0.3, pool: [{ key: "mat_stormglass", w: 1 }] }, { chance: 0.12, pool: T3, boost: 1 }, { chance: 0.05, pool: SKY, boost: 0.5 }] },
+    f2soldier: { gold: [9, 18], rolls: [{ chance: 0.4, pool: [{ key: "mat_gilded", w: 1 }] }, { chance: 0.1, pool: tonic }, { chance: 0.06, pool: T3, boost: 0.3 }, { chance: 0.02, pool: SKY }] },
+    f2caster: { gold: [8, 16], rolls: [{ chance: 0.45, pool: [{ key: "mat_stormglass", w: 2 }, { key: "mat_feather", w: 1 }] }, { chance: 0.1, pool: tonic }, { chance: 0.06, pool: T3, boost: 0.3 }, { chance: 0.02, pool: SKY }] },
+    f2construct: { gold: [16, 30], rolls: [{ chance: 0.85, pool: [{ key: "mat_gilded", w: 1 }], qty: [1, 2] }, { chance: 0.3, pool: [{ key: "mat_stormglass", w: 1 }] }, { chance: 0.12, pool: T3, boost: 0.4 }, { chance: 0.05, pool: SKY, boost: 0.2 }] },
     stormwarden: {
       gold: [260, 360],
       rolls: [
-        { chance: 1, pool: SKY, boost: 2, minRarity: 1 },
+        { chance: 1, pool: SKY, boost: 0.8, minRarity: 1 },
         { chance: 1, pool: [{ key: "mat_stormglass", w: 1 }], qty: [3, 5] },
         { chance: 1, pool: tonic, qty: [2, 3] },
       ],
@@ -297,8 +307,8 @@ function register() {
       gold: [650, 900],
       guaranteed: [{ key: "art_stormheart", once: true }],
       rolls: [
-        { chance: 1, pool: SKY, boost: 3, minRarity: 3 },
-        { chance: 0.6, pool: SKY, boost: 3, minRarity: 2 },
+        { chance: 1, pool: SKY, boost: 1.3, minRarity: 2 },
+        { chance: 0.4, pool: SKY, boost: 0.8, minRarity: 1 },
         { chance: 1, pool: [{ key: "mat_stormglass", w: 1 }, { key: "mat_gilded", w: 1 }], qty: [4, 6] },
       ],
     },
@@ -306,14 +316,14 @@ function register() {
       gold: [200, 280],
       guaranteed: [{ key: "key_stormspire", once: true }],
       rolls: [
-        { chance: 1, pool: [...T3, ...SKY], boost: 2.5, minRarity: 2 },
+        { chance: 1, pool: [...T3, ...SKY], boost: 0.6, minRarity: 1 },
         { chance: 1, pool: [{ key: "mat_stormglass", w: 1 }], qty: [2, 4] },
         { chance: 1, pool: tonic, qty: [2, 3] },
       ],
     },
   });
   Object.assign(SHOPS, {
-    store2: [
+    store2: priceGear([
       { key: "map_floor2", price: 60 },
       { key: "tonic", price: 22 },
       // Floor 1's best for climbers who arrive short, then the Stormglass set.
@@ -323,14 +333,21 @@ function register() {
       { key: "armor_gilded", price: 700 },
       { key: "helm_winged", price: 480 },
       { key: "helm_stormcrown", price: 500 },
-    ],
-    smith2: [
+      { key: "armor_mystic", price: 760 },
+      { key: "armor_sunforged", price: 860 },
+      { key: "helm_suncrown", price: 640 },
+    ]),
+    smith2: priceGear([
       { key: "sword_storm", price: 640 },
       { key: "greatsword_storm", price: 700 },
       { key: "daggers_storm", price: 620 },
       { key: "spear_storm", price: 660 },
       { key: "staff_storm", price: 660 },
-    ],
+      { key: "greatsword_gilded", price: 780 },
+      { key: "daggers_gilded", price: 700 },
+      { key: "spear_sun", price: 740 },
+      { key: "staff_sun", price: 740 },
+    ]),
   });
 }
 register();

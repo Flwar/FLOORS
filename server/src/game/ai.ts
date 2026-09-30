@@ -16,6 +16,35 @@ import type { EnemyData, PlayerData, Sim } from "./sim.ts";
 const MELEE_TOKENS = 2;
 const TURN_RATE = 7; // rad/s outside attacks
 
+/** How often an enemy reconsiders who to fight (ms). */
+const RETARGET_MS = 400;
+/** Another player must top the current target's threat by this much (and 10) to pull the enemy away. */
+const THREAT_MARGIN = 1.2;
+/** Threat kept at each reconsideration (fades by about half every 4–5 seconds). */
+const THREAT_FADE = 0.94;
+
+/**
+ * Leashing. An enemy in a fight doesn't give up the moment you step past its leash range: it
+ * keeps after you for LEASH_GRACE_MS, up to LEASH_SLACK times its range. When it does go home
+ * it keeps its wounds (no free heal on the way), turns and fights if you hit it on the way,
+ * and only starts to recover once it has been home and left alone for REST_DELAY_MS.
+ */
+const LEASH_GRACE_MS = 5000;
+const LEASH_SLACK = 1.5;
+const REST_DELAY_MS = 8000;
+/** Share of its health a resting enemy recovers per second. */
+const REST_RATE = 0.04;
+
+/** Below this share of its health an enemy calls for help, once a fight… */
+const HELP_AT = 0.5;
+/** …and allies this close (and in sight) answer. */
+const HELP_RANGE = 260;
+
+/** Frenzied elites stay enraged (Affix.Frenzied). */
+const FRENZIED = 2;
+/** Shielded elites' ward returns (Affix.Shielded). */
+const SHIELDED = 7;
+
 /** Server-side enemy brains. One `update` per enemy per 60 Hz tick. */
 export class EnemyAI {
   constructor(private sim: Sim) {}
@@ -27,7 +56,12 @@ export class EnemyAI {
 
     if (ed.enrageUntil && now > ed.enrageUntil) {
       ed.enrageUntil = 0;
-      if (!ed.def.boss) e.flags &= ~EFlag.Enraged;
+      if (!ed.def.boss && ed.affix !== FRENZIED) e.flags &= ~EFlag.Enraged;
+    }
+    if (ed.affix === SHIELDED && ed.shield !== undefined && ed.shield <= 0 && now >= (ed.shieldAt ?? 0) && e.act !== EAct.Dead) {
+      ed.shield = Math.round(e.hpMax * 0.2);
+      e.flags |= EFlag.Shielded;
+      sim.emit("fx", { k: "shieldup", x: e.x, y: e.y, t: ed.id }, e.x, e.y);
     }
     if (ed.slowUntil && now > ed.slowUntil) {
       ed.slowUntil = 0;
@@ -76,14 +110,39 @@ export class EnemyAI {
     return !!this.sim.map.zoneAt(x, y)?.safe;
   }
 
-  private validTarget(ed: EnemyData, pd: PlayerData | undefined): pd is PlayerData {
+  private validTarget(ed: EnemyData, pd: PlayerData | undefined, slack = 1): pd is PlayerData {
     if (!pd) return false;
     const p = pd.p;
     if (p.act === Act.Dead) return false;
     // The training yard's sparring partner lives inside the safe town on purpose.
     if (ed.def.behavior === "sparring") return Math.hypot(p.x - ed.e.x, p.y - ed.e.y) <= ed.def.aggroRange;
     if (this.inSafeZone(p.x, p.y)) return false;
-    if (Math.hypot(p.x - ed.homeX, p.y - ed.homeY) > ed.def.leashRange) return false;
+    if (Math.hypot(p.x - ed.homeX, p.y - ed.homeY) > ed.def.leashRange * slack) return false;
+    return true;
+  }
+
+  /**
+   * Is the enemy still willing to fight this target? Past its leash range it gives chase for a
+   * few seconds more (and never past the slack), instead of turning for home at once.
+   */
+  private keepsTarget(ed: EnemyData, pd: PlayerData | undefined): pd is PlayerData {
+    if (!this.validTarget(ed, pd, LEASH_SLACK)) return false;
+    if (ed.def.behavior === "sparring") return true;
+    if (Math.hypot(pd.p.x - ed.homeX, pd.p.y - ed.homeY) <= ed.def.leashRange) {
+      ed.strayAt = 0;
+      return true;
+    }
+    if (!ed.strayAt) ed.strayAt = this.sim.now;
+    return this.sim.now - ed.strayAt < LEASH_GRACE_MS;
+  }
+
+  /** Struck while walking home: turn and fight, if the attacker is near enough to chase. */
+  reengage(ed: EnemyData, pd: PlayerData): boolean {
+    if (!this.validTarget(ed, pd, LEASH_SLACK)) return false;
+    ed.target = pd.sid;
+    ed.strayAt = 0;
+    ed.e.flags |= EFlag.Aggro;
+    this.sim.setEnemyAct(ed, EAct.Idle);
     return true;
   }
 
@@ -107,6 +166,47 @@ export class EnemyAI {
     }
   }
 
+  /** The valid player with the most threat on this enemy, if anyone has any. */
+  private topThreat(ed: EnemyData): PlayerData | undefined {
+    let best: PlayerData | undefined;
+    let bestT = 0;
+    for (const [sid, t] of ed.threat) {
+      if (t <= bestT) continue;
+      const pd = this.sim.players.get(sid);
+      if (!this.validTarget(ed, pd)) continue;
+      best = pd;
+      bestT = t;
+    }
+    return best;
+  }
+
+  /** Threat fades, so whoever is hitting it now counts more than whoever hit it long ago. */
+  private fadeThreat(ed: EnemyData) {
+    for (const [sid, t] of ed.threat) {
+      const next = t * THREAT_FADE;
+      if (next < 1 || !this.sim.players.has(sid)) ed.threat.delete(sid);
+      else ed.threat.set(sid, next);
+    }
+  }
+
+  /** A cry for help: idle allies within earshot (and sight) come for whoever hurt it. */
+  private callForHelp(ed: EnemyData, pd: PlayerData) {
+    const e = ed.e;
+    let came = 0;
+    for (const other of this.sim.enemies.values()) {
+      const o = other.e;
+      if (other === ed || other.target || o.act === EAct.Dead || o.act === EAct.Leash || other.def.boss) continue;
+      if (other.def.behavior === "dummy" || other.def.behavior === "sparring") continue;
+      if (Math.hypot(o.x - e.x, o.y - e.y) > HELP_RANGE || !this.sim.grid.lineClear(e.x, e.y, o.x, o.y, 1)) continue;
+      if (!this.validTarget(other, pd)) continue;
+      other.target = pd.sid;
+      other.threat.set(pd.sid, Math.max(other.threat.get(pd.sid) ?? 0, 10));
+      o.flags |= EFlag.Aggro;
+      came++;
+    }
+    if (came) this.sim.emit("fx", { k: "rally", x: e.x, y: e.y, t: ed.id }, e.x, e.y);
+  }
+
   /** Nearby idle allies join the fight. */
   private alertPack(ed: EnemyData, sid: string) {
     for (const other of this.sim.enemies.values()) {
@@ -123,26 +223,57 @@ export class EnemyAI {
     if (def.behavior === "dummy") return;
 
     let pd = this.target(ed);
-    if (ed.target && !this.validTarget(ed, pd)) {
+    if (ed.target && !this.keepsTarget(ed, pd)) {
+      ed.threat.delete(ed.target);
       ed.target = undefined;
+      ed.strayAt = 0;
       sim.releaseToken(ed);
-      pd = undefined;
-      if (def.behavior !== "sparring" && Math.hypot(e.x - ed.homeX, e.y - ed.homeY) > 60) {
+      // Someone else has been hitting it: it turns on them instead of going home.
+      pd = this.topThreat(ed);
+      if (pd) ed.target = pd.sid;
+      else ed.threat.clear();
+      if (!pd && def.behavior !== "sparring" && Math.hypot(e.x - ed.homeX, e.y - ed.homeY) > 60) {
         sim.setEnemyAct(ed, EAct.Leash);
         e.flags &= ~EFlag.Aggro;
         return;
       }
+    }
+    // Its target is gone (left, or never picked): whoever else has been hitting it comes first.
+    if (!pd && ed.threat.size) {
+      pd = this.topThreat(ed);
+      if (pd) ed.target = pd.sid;
     }
     if (!pd && sim.now >= ed.thinkAt) {
       ed.thinkAt = sim.now + 220 + Math.random() * 80;
       this.acquire(ed);
       pd = this.target(ed);
     }
+    // Threat: every so often, fight whoever has clearly out-threatened the current target.
+    if (pd && sim.now >= ed.retargetAt && def.behavior !== "sparring") {
+      ed.retargetAt = sim.now + RETARGET_MS;
+      this.fadeThreat(ed);
+      const better = this.topThreat(ed);
+      if (better && better.sid !== ed.target) {
+        const cur = ed.threat.get(ed.target!) ?? 0;
+        if ((ed.threat.get(better.sid) ?? 0) > cur * THREAT_MARGIN + 10) {
+          sim.releaseToken(ed);
+          ed.target = better.sid;
+          pd = better;
+        }
+      }
+    }
     if (!pd) {
       e.flags &= ~EFlag.Aggro;
       if (e.act === EAct.Guard) sim.setEnemyAct(ed, EAct.Idle);
+      this.rest(ed);
       this.wander(ed, dt);
       return;
+    }
+    ed.restAt = 0;
+    // Badly hurt, it cries out: idle allies within earshot join the fight.
+    if (!ed.calledHelp && e.hp < e.hpMax * HELP_AT && !def.boss && def.behavior !== "sparring") {
+      ed.calledHelp = true;
+      this.callForHelp(ed, pd);
     }
 
     const p = pd.p;
@@ -194,7 +325,10 @@ export class EnemyAI {
     let gy = e.y;
     let spd = speed;
     const hasToken = ed.token === pd.sid;
-    if (ranged) {
+    if (ranged && !sim.grid.lineClear(e.x, e.y, p.x, p.y, 1)) {
+      gx = p.x;
+      gy = p.y;
+    } else if (ranged) {
       if (d < pmin) {
         const blink = def.attacks.findIndex((a) => a.special === "blink");
         if (blink >= 0 && ed.cooldowns[blink] === 0 && d < 70) {
@@ -496,24 +630,53 @@ export class EnemyAI {
   private speed(ed: EnemyData) {
     let s = ed.def.speed;
     if (ed.e.flags & EFlag.Chilled) s *= 0.55;
+    if (ed.e.flags & EFlag.Soaked) s *= 0.85;
     if (ed.e.flags & EFlag.Enraged && !ed.def.boss) s *= 1.15;
     return s;
   }
 
+  /** Walk home, wounds and all (no free heal on the way). */
   private leash(ed: EnemyData, dt: number) {
     const e = ed.e;
     const d = Math.hypot(ed.homeX - e.x, ed.homeY - e.y);
-    e.hp = Math.min(e.hpMax, e.hp + Math.ceil(e.hpMax * 0.4 * dt));
     if (d < 12) {
-      e.hp = e.hpMax;
       e.posture = 0;
-      ed.phase = 0;
-      if (ed.def.boss) e.flags &= ~EFlag.Enraged;
-      ed.contrib.clear();
+      ed.restAt = this.sim.now + REST_DELAY_MS;
+      // A Floor Boss whose challengers have all gone (or fallen) resets its arena.
+      if (ed.def.boss && ed.def.boss.music !== "miniboss") this.recover(ed);
       this.sim.setEnemyAct(ed, EAct.Idle);
       return;
     }
     this.goTo(ed, ed.homeX, ed.homeY, ed.def.speed * 1.4, dt);
+  }
+
+  /** Home and left alone: after a while, a hurt enemy slowly recovers. */
+  private rest(ed: EnemyData) {
+    const e = ed.e;
+    if (e.hp >= e.hpMax) return;
+    const now = this.sim.now;
+    if (!ed.restAt) ed.restAt = now + REST_DELAY_MS;
+    if (now < ed.restAt) return;
+    // (Twice a second, so the rate holds however small the enemy.)
+    ed.restAt = now + 500;
+    e.hp = Math.min(e.hpMax, e.hp + Math.max(1, Math.round(e.hpMax * REST_RATE * 0.5)));
+    if (e.hp >= e.hpMax) this.recover(ed);
+  }
+
+  /** Whole again: the fight is forgotten. */
+  private recover(ed: EnemyData) {
+    const e = ed.e;
+    ed.calledHelp = false;
+    if (ed.affix === SHIELDED) {
+      ed.shield = undefined;
+      e.flags |= EFlag.Shielded;
+    }
+    e.hp = e.hpMax;
+    e.posture = 0;
+    ed.phase = 0;
+    if (ed.def.boss) e.flags &= ~EFlag.Enraged;
+    ed.contrib.clear();
+    ed.restAt = 0;
   }
 
   private wander(ed: EnemyData, dt: number) {

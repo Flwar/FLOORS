@@ -28,34 +28,42 @@ export class Controls {
     return settings.value.bindings;
   }
 
+  /** Unhooks every listener this instance added (the scene restarts on each room change). */
+  private listening = new AbortController();
+
+  destroy() {
+    this.listening.abort();
+  }
+
   constructor(private scene: Phaser.Scene) {
     const canvas = scene.game.canvas;
-    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    const signal = this.listening.signal;
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault(), { signal });
     window.addEventListener("keydown", (e) => {
       if (this.blocked || this.capturing || isTyping(e)) return;
       sfx.unlock();
       if (e.code === "Space" || e.code === "Tab") e.preventDefault();
       if (!e.repeat) this.press(e.code);
       this.down.add(e.code);
-    });
-    window.addEventListener("keyup", (e) => this.down.delete(e.code));
-    window.addEventListener("blur", () => this.down.clear());
+    }, { signal });
+    window.addEventListener("keyup", (e) => this.down.delete(e.code), { signal });
+    window.addEventListener("blur", () => this.down.clear(), { signal });
     canvas.addEventListener("pointerdown", (e) => {
       sfx.unlock();
       if (this.blocked || this.capturing) return;
       const code = `Mouse${e.button}`;
       this.press(code);
       this.down.add(code);
-    });
-    window.addEventListener("pointerup", (e) => this.down.delete(`Mouse${e.button}`));
+    }, { signal });
+    window.addEventListener("pointerup", (e) => this.down.delete(`Mouse${e.button}`), { signal });
     canvas.addEventListener("mouseup", (e) => {
       if (e.button === 3 || e.button === 4) e.preventDefault();
-    });
+    }, { signal });
     canvas.addEventListener("pointermove", (e) => {
       const r = canvas.getBoundingClientRect();
       this.pointer.x = ((e.clientX - r.left) / r.width) * scene.scale.width;
       this.pointer.y = ((e.clientY - r.top) / r.height) * scene.scale.height;
-    });
+    }, { signal });
   }
 
   private press(code: string) {

@@ -1,4 +1,4 @@
-import { makeItem, rollRarity, TILE } from "@floors/shared";
+import { makeItem, rollRarity, TILE, randomScroll, itemBase, floorOfRoom } from "@floors/shared";
 import type { WorldRoom } from "../rooms/WorldRoom.ts";
 import type { EnemyData } from "./sim.ts";
 
@@ -94,6 +94,237 @@ export const FLOOR2_EVENTS: EventDef[] = [
   },
 ];
 
+/** Floor 3: dragons on the wing, the caldera stirring, and the wandering merchant. */
+export const FLOOR3_EVENTS: EventDef[] = [
+  {
+    id: "dragonraid",
+    name: "Dragon Raid",
+    announce: "Drakes are diving on the Ashen Slopes — a raiding flight, and something bigger leads it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 80, y: 96 }, { x: 104, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "drake", level: 13 }, { key: "drake", level: 13 }, { key: "ashling", level: 13 }, { key: "ashling", level: 13 },
+      { key: "drake", level: 14, elite: true, hpScale: 1.7 },
+    ],
+    reward: { xp: 900, gold: 260, loot: true },
+    lootPool: ["mat_dragonscale", "mat_emberheart", "helm_dragon", "armor_drakehide", "daggers_dragon", "spear_dragon"],
+  },
+  {
+    id: "eruption",
+    name: "The Caldera Wakes",
+    announce: "The ground splits on the Caldera Heights — obsidian golems climb out of the magma!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 80, y: 42 }),
+    enemies: [
+      { key: "obsidian", level: 14 }, { key: "obsidian", level: 14 }, { key: "flamecaller", level: 14 }, { key: "flamecaller", level: 14 },
+      { key: "emberguard", level: 15, elite: true },
+    ],
+    reward: { xp: 1000, gold: 300, loot: true },
+    lootPool: ["mat_cinder", "mat_emberheart", "armor_emberweave", "staff_dragon", "sword_dragon", "greatsword_dragon"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has braved the heat to set up in Emberhold — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 92, y: 138 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+/** Floor 4: the wolves' winter hunt, the white storm, and the wandering merchant. */
+export const FLOOR4_EVENTS: EventDef[] = [
+  {
+    id: "wintermoon",
+    name: "The Winter Moon Hunt",
+    announce: "A winter moon rises over the Snowfields — the rime wolves run in a great pack tonight!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 78, y: 96 }, { x: 108, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "rimewolf", level: 17 }, { key: "rimewolf", level: 17 }, { key: "rimewolf", level: 17 }, { key: "rimewolf", level: 17 },
+      { key: "rimewolf", level: 18, elite: true, hpScale: 1.8 }, { key: "yeti", level: 17 },
+    ],
+    reward: { xp: 1500, gold: 380, loot: true },
+    lootPool: ["mat_frostpelt", "mat_glacialheart", "helm_furhood", "armor_furmantle", "daggers_rime", "spear_rime"],
+  },
+  {
+    id: "whitestorm",
+    name: "The White Storm",
+    announce: "A white storm rolls off the Glacier Peak — ice golems and wraiths walk inside it!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 82, y: 42 }),
+    enemies: [
+      { key: "icegolem", level: 18 }, { key: "icegolem", level: 18 }, { key: "icewraith", level: 18 }, { key: "icewraith", level: 18 },
+      { key: "rimeguard", level: 19, elite: true },
+    ],
+    reward: { xp: 1700, gold: 420, loot: true },
+    lootPool: ["mat_rimeshard", "mat_glacialheart", "armor_frostweave", "staff_rime", "sword_rime", "greatsword_rime"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has stamped the snow off her boots in Rimeholt — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 92, y: 138 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+/** Floor 5: the blood moon, the eclipse tide, and the wandering merchant. */
+export const FLOOR5_EVENTS: EventDef[] = [
+  {
+    id: "bloodmoon",
+    name: "The Blood Moon",
+    announce: "A red moon shows through the dark over the Gloaming — the void hounds run mad beneath it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 76, y: 90 }, { x: 108, y: 96 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "voidhound", level: 21 }, { key: "voidhound", level: 21 }, { key: "voidhound", level: 21 }, { key: "voidhound", level: 21 },
+      { key: "voidhound", level: 22, elite: true, hpScale: 1.8 }, { key: "shade", level: 21 },
+    ],
+    reward: { xp: 2200, gold: 480, loot: true },
+    lootPool: ["mat_shadowsilk", "mat_voidheart", "helm_shadowveil", "armor_shadowsilk", "daggers_void", "spear_void"],
+  },
+  {
+    id: "eclipsetide",
+    name: "The Eclipse Tide",
+    announce: "The void spills over the Shattered Moon — golems and knights march out of the craters!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 152, y: 84 }),
+    enemies: [
+      { key: "voidgolem", level: 22 }, { key: "voidgolem", level: 22 }, { key: "voidcaller", level: 22 }, { key: "voidcaller", level: 22 },
+      { key: "abyssalknight", level: 23, elite: true },
+    ],
+    reward: { xp: 2500, gold: 540, loot: true },
+    lootPool: ["mat_umbralshard", "mat_voidheart", "armor_voidweave", "staff_void", "sword_void", "greatsword_void"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has lit a lantern in Duskhollow — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 92, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+/** Floor 6: the spring tide, the wreckers, and the wandering merchant. */
+export const FLOOR6_EVENTS: EventDef[] = [
+  {
+    id: "springtide",
+    name: "The Spring Tide",
+    announce: "The spring tide is in over the Tidepools — the brinehounds run with it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 120, y: 126 }, { x: 138, y: 120 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "brinehound", level: 25 }, { key: "brinehound", level: 25 }, { key: "brinehound", level: 25 }, { key: "brinehound", level: 25 },
+      { key: "brinehound", level: 26, elite: true, hpScale: 1.8 }, { key: "siren", level: 25 },
+    ],
+    reward: { xp: 2800, gold: 560, loot: true },
+    lootPool: ["mat_brinepearl", "mat_leviathanscale", "helm_divers", "armor_sharkskin", "daggers_tide", "spear_tide"],
+  },
+  {
+    id: "wreckers",
+    name: "The Wreckers",
+    announce: "Lights on the Wreck Coast — the drowned crews are coming ashore to loot their own ships!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 154, y: 80 }),
+    enemies: [
+      { key: "drowned", level: 26 }, { key: "drowned", level: 26 }, { key: "drowned", level: 26 }, { key: "merrowguard", level: 26 },
+      { key: "coralgolem", level: 27, elite: true },
+    ],
+    reward: { xp: 3100, gold: 620, loot: true },
+    lootPool: ["mat_coral", "mat_leviathanscale", "armor_seasilk", "staff_tide", "sword_tide", "greatsword_tide"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has tied up at Saltmere's pier — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 47, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+/** Floor 7: the runaway line, the boiler storm, and the wandering merchant. */
+export const FLOOR7_EVENTS: EventDef[] = [
+  {
+    id: "runaway",
+    name: "The Runaway Line",
+    announce: "The Foundry's line has jammed open — clockhounds are pouring out of the yards!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 80, y: 92 }, { x: 102, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "clockhound", level: 29 }, { key: "clockhound", level: 29 }, { key: "clockhound", level: 29 }, { key: "clockhound", level: 29 },
+      { key: "clockhound", level: 30, elite: true, hpScale: 1.8 }, { key: "tinkerer", level: 29 },
+    ],
+    reward: { xp: 3400, gold: 640, loot: true },
+    lootPool: ["mat_spring", "mat_aethercore", "helm_goggles", "armor_tinker", "daggers_brass", "spear_brass"],
+  },
+  {
+    id: "boilerstorm",
+    name: "The Boiler Storm",
+    announce: "The Steam Vents are overpressured — golems and soldiers march out of the fog!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 34, y: 96 }),
+    enemies: [
+      { key: "steamgolem", level: 30 }, { key: "steamgolem", level: 30 }, { key: "cogsoldier", level: 30 }, { key: "sentry", level: 30 },
+      { key: "cogsoldier", level: 31, elite: true },
+    ],
+    reward: { xp: 3800, gold: 700, loot: true },
+    lootPool: ["mat_brassgear", "mat_aethercore", "armor_aether", "staff_brass", "sword_brass", "greatsword_brass"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has parked her ticking cart in Gearhaven — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 133, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+/** Each floor's world events. */
+/** Floor 8: the great sandstorm, the tombs opening, and the wandering merchant. */
+export const FLOOR8_EVENTS: EventDef[] = [
+  {
+    id: "sandstorm",
+    name: "The Great Sandstorm",
+    announce: "A wall of sand is rolling across the Dune Sea — and things are walking inside it!",
+    durationMs: 6 * 60_000,
+    where: () => [{ x: 80, y: 92 }, { x: 102, y: 84 }][Math.floor(Math.random() * 2)],
+    enemies: [
+      { key: "sandwraith", level: 33 }, { key: "sandwraith", level: 33 }, { key: "sandjackal", level: 33 }, { key: "sandjackal", level: 33 },
+      { key: "sandwraith", level: 34, elite: true, hpScale: 1.8 }, { key: "sunpriest", level: 33 },
+    ],
+    reward: { xp: 3800, gold: 700, loot: true },
+    lootPool: ["mat_scarab", "mat_solarheart", "helm_veil", "armor_nomad", "daggers_solar", "spear_solar"],
+  },
+  {
+    id: "tombs",
+    name: "The Tombs Open",
+    announce: "The Colossus's tombs have cracked open — the guardians are marching on the sands!",
+    durationMs: 5 * 60_000,
+    where: () => ({ x: 152, y: 86 }),
+    enemies: [
+      { key: "tombguard", level: 34 }, { key: "tombguard", level: 34 }, { key: "sandgolem", level: 34 }, { key: "sunpriest", level: 34 },
+      { key: "tombguard", level: 35, elite: true },
+    ],
+    reward: { xp: 4200, gold: 780, loot: true },
+    lootPool: ["mat_sunstone", "mat_solarheart", "armor_sunweave", "staff_solar", "sword_solar", "greatsword_solar"],
+  },
+  {
+    id: "merchant",
+    name: "Travelling Merchant",
+    announce: "Sella the Wanderer has pitched her tent by the well in Sunwell — rare wares, for a while.",
+    durationMs: 6 * 60_000,
+    where: () => ({ x: 93, y: 137 }),
+    reward: { xp: 0, gold: 0 },
+  },
+];
+
+export const FLOOR_EVENTS: Record<number, EventDef[]> = { 1: FLOOR1_EVENTS, 2: FLOOR2_EVENTS, 3: FLOOR3_EVENTS, 4: FLOOR4_EVENTS, 5: FLOOR5_EVENTS, 6: FLOOR6_EVENTS, 7: FLOOR7_EVENTS, 8: FLOOR8_EVENTS };
+
 /** Periodic world events: announced to everyone, rewarding everyone who takes part. */
 export class WorldEvents {
   private active?: { def: EventDef; until: number; enemies: Set<string>; contributors: Set<string> };
@@ -134,10 +365,13 @@ export class WorldEvents {
       this.merchantStock = [
         { key: "charm_duelist", rarity: 2, price: 320 },
         { key: "charm_feather", rarity: 2, price: 300 },
-        { key: "charm_gale", rarity: rollRarity(1, 2), price: 360 },
-        { key: ["sword_iron", "daggers_stalker", "spear_iron", "staff_ember", "greatsword_bandit"][Math.floor(Math.random() * 5)], rarity: rollRarity(1.5, 2), price: 420 },
-        { key: ["armor_ranger", "armor_robes", "helm_horned"][Math.floor(Math.random() * 3)], rarity: rollRarity(1.5, 2), price: 380 },
+        { key: "charm_gale", rarity: rollRarity(0.5, 2), price: 360 },
+        { key: ["sword_iron", "daggers_stalker", "spear_iron", "staff_ember", "greatsword_bandit"][Math.floor(Math.random() * 5)], rarity: rollRarity(0.7, 2), price: 420 },
+        { key: ["armor_ranger", "armor_robes", "helm_horned"][Math.floor(Math.random() * 3)], rarity: rollRarity(0.7, 2), price: 380 },
       ];
+      // The caravan sometimes carries a skill scroll, for gold alone (no Marks) — at a price.
+      const scroll = Math.random() < 0.6 ? randomScroll(Math.random() < 0.25 ? 2 : 1, Math.random, floorOfRoom(this.room.kind)?.n ?? 1) : undefined;
+      if (scroll) this.merchantStock.push({ key: scroll, rarity: itemBase(scroll)?.rarity ?? 1, price: itemBase(scroll)?.rarity === 2 ? 1500 : 600 });
     }
     this.active = { def, until: now + def.durationMs, enemies, contributors: new Set() };
     const st = this.room.state;
@@ -185,7 +419,7 @@ export class WorldEvents {
       ch.data.gold += a.def.reward.gold;
       if (a.def.reward.loot) {
         const pool = a.def.lootPool ?? ["charm_amber", "charm_wolf", "armor_chain", "armor_ranger", "helm_iron", "helm_horned", "sword_iron"];
-        const it = makeItem(pool[Math.floor(Math.random() * pool.length)], rollRarity(1.4, 1));
+        const it = makeItem(pool[Math.floor(Math.random() * pool.length)], rollRarity(0.6, 1));
         if (!ch.addItem(it)) ch.data.bank[ch.data.bank.indexOf(null)] = it;
         this.room.clients.getById(sid)?.send("looted", { key: it.key, rarity: it.rarity, qty: 1 });
       }

@@ -1,5 +1,6 @@
 import { TILE } from "../constants.ts";
 import { Tile, WorldMap, type WorldObject } from "./map.ts";
+import { addInteriors } from "./interiors.ts";
 
 const px = (t: number) => t * TILE + TILE / 2;
 
@@ -36,6 +37,7 @@ export function buildFloor2(): WorldMap {
   const H = 140;
   const m = new WorldMap(W, H);
   m.name = "Floor 2 — The Gilded Terraces";
+  m.theme = "gilded";
   m.fill(0, 0, W, H, Tile.Void);
   const protect = new Uint8Array(W * H);
   const P = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && protect[y * W + x] === 1;
@@ -263,11 +265,11 @@ export function buildFloor2(): WorldMap {
   obj({ id: "causeway-ward", kind: "lore", tx: 160, ty: 55, name: "Causeway Ward", text: "A wardstone thrums as you touch it, and the broken stones around it settle. Something far above notices." });
   obj({ id: "storm-shrine", kind: "lore", tx: 66, ty: 28, name: "Shrine of the Storm", text: "Lightning has etched a single word into the stone: VAELRA. The air tastes of copper." });
   obj({ id: "aviary-nest", kind: "lore", tx: 11, ty: 42, name: "The Aviary", text: "Golden feathers, hundreds of them. Whatever nested here was large, and left in a hurry." });
-  obj({ id: "aviary-chest", kind: "chest", tx: 13, ty: 45, name: "Gilded Chest", gold: 220, loot: [{ key: "mat_feather", qty: 5 }, { key: "charm_gale", rarity: 3 }] });
+  obj({ id: "aviary-chest", kind: "chest", tx: 13, ty: 45, name: "Gilded Chest", gold: 220, loot: [{ key: "mat_feather", qty: 5 }, { key: "charm_gale", rarity: 2 }] });
   obj({ id: "causeway-chest", kind: "chest", tx: 150, ty: 40, name: "Weathered Chest", gold: 120, loot: [{ key: "mat_stormglass", qty: 3 }, { key: "tonic", qty: 2 }] });
   obj({ id: "heights-chest", kind: "chest", tx: 114, ty: 30, name: "Storm-Scorched Chest", gold: 150, loot: [{ key: "mat_gilded", qty: 3 }] });
   obj({ id: "stormspire-door", kind: "door", tx: 85, ty: 5, name: "Stormspire Gate", requires: "key_stormspire", text: "A great door of stormglass. A seal-shaped hollow waits in its centre — the Colossus in the Thunder Ring wears the seal.", dest: "stormspire" });
-  obj({ id: "sealed-stair", kind: "gate", tx: 92, ty: 9, name: "The Sealed Stair", text: "Stairs climb into the clouds and simply stop. Floor 3 is not ready for you — yet.", dest: "floor3" });
+  obj({ id: "sealed-stair", kind: "gate", tx: 92, ty: 9, name: "The Ember Stair", text: "Stairs climb through the clouds toward a sky the colour of embers.", dest: "floor3" });
 
   // --- Enemies ---------------------------------------------------------------------------------
   const spawn = (id: string, tx: number, ty: number, enemies: string[], level: number, radius = 48, respawn = 55, elite = 0.07) =>
@@ -294,5 +296,18 @@ export function buildFloor2(): WorldMap {
   spawn("s-guard", 85, 10, ["aegis", "stormadept", "skyguard"], 12, 40, 70, 0.2);
 
   m.spawn = { x: px(85), y: px(121) };
+  m.npcs.push({ id: "board2", name: "Mission Board", role: "board", x: px(88), y: px(114), look: { skin: "#000", cloth: "#000", trim: "#000", hair: "#000" }, greeting: "Missions posted by the town. Each pays gold, experience and Marks — and goes back up on the board a while after it's done." });
+  addInteriors(m, [
+    {
+      building: "skyhall",
+      style: "library",
+      add: [{ id: "archivist2", name: "Archivist Selune", role: "archivist", shop: "scrolls2", look: { skin: "#f4e6c8", cloth: "#3a5a8a", trim: "#f0c860", hair: "#fff6d8", helm: "hood" },
+        greeting: "The Skyreach archive keeps the rarer arts — the ones climbers died learning. Marks and gold, climber. The board outside pays in Marks." }],
+    },
+    { building: "quarter", style: "shop", npcs: [{ id: "quarter" }] },
+    { building: "skyforge", style: "smithy", npcs: [{ id: "skysmith" }] },
+    { building: "skyvault", style: "vault", npcs: [{ id: "vaultkeep" }] },
+    { building: "windrest", style: "inn", npcs: [{ id: "windrest" }] },
+  ]);
   return m;
 }

@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { castShadow } from "./sunlight.ts";
 import { hasCape, paintCharacter, paintShield, paintWeapon, paintWolf, RES, type CharLook, type View, type WeaponArt } from "../art/characters.ts";
 
 /** Everything a clip controls. Poses blend numerically, so transitions never snap. */
@@ -19,6 +20,8 @@ export interface Pose {
   alpha: number;
   /** Facing used to pick the view (radians). */
   face: number;
+  /** 0 standing … 1 seated: the body settles and the legs fold forward. */
+  sit: number;
 }
 
 /** Arm length when the weapon hangs at rest. */
@@ -36,7 +39,7 @@ export function restAngle(face: number): number {
 }
 
 export const restPose = (face: number): Pose => ({
-  bob: 0, lift: 0, lean: 0, tilt: 0, step: 0, stepAmp: 0, wAngle: restAngle(face), wReach: REST_REACH, offArm: 0, sx: 1, sy: 1, alpha: 1, face,
+  bob: 0, lift: 0, lean: 0, tilt: 0, step: 0, stepAmp: 0, wAngle: restAngle(face), wReach: REST_REACH, offArm: 0, sx: 1, sy: 1, alpha: 1, face, sit: 0,
 });
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -64,6 +67,7 @@ export function blendPose(a: Pose, b: Pose, t: number, out: Pose): Pose {
   out.sy = lerp(a.sy, b.sy, t);
   out.alpha = lerp(a.alpha, b.alpha, t);
   out.face = lerpAngle(a.face, b.face, t);
+  out.sit = lerp(a.sit ?? 0, b.sit ?? 0, t);
   return out;
 }
 
@@ -292,6 +296,8 @@ export class HumanoidRig {
   readonly root: Phaser.GameObjects.Container;
   private upper: Phaser.GameObjects.Container;
   private shadow: Phaser.GameObjects.Image;
+  /** The shadow the light casts (see sunlight.ts). */
+  private cast: Phaser.GameObjects.Image;
   private legL: Phaser.GameObjects.Image;
   private legR: Phaser.GameObjects.Image;
   private torso: Phaser.GameObjects.Image;
@@ -315,6 +321,7 @@ export class HumanoidRig {
     paintCharacter(scene, look);
     const k = 1 / RES;
     this.shadow = scene.add.image(0, 0, "shadow").setScale(k * look.bulk);
+    this.cast = scene.add.image(0, 0, "shadow").setVisible(false);
     this.legL = scene.add.image(-3.5, -7, `${look.key}:leg`).setOrigin(0.5, 0).setScale(k);
     this.legR = scene.add.image(3.5, -7, `${look.key}:leg`).setOrigin(0.5, 0).setScale(k);
     this.torso = scene.add.image(0, -13, `${look.key}:torso:front`).setScale(k);
@@ -325,7 +332,7 @@ export class HumanoidRig {
     if (shield) this.shield = scene.add.image(0, 0, paintShield(scene, shield.color, shield.trim)).setScale(k);
     this.upper = scene.add.container(0, 0, [this.armO, this.torso, this.head, this.armW, this.weapon]);
     if (this.shield) this.upper.add(this.shield);
-    this.root = scene.add.container(0, 0, [this.shadow, this.legL, this.legR, this.upper]);
+    this.root = scene.add.container(0, 0, [this.cast, this.shadow, this.legL, this.legR, this.upper]);
     this.root.setScale(scale);
     this.images = [this.legL, this.legR, this.torso, this.head, this.armW, this.armO, this.weapon];
     if (this.shield) this.images.push(this.shield);
@@ -395,6 +402,7 @@ export class HumanoidRig {
     this.upper.setScale(p.sx, p.sy);
     this.shadow.setScale((1 / RES) * look.bulk * (1 + p.lift / 80), (1 / RES) * look.bulk * (1 + p.lift / 80));
     this.shadow.setAlpha(p.alpha);
+    castShadow(this.cast, (1 / RES) * look.bulk, (1 / RES) * look.bulk, 1.5, p.alpha);
 
     // Legs step along the facing direction.
     const stepX = Math.cos(p.face) * 2.2 * p.stepAmp;
@@ -403,6 +411,23 @@ export class HumanoidRig {
     const legSpread = view === "side" ? 1.5 : 3.5 * look.bulk;
     this.legL.setPosition(-legSpread + stepX * s1 + lean.x * 0.3, -7 + stepY * s1 - Math.max(0, s1) * 1.5 * p.stepAmp + p.lift);
     this.legR.setPosition(legSpread - stepX * s1 + lean.x * 0.3, -7 - stepY * s1 - Math.max(0, -s1) * 1.5 * p.stepAmp + p.lift);
+    // Sitting: the body settles, and the legs fold toward the facing (in profile) or
+    // foreshorten toward the camera (front and back).
+    const k = 1 / RES;
+    const sit = p.sit ?? 0;
+    if (sit > 0.01) {
+      const drop = 5 * sit;
+      this.upper.y += drop;
+      const dir = Math.cos(p.face) >= 0 ? 1 : -1;
+      for (const leg of [this.legL, this.legR]) {
+        if (view === "side") leg.setRotation(-dir * 1.45 * sit).setScale(k, k);
+        else leg.setRotation(0).setScale(k, k * (1 - (view === "front" ? 0.5 : 0.62) * sit));
+        leg.y += drop * 0.85;
+      }
+    } else {
+      this.legL.setRotation(0).setScale(k, k);
+      this.legR.setRotation(0).setScale(k, k);
+    }
     for (const im of this.images) im.setAlpha(p.alpha);
 
     this.torso.setPosition(0, -13);
@@ -456,8 +481,14 @@ export class HumanoidRig {
         cape.setPosition(this.upper.x + sideX, this.upper.y - 20);
       }
     }
-    this.upper.removeAll(false);
-    this.upper.add(order);
+    // Re-parenting is not free: only rebuild the stack when the layering actually changed.
+    const list = this.upper.list;
+    let same = list.length === order.length;
+    for (let i = 0; same && i < order.length; i++) same = list[i] === order[i];
+    if (!same) {
+      this.upper.removeAll(false);
+      this.upper.add(order);
+    }
   }
 
   destroy() {
@@ -473,6 +504,7 @@ export class WolfRig {
   private tail: Phaser.GameObjects.Image;
   private legs: Phaser.GameObjects.Image[];
   private shadow: Phaser.GameObjects.Image;
+  private cast: Phaser.GameObjects.Image;
   private flip = false;
   private flashUntil = 0;
   private images: Phaser.GameObjects.Image[];
@@ -481,11 +513,12 @@ export class WolfRig {
     paintWolf(scene, key, fur, dark, belly, eye);
     const k = 1 / RES;
     this.shadow = scene.add.image(0, 0, "shadow").setScale(k * 1.3, k);
+    this.cast = scene.add.image(0, 0, "shadow").setVisible(false);
     this.legs = [0, 1, 2, 3].map(() => scene.add.image(0, 0, `${key}:leg`).setOrigin(0.5, 0).setScale(k));
     this.body = scene.add.image(0, -12, `${key}:body`).setScale(k);
     this.head = scene.add.image(10, -17, `${key}:head`).setOrigin(0.35, 0.55).setScale(k);
     this.tail = scene.add.image(-12, -15, `${key}:tail`).setOrigin(0.95, 0.5).setScale(k);
-    this.root = scene.add.container(0, 0, [this.shadow, this.legs[0], this.legs[2], this.tail, this.body, this.legs[1], this.legs[3], this.head]);
+    this.root = scene.add.container(0, 0, [this.cast, this.shadow, this.legs[0], this.legs[2], this.tail, this.body, this.legs[1], this.legs[3], this.head]);
     this.root.setScale(scale);
     this.images = [...this.legs, this.body, this.head, this.tail];
   }
@@ -557,6 +590,7 @@ export class WolfRig {
       leg.setPosition((legX[i] * stretch + swing) * sx, -6 + lift * 0.7).setRotation(anim === "pounce" && inAct ? 0.6 * sx * (i > 1 ? -1 : 1) : 0);
     });
     this.shadow.setScale((1 / RES) * 1.3 * (1 + lift / 60), (1 / RES) * (1 + lift / 60));
+    castShadow(this.cast, (1 / RES) * 1.3, 1 / RES, 0.8, alpha);
     for (const im of this.images) im.setAlpha(alpha);
     if (anim === "dead") {
       this.root.setAlpha(alpha);

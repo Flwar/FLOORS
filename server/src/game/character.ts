@@ -1,8 +1,18 @@
 import {
-  baseHp, baseStamina, cannotLearn, combatBonus, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemMasteryLevel, itemStats, learnedSkills, makeItem, masteryProgress,
-  MAX_LEVEL, Mod, NO_SKILL, QUEST_SKILL_POINTS, skillPointsTotal, treeMods, treeNode, TREES, WEAPON_ARTS, WEAPONS, xpToNext,
-  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type WeaponKey,
-} from "@floors/shared";
+  baseHp, baseStamina, combatBonus, DEFAULT_WEAPON_ART, EQUIP_SLOTS, itemBase, itemMasteryLevel, itemStats, knownIndices, makeItem, masteryProgress,
+  MAX_LEVEL, Mod, NO_SKILL, scrollSkill, setsWorn, skillEntry, skillMods, WEAPON_ARTS, WEAPONS, xpToNext,
+  type EquipSlot, type Item, type ItemEffect, type PlayerSettings, type SkillEntry, type WeaponKey, drinkById, type DrinkDef } from "@floors/shared";
+
+/** Main-story quests that used to award a skill point (for converting old characters). */
+const OLD_QUEST_POINTS = ["q_welcome", "q_grakk", "q_undercroft", "q_keeper", "f2_causeway", "f2_storm", "f2_spire"];
+/** Marks paid for each skill point a character had not spent when the skill tree was retired. */
+const MARKS_PER_POINT = 3;
+/**
+ * Bump to reset everyone's skills once: each character goes back to knowing only Whirlwind
+ * the next time they load, and every skill they lose is paid back in Marks.
+ * (2 = the reset after the skill tree became skill scrolls.)
+ */
+export const SKILLS_VERSION = 2;
 import type { Player } from "../state.ts";
 
 export const INV_SIZE = 24;
@@ -12,11 +22,23 @@ export interface QuestState {
   stage: number;
   progress: number;
   done?: boolean;
+  /** When it was finished (missions go back on the board after a while). */
+  at?: number;
 }
 
 /** Everything persisted for a character. */
 export interface CharacterData {
   version: 1;
+  /** When a Floor Boss trophy will carry you again (Date.now() time). */
+  relicAt?: number;
+  /** The drink you last had at a bar, and when it wears off (Date.now() time). */
+  drink?: { id: string; until: number };
+  /** Hunter's Lore: kills of each kind of enemy. */
+  hunts?: Record<string, number>;
+  /** Rested: bonus experience still to be paid out (kills pay double until it's spent). */
+  rested?: number;
+  /** When (and whether in a town) you last left, to fill up rested experience. */
+  away?: { at: number; town: boolean };
   name: string;
   hue: number;
   level: number;
@@ -28,13 +50,19 @@ export interface CharacterData {
   equipment: Partial<Record<EquipSlot, Item>>;
   /** Legacy (per weapon type); mastery now lives on each weapon item. */
   mastery: Partial<Record<WeaponKey, number>>;
-  /** Legacy perk picks; they became General skill-tree nodes. */
+  /** Legacy perk picks (converted into known skills). */
   perks: string[];
-  /** Learned skill-tree nodes. */
+  /** Legacy skill tree (converted into known skills and Marks). */
   tree?: string[];
-  /** Skill points from quests (levels give the rest). */
   bonusPoints?: number;
-  /** Equipped skills per weapon type: skill-pool indices, NO_SKILL for empty. */
+  treeVersion?: number;
+  /** Skills learned from scrolls (weapon skills, universal skills and passives), by id. */
+  skills?: string[];
+  /** Marks: earned from missions and quests, spent on skill scrolls at the Archivists. */
+  marks?: number;
+  /** Which skills reset this character has had (see SKILLS_VERSION). */
+  skillsVersion?: number;
+  /** Equipped skills per weapon type: loadout indices (see skillMove), NO_SKILL for empty. */
   loadout?: Partial<Record<WeaponKey, [number, number]>>;
   quests: Record<string, QuestState>;
   discovered: string[];
@@ -69,6 +97,10 @@ export function newCharacter(name: string): CharacterData {
     floor: 1,
     stats: { kills: 0, deaths: 0, parries: 0, perfects: 0, playMs: 0 },
     achievements: [],
+    skills: ["sword.whirlwind"],
+    marks: 0,
+    skillsVersion: SKILLS_VERSION,
+    loadout: { sword: [0, NO_SKILL] },
   };
   c.equipment.weapon = makeItem("sword_rusty", 0);
   c.equipment.armor = makeItem("armor_padded", 0);
@@ -98,6 +130,8 @@ export class Character {
   derived!: Derived;
   dirty = true;
   unbrokenReadyAt = 0;
+  /** Set when loading converted an old skill tree into scrolls: the room tells the player once. */
+  skillbookNews?: { lost: number; marks: number };
   /** Set when a gate sends the character to another floor: where they will appear. */
   travelTo?: { room: string; via: string; pos?: CharacterData["pos"] };
 
@@ -116,67 +150,95 @@ export class Character {
     d.stats ??= { kills: 0, deaths: 0, parries: 0, perfects: 0, playMs: 0 };
     d.achievements ??= [];
     if (!d.equipment.weapon) d.equipment.weapon = makeItem("sword_rusty", 0);
-    // Skill tree migration: old perks become General nodes, quest points are credited,
-    // and the old per-type mastery moves onto the weapon in hand.
-    if (!d.tree) {
-      d.tree = d.perks.filter((id) => treeNode(id));
-      d.bonusPoints = Object.entries(QUEST_SKILL_POINTS).reduce((n, [id, pts]) => n + (d.quests[id]?.done ? pts : 0), 0);
+    // The oldest characters kept mastery per weapon type: it moves onto the weapon in hand.
+    if (!d.tree && !d.skills) {
       const w = d.equipment.weapon!;
       const wk = itemBase(w.key)?.weapon;
       if (wk && w.mxp === undefined && d.mastery[wk]) w.mxp = d.mastery[wk];
     }
-    d.bonusPoints ??= 0;
+    // Skill scrolls replaced the skill tree, and everyone's skills were reset once
+    // (SKILLS_VERSION): back to Whirlwind, with what they had paid back in Marks.
+    let refund = 0;
+    if (!d.skills) {
+      // Still on the old skill tree: every point it ever had (spent or not) comes back as Marks.
+      const learned = [...new Set([...(d.tree ?? []), ...(d.perks ?? [])])].filter((id) => skillEntry(id) && id !== "sword.whirlwind");
+      const points = d.level + (d.tree ? d.bonusPoints ?? 0 : OLD_QUEST_POINTS.filter((id) => d.quests[id]?.done).length);
+      refund = points * MARKS_PER_POINT;
+      d.skills = ["sword.whirlwind"];
+      d.loadout = { sword: [0, NO_SKILL] };
+      d.marks = (d.marks ?? 0) + refund;
+      d.skillsVersion = SKILLS_VERSION;
+      this.skillbookNews = { lost: learned.length, marks: refund };
+    }
+    // Everyone's skills were reset: back to Whirlwind, with every lost skill paid back in Marks.
+    if ((d.skillsVersion ?? 1) < SKILLS_VERSION) {
+      const lost = d.skills.filter((id) => id !== "sword.whirlwind").length;
+      const marks = lost * MARKS_PER_POINT;
+      d.skills = ["sword.whirlwind"];
+      d.loadout = { sword: [0, NO_SKILL] };
+      d.marks = (d.marks ?? 0) + marks;
+      d.skillsVersion = SKILLS_VERSION;
+      refund += marks;
+      if (lost || refund) this.skillbookNews = { lost, marks: refund };
+    }
+    delete d.tree;
+    delete d.bonusPoints;
+    delete d.treeVersion;
+    d.marks ??= 0;
     d.loadout ??= {};
+    // Durability was removed: drop the old field from saved gear.
+    for (const it of [...Object.values(d.equipment), ...d.inventory, ...d.bank]) if (it && "dur" in it) delete (it as { dur?: number }).dur;
   }
 
   get weaponKey(): WeaponKey {
     return itemBase(this.data.equipment.weapon!.key)?.weapon ?? "sword";
   }
 
+  /** Knows this skill or passive (learned from its scroll). */
+  knows(id: string) {
+    return this.data.skills!.includes(id);
+  }
+
   hasPerk(id: string) {
-    return this.data.tree!.includes(id);
+    return this.knows(id);
   }
 
   // ---------------------------------------------------------------------------
-  // Skill tree
+  // Skills
 
-  skillPoints() {
-    const total = skillPointsTotal(this.data.level, this.data.bonusPoints ?? 0);
-    const used = this.data.tree!.filter((id) => treeNode(id)).length;
-    return { total, left: Math.max(0, total - used) };
-  }
-
-  learn(id: string): string | undefined {
+  /**
+   * Read a skill scroll from the pack: learn its skill and use the scroll up. A new skill
+   * goes straight into an empty slot (the weapon in hand first).
+   */
+  readScroll(uid: string): { err?: string; entry?: SkillEntry } {
     const d = this.data;
-    const err = cannotLearn(id, d.tree!, d.level, this.skillPoints().left);
-    if (err) return err;
-    d.tree!.push(id);
-    // A new skill goes straight into an empty slot.
-    const n = treeNode(id)!;
-    if (n.kind === "skill" && n.tree !== "general") {
-      const lo = this.loadoutFor(n.tree);
-      const empty = lo.indexOf(NO_SKILL);
-      if (empty >= 0) lo[empty] = n.skill!;
+    const i = this.findSlot(uid);
+    const it = i >= 0 ? d.inventory[i] : null;
+    const e = it ? scrollSkill(it.key) : undefined;
+    if (!it || !e) return { err: "That isn't a skill scroll." };
+    if (this.knows(e.id)) return { err: `You already know ${e.name}. Sell the scroll or trade it.` };
+    it.qty--;
+    if (it.qty <= 0) d.inventory[i] = null;
+    d.skills!.push(e.id);
+    if (e.kind === "skill") {
+      const order: WeaponKey[] = e.weapon ? [e.weapon] : [this.weaponKey];
+      for (const wk of order) {
+        const lo = this.loadoutFor(wk);
+        const empty = lo.indexOf(NO_SKILL);
+        if (empty >= 0) {
+          lo[empty] = e.index!;
+          break;
+        }
+      }
     }
     this.recompute();
-    return undefined;
-  }
-
-  /** Unlearn everything (for a fee), refunding every point. */
-  resetTree() {
-    this.data.tree = [];
-    this.data.loadout = {};
-    this.recompute();
-  }
-
-  resetCost() {
-    return 20 * this.data.level;
+    return { entry: e };
   }
 
   /** The two equipped skills for a weapon type, cleaned of anything not learned. */
   loadoutFor(wk: WeaponKey): [number, number] {
     const d = this.data;
-    const known = learnedSkills(wk, d.tree!);
+    const known = knownIndices(wk, d.skills!);
     let lo = d.loadout![wk] ?? [NO_SKILL, NO_SKILL];
     lo = lo.map((i) => (known.includes(i) ? i : NO_SKILL)) as [number, number];
     if (lo[0] !== NO_SKILL && lo[0] === lo[1]) lo[1] = NO_SKILL;
@@ -187,7 +249,7 @@ export class Character {
   equipSkill(wk: WeaponKey, slot: number, index: number): string | undefined {
     if (slot !== 0 && slot !== 1) return "No such slot.";
     const lo = this.loadoutFor(wk);
-    if (index !== NO_SKILL && !learnedSkills(wk, this.data.tree!).includes(index)) return "Learn that skill in the skill tree first.";
+    if (index !== NO_SKILL && !knownIndices(wk, this.data.skills!).includes(index)) return "You haven't learned that skill. Read its scroll first.";
     const other = 1 - slot;
     if (index !== NO_SKILL && lo[other] === index) lo[other] = lo[slot];
     lo[slot] = index;
@@ -215,14 +277,34 @@ export class Character {
     }
     const wk = this.weaponKey;
     const mlevel = itemMasteryLevel(d.equipment.weapon?.mxp);
-    let mods = treeMods(wk, d.tree!);
+    let mods = skillMods(wk, d.skills!, mlevel);
     if (effects.has("wideParry")) mods |= Mod.WideParry;
     if (effects.has("lightDodge")) mods |= Mod.LightDodge;
     if (effects.has("longDodge")) mods |= Mod.LongDodge;
+    // Gear sets: two pieces of one set add health and defense; all three add its power.
+    for (const { set, count } of setsWorn([d.equipment.weapon?.key, d.equipment.armor?.key, d.equipment.helm?.key])) {
+      if (count >= 2) {
+        hp += set.two.hp;
+        defense += set.two.defense;
+      }
+      if (count >= 3) effects.add(set.three.effect);
+    }
     if (this.hasPerk("ironSkin")) defense += 12;
+    if (this.hasPerk("scaleguard")) defense += 20;
+    if (this.hasPerk("glacialHide")) defense += 25;
     if (this.hasPerk("deepLungs")) stamina += 15;
+    if (this.hasPerk("tidalGrace")) stamina += 20;
+    if (this.hasPerk("clockworkHeart")) stamina += 25;
+    // A drink at the bar: one thing, done well, for a while.
+    const drink = this.drink();
+    if (drink?.stamina) stamina += drink.stamina;
+    if (drink?.dmgPct) power *= 1 + drink.dmgPct;
     let hpMax = baseHp(d.level) + hp;
+    if (drink?.hpPct) hpMax *= 1 + drink.hpPct;
     if (this.hasPerk("wardensGrace")) hpMax = Math.round(hpMax * 1.1);
+    if (this.hasPerk("glacialHide")) hpMax = Math.round(hpMax * 1.08);
+    if (this.hasPerk("clockworkHeart")) hpMax = Math.round(hpMax * 1.08);
+    if (this.hasPerk("oasisHeart")) hpMax = Math.round(hpMax * 1.1);
     this.derived = {
       atkMul: (power / 100) * (1 + (d.level - 1) * 0.04),
       defense,
@@ -232,9 +314,24 @@ export class Character {
       effects,
       weaponKey: wk,
       mastery: mlevel,
-      mdmg: combatBonus(wk, d.tree!, mlevel),
+      mdmg: combatBonus(wk, mlevel),
     };
     this.dirty = true;
+  }
+
+  /** The drink still doing you good, if any. */
+  drink(): DrinkDef | undefined {
+    const m = this.data.drink;
+    return m && m.until > Date.now() ? drinkById(m.id) : undefined;
+  }
+
+  /** A drink has worn off: forget it, and lose what it gave. Returns true if one did. */
+  expireDrink(): boolean {
+    const m = this.data.drink;
+    if (!m || m.until > Date.now()) return false;
+    this.data.drink = undefined;
+    this.recompute();
+    return true;
   }
 
   /** Push derived stats and visible gear onto the synced player. */
@@ -433,9 +530,8 @@ export class Character {
       gold: d.gold,
       inventory: d.inventory,
       equipment: d.equipment,
-      tree: d.tree,
-      points: this.skillPoints(),
-      resetCost: this.resetCost(),
+      skills: d.skills,
+      marks: d.marks ?? 0,
       loadout: Object.fromEntries(WEAPONS.map((w) => [w.key, this.loadoutFor(w.key)])),
       weaponMastery: masteryProgress(this.data.equipment.weapon?.mxp ?? 0),
       quests: d.quests,
@@ -444,7 +540,11 @@ export class Character {
       floor: d.floor,
       stats: d.stats,
       achievements: d.achievements,
-      derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax },
+      relicAt: d.relicAt && d.relicAt > Date.now() ? d.relicAt : undefined,
+      drink: this.drink() ? d.drink : undefined,
+      hunts: d.hunts ?? {},
+      rested: d.rested || undefined,
+      derived: { atk: Math.round(this.derived.atkMul * 100), defense: Math.round(this.derived.defense), hpMax: this.derived.hpMax, staminaMax: this.derived.staminaMax, effects: [...this.derived.effects] },
       ...extra,
     };
   }

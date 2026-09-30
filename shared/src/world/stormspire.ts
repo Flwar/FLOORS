@@ -33,6 +33,7 @@ export function buildStormspire(): WorldMap & { gates: GateDef[]; traps: { x: nu
   const H = STORMSPIRE_H;
   const m = new WorldMap(W, H) as WorldMap & { gates: GateDef[]; traps: { x: number; y: number; row: number }[] };
   m.name = "The Stormspire";
+  m.theme = "storm";
   m.gates = [];
   m.traps = [];
   m.fill(0, 0, W, H, Tile.Void);
@@ -130,7 +131,7 @@ export function buildStormspire(): WorldMap & { gates: GateDef[]; traps: { x: nu
   obj({ id: "lever-2", kind: "lever", tx: 52, ty: 68, name: "East Conduit" });
   obj({ id: "conduit-tablet", kind: "lore", tx: 40, ty: 73, name: "Conduit Plate", text: "\"Wake all three conduits and the storm will open the way. The storm does not like to be woken.\"" });
   obj({ id: "lore-ante", kind: "lore", tx: 36, ty: 29, name: "Vaelra's Vow", text: "\"I am the storm that keeps the stair. Stand in my eye and I will teach you to fear the calm — and to run when the wind turns.\"" });
-  obj({ id: "ascent", kind: "gate", tx: 40, ty: 3, dest: "floor3", name: "The Sealed Stair", text: "The stair climbs into the clouds and stops. Floor 3 is not open yet." });
+  obj({ id: "ascent", kind: "gate", tx: 40, ty: 3, dest: "floor3", name: "The Ember Stair", text: "The stair climbs into a burning sky. It will not open while Vaelra lives." });
 
   m.spawns.push({ id: "warden", x: px(40), y: px(42), radius: 0, enemies: ["stormwarden"], respawn: 0, elite: 0, level: 11 });
   m.spawns.push({ id: "boss", x: px(40), y: px(9), radius: 0, enemies: ["vaelra"], respawn: 0, elite: 0, level: 12 });

@@ -11,6 +11,8 @@ import {
 
 const endpoint = process.env.SERVER ?? `ws://localhost:${SERVER_PORT}`;
 const map = buildFloor1();
+// Guests live in server memory: a fixed name would carry the last run's party into this one.
+const BUDDY = `Buddy${Math.floor(Math.random() * 1e5)}`;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 const check = (name: string, ok: boolean, detail: string) => {
@@ -280,8 +282,8 @@ async function main() {
 
   // --- Party -----------------------------------------------------------------------------
   const b = new Bot(new Client(endpoint));
-  await b.join("world", { guest: "Buddy" });
-  a2.room.send("party:invite", "Buddy");
+  await b.join("world", { guest: BUDDY });
+  a2.room.send("party:invite", BUDDY);
   const inv = await b.next("partyInvite");
   b.room.send("party:accept");
   const pa = await a2.next("party", (m) => m && m.members?.length === 2);
@@ -309,7 +311,7 @@ async function main() {
     await a2.room.leave(true);
     await b.room.leave(true);
     await a2.join("dungeon", { token }, ta.roomId);
-    await b.join("dungeon", { guest: "Buddy" }, tb.roomId);
+    await b.join("dungeon", { guest: BUDDY }, tb.roomId);
     await wait(500);
     check("party is together in the Undercroft", a2.room.state.players.size === 2 && a2.room.roomId === b.room.roomId, `${a2.room.state.players.size} players in ${a2.room.roomId}`);
   }

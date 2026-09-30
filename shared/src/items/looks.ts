@@ -2,10 +2,10 @@
  * Visible equipment styles. Each armour, helm and weapon names one of these, and the
  * index is synced on the player so everyone sees what you wear.
  */
-export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave"] as const;
+export const ARMOR_STYLES = ["clothes", "padded", "leather", "ranger", "chain", "robes", "plate", "warden", "dawn", "scale", "brigandine", "shadow", "arcanist", "gilded", "skyguard", "stormweave", "hide", "ringmail", "templar", "windrunner", "sunforged", "mystic", "dragonscale", "drakehide", "emberweave", "rimeplate", "furmantle", "frostweave", "eclipse", "shadowsilk", "voidweave", "tideplate", "sharkskin", "seasilk", "brassplate", "tinkercoat", "aetherweave", "solarplate", "nomadwraps", "sunweave"] as const;
 export type ArmorStyle = (typeof ARMOR_STYLES)[number];
 
-export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown"] as const;
+export const HELM_STYLES = ["none", "cap", "hood", "iron", "circlet", "horned", "keeper", "bandana", "wizard", "kettle", "greathelm", "winged", "stormcrown", "coif", "templar", "suncrown", "dragonhelm", "embercirclet", "rimecrown", "furhood", "eclipsecrown", "shadowveil", "coralcrown", "divers", "brassvisor", "goggles", "nemes", "desertveil"] as const;
 export type HelmStyle = (typeof HELM_STYLES)[number];
 
 export const WEAPON_ARTS = [
@@ -22,6 +22,24 @@ export const WEAPON_ARTS = [
   "st_frost", "st_moon",
   // Floor 2: the Stormglass set.
   "sword_storm", "gs_storm", "dg_storm", "sp_storm", "st_storm",
+  // The third wave.
+  "sword_bronze", "sword_falchion", "sword_royal",
+  "gs_bone", "gs_moon", "gs_gilded",
+  "dg_bone", "dg_duel", "dg_gilded",
+  "sp_partisan", "sp_halberd", "sp_sun",
+  "st_bone", "st_crystal", "st_sun",
+  // Floor 3: the Dragonscale set.
+  "sword_dragon", "gs_dragon", "dg_dragon", "sp_dragon", "st_dragon",
+  // Floor 4: the Frostforged set.
+  "sword_rime", "gs_rime", "dg_rime", "sp_rime", "st_rime",
+  // Floor 5: the Eclipse set.
+  "sword_void", "gs_void", "dg_void", "sp_void", "st_void",
+  // Floor 6: the Tidecaller set.
+  "sword_tide", "gs_tide", "dg_tide", "sp_tide", "st_tide",
+  // Floor 7: the Brassbound set.
+  "sword_brass", "gs_brass", "dg_brass", "sp_brass", "st_brass",
+  // Floor 8: the Solar set.
+  "sword_solar", "gs_solar", "dg_solar", "sp_solar", "st_solar",
 ] as const;
 export type WeaponArtKey = (typeof WEAPON_ARTS)[number];
 

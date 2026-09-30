@@ -19,6 +19,8 @@ export class Lighting {
   private glow: Phaser.GameObjects.Graphics;
   private darkness = 0;
   target = 0;
+  /** The colour of the dark: cave black, night blue, or the warm dim of dusk. */
+  color = 0x05070c;
 
   constructor(private scene: Phaser.Scene) {
     if (!scene.textures.exists("lightBrush")) {
@@ -55,7 +57,7 @@ export class Lighting {
     if (this.rt.width !== w || this.rt.height !== h) this.rt.resize(w, h);
     this.rt.setPosition(W / 2 - W / (2 * z) - 2, H / 2 - H / (2 * z) - 2);
     this.rt.clear();
-    this.rt.fill(0x05070c, this.darkness);
+    this.rt.fill(this.color, this.darkness);
     const t = performance.now();
     for (const l of lights) {
       // In overlay pixels (= world units): world position relative to the view's top-left.
@@ -66,7 +68,7 @@ export class Lighting {
       this.brush.setDisplaySize(r * 2, r * 2);
       this.rt.erase(this.brush, sx, sy);
       if (l.color) {
-        this.glow.fillStyle(l.color, 0.08 * this.darkness);
+        this.glow.fillStyle(l.color, 0.14 * this.darkness);
         this.glow.fillCircle(l.x, l.y, l.r * 0.6);
       }
     }

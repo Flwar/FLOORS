@@ -52,6 +52,15 @@ export class Hud {
     this.set("lv", level, () => ($("#level").textContent = String(level)));
   }
 
+  /** The drink doing you good (name, colour, minutes left), or nothing. */
+  drink(m: { name: string; color: string; min: number } | undefined) {
+    this.set("drink", m ? `${m.name}|${m.min}` : "", () => {
+      const box = $("#drink");
+      box.hidden = !m;
+      if (m) box.innerHTML = `<i style="background:${m.color}"></i>${m.name} · ${m.min} min`;
+    });
+  }
+
   /** Clicking an empty skill slot (to open the skill tree). */
   onEmptySkillSlot?: () => void;
 
@@ -138,6 +147,13 @@ export class Hud {
       $("#boss .boss-trail").style.transform = `scaleX(${f})`;
     });
     this.set("bossPosture", posture, () => ($("#boss .posture-fill").style.transform = `scaleX(${posture / 255})`));
+  }
+
+  /** The tower's clock: a sun or a moon, and the time (or nothing, underground). */
+  clock(text: string | undefined, night: boolean) {
+    this.set("clock", text ? `${text}|${night}` : "", () => {
+      $("#clock").innerHTML = text ? `<i class="${night ? "moon" : "sun"}"></i>${text} · ` : "";
+    });
   }
 
   online(count: number) {

@@ -62,7 +62,6 @@ button.wide { width: 100%; margin-top: 6px; }
 .slot-cell.r4 { box-shadow: inset 0 0 0 2px #f2a93b, 0 0 12px rgba(242, 169, 59, 0.6); }
 .slot-cell .qty, .slot-cell .plus { position: absolute; bottom: 1px; right: 4px; font-size: 11px; text-shadow: 0 1px 0 #000; }
 .slot-cell .plus { top: 1px; bottom: auto; color: #9fe0a6; }
-.slot-cell .broken { position: absolute; top: 0; left: 4px; color: #ff6b5a; font-weight: bold; }
 .slot-cell .slot-label { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; color: rgba(244, 236, 216, 0.3); text-transform: capitalize; }
 .bank-gold { display: flex; align-items: center; gap: 6px; font-size: 13px; flex-wrap: wrap; }
 .bank-gold img { width: 22px; }
@@ -73,6 +72,8 @@ button.wide { width: 100%; margin-top: 6px; }
 .tt-kind { color: var(--ink-dim); font-size: 12px; margin-bottom: 4px; }
 .tt-effect { color: #ffd98a; margin-top: 4px; }
 .tt-desc { color: #d8cfbc; font-style: italic; margin-top: 4px; }
+.tt-set { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 12px; }
+.tt-setname { font-family: Georgia, serif; color: #c9b8ff; font-size: 13px; }
 .menu { position: fixed; z-index: 45; display: flex; flex-direction: column; gap: 3px; padding: 6px; background: rgba(10, 9, 8, 0.96); border-radius: 8px; }
 
 .char-top { display: flex; flex-direction: column; gap: 2px; }
@@ -192,7 +193,8 @@ button.small { padding: 2px 8px; font-size: 11px; min-height: 0; }
 .toast.good { color: #9fe0a6; }
 .toast.fade { opacity: 0; }
 .xpbar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(0, 0, 0, 0.5); }
-.xpbar .fill { height: 100%; background: linear-gradient(90deg, #7fb3ff, #b77af2); transform-origin: left; transform: scaleX(0); transition: transform 0.4s; }
+.xpbar .rested { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(127, 179, 255, 0.35); transform-origin: left; transform: scaleX(0); transition: transform 0.4s; }
+.xpbar .fill { position: relative; height: 100%; background: linear-gradient(90deg, #7fb3ff, #b77af2); transform-origin: left; transform: scaleX(0); transition: transform 0.4s; }
 #prompt-f { position: fixed; z-index: 15; transform: translate(-50%, -100%); padding: 4px 10px; border-radius: 6px; background: rgba(10, 9, 8, 0.82);
   font-size: 13px; pointer-events: none; white-space: nowrap; box-shadow: inset 0 0 0 1px rgba(232, 197, 90, 0.4); color: var(--ink); }
 #prompt-f b { color: var(--gold); }
@@ -218,3 +220,38 @@ button.small { padding: 2px 8px; font-size: 11px; min-height: 0; }
 .trade-gold { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: #f2c94c; }
 .trade-gold img { width: 22px; }
 .trade-gold input { width: 90px; font: inherit; color: var(--ink); background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(232, 197, 90, 0.35); border-radius: 6px; padding: 4px 6px; }
+
+/* The minimap: a round chart window in the top-left corner. */
+#minimap { position: fixed; top: 12px; left: 12px; width: 168px; height: 168px; z-index: 5; pointer-events: none; border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 3px #1d1a17, 0 0 0 6px #c9a24a, 0 0 0 8px #1d1a17; }
+#minimap.hidden { display: none; }
+#minimap canvas { width: 168px; height: 168px; border-radius: 50%; display: block; }
+#minimap .mm-n { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font: bold 12px Georgia, serif; color: #ffe1a0;
+  background: #1d1a17; border: 2px solid #c9a24a; border-radius: 50%; width: 20px; height: 20px; line-height: 17px; text-align: center; }
+@media (max-width: 700px) { #minimap { width: 112px; height: 112px; } #minimap canvas { width: 112px; height: 112px; } }
+
+/* The First Gate's floor picker. */
+.relic-menu { min-width: 220px; }
+.relic-menu .tt-dim { padding: 4px 6px 6px; }
+
+/* The inn's menu. */
+.dialog .drinks { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.dialog .drink-row { display: grid; grid-template-columns: 10px auto 1fr; align-items: center; gap: 8px; text-align: left; }
+.dialog .drink-row i { width: 10px; height: 10px; border-radius: 50%; }
+.dialog .drink-row span { opacity: 0.8; font-size: 0.92em; }
+.dialog .drink-row.active { outline: 1px solid #e8c55a; }
+
+/* The smith's work on one item. */
+.smith-menu { min-width: 300px; max-width: 330px; }
+.smith-menu > .tt-dim { padding: 4px 8px 6px; }
+.smith-menu button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.smith-menu button span { font-size: 0.85em; opacity: 0.8; }
+.smith-menu button.dim { opacity: 0.55; }
+
+/* Hunter's Lore. */
+.hunts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 6px; }
+.hunt { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 6px; font-size: 0.92em; }
+.hunt .m-bar { grid-column: 1 / -1; }
+.hunt .h-rank { color: #e8c55a; font-size: 0.85em; }
+.hunt .h-rank.r3 { color: #ffb347; }
+.hunt .h-n { opacity: 0.7; font-size: 0.85em; }

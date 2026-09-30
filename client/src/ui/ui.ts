@@ -1,7 +1,7 @@
 import {
   ACHIEVEMENTS, BIND_ACTIONS, BIND_LABELS, DEFAULT_WEAPON_ART, EQUIP_SLOTS, isBindableCode, keyLabel, ZOOM_MAX, ZOOM_MIN, type BindAction, itemBase, itemName, itemStats, itemMasteryLevel, MAX_LEVEL, questDef, QUESTS, RARITY_COLORS,
-  RARITY_NAMES, repairCost, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
-  masteryProgress, weaponMasteryDamage,
+  RARITY_NAMES, roomLabel, scrollSkill, SCROLL_SOURCES, sellPrice, upgradeCost, WEAPONS, type EquipSlot, type Item, type WeaponKey,
+  masteryProgress, weaponMasteryDamage, gearSetOf, relicOf, relicPower, isDungeonRoom, TOWER, DRINKS, DRINK_MS, salvageYield, temperCost, ENEMIES, HUNT_BONUS, HUNT_RANKS, HUNT_TITLES, huntRank,
 } from "@floors/shared";
 import type { Room } from "@colyseus/sdk";
 import { sfx } from "../audio/sfx.ts";
@@ -25,10 +25,10 @@ export interface InvView {
   gold: number;
   inventory: (Item | null)[];
   equipment: Partial<Record<EquipSlot, Item>>;
-  /** Learned skill-tree nodes. */
-  tree: string[];
-  points: { total: number; left: number };
-  resetCost: number;
+  /** Skills learned from scrolls (weapon skills, universal skills and passives). */
+  skills: string[];
+  /** Marks: earned from missions and quests, spent on scrolls at the Archivists. */
+  marks: number;
   loadout: Record<WeaponKey, [number, number]>;
   /** Mastery of the weapon in hand. */
   weaponMastery: { level: number; into: number; need: number };
@@ -41,6 +41,14 @@ export interface InvView {
   stats: { kills: number; deaths: number; parries: number; perfects: number };
   achievements: string[];
   derived: { atk: number; defense: number; hpMax: number; staminaMax: number };
+  /** When a Floor Boss trophy will carry you again. */
+  relicAt?: number;
+  /** The drink doing you good, and when it wears off. */
+  drink?: { id: string; until: number };
+  /** Hunter's Lore: kills of each kind of enemy. */
+  hunts?: Record<string, number>;
+  /** Rested experience still to be paid out (kills pay double). */
+  rested?: number;
 }
 
 export interface DialogMsg {
@@ -51,7 +59,9 @@ export interface DialogMsg {
   offers: { id: string; name: string; pitch: string; main: boolean }[];
   done: { id: string; name: string; thanks: string }[];
   services: string[];
-  shop?: { key: string; price: number; rarity?: number }[];
+  /** What a drink costs at this bar. */
+  drinkPrice?: number;
+  shop?: { key: string; price: number; rarity?: number; marks?: number }[];
 }
 
 type Mode = "none" | "shop" | "smith" | "bank" | "sell" | "trade";
@@ -87,10 +97,10 @@ export class GameUI {
   private tooltip = el(`<div class="tooltip hidden"></div>`);
   private toasts = el(`<div class="toasts"></div>`);
   private chatLog = el(`<div class="chat-log"></div>`);
-  private chatInput = el(`<input class="chat-input hidden" maxlength="160" placeholder="Say something… (/p party, /w world)">`) as HTMLInputElement;
+  private chatInput = el(`<input class="chat-input hidden" maxlength="160" placeholder="Say something… (/p party, /w world, /wave /dance /sit)">`) as HTMLInputElement;
   private partyEl = el(`<div class="party-frames"></div>`);
   private trackerEl = el(`<div class="tracker"></div>`);
-  private xpBar = el(`<div class="xpbar"><div class="fill"></div></div>`);
+  private xpBar = el(`<div class="xpbar"><div class="rested"></div><div class="fill"></div></div>`);
   onBlockChange?: (blocked: boolean) => void;
   onMap?: () => void;
   mapRender?: (canvas: HTMLCanvasElement) => void;
@@ -99,6 +109,7 @@ export class GameUI {
 
   constructor(private getRoom: () => Room | undefined) {
     this.root.append(this.tooltip, this.toasts, this.partyEl, this.trackerEl, this.xpBar);
+    window.addEventListener("pointerdown", (e) => (this.lastPointer = { x: e.clientX, y: e.clientY }), true);
     this.trackerEl.addEventListener("click", () => this.toggle("quests"));
     const chat = el(`<div class="chat"></div>`);
     chat.append(this.chatLog, this.chatInput);
@@ -139,7 +150,10 @@ export class GameUI {
       return;
     }
     if (e.code === "Escape") {
-      if (this.open.size) this.closeAll();
+      // A context menu (item, smith, First Gate) closes first.
+      const menu = this.root.querySelector(".menu");
+      if (menu) menu.remove();
+      else if (this.open.size) this.closeAll();
       else this.toggle("settings");
       return;
     }
@@ -233,7 +247,7 @@ export class GameUI {
   private slotEl(it: Item | null | undefined, label?: string) {
     const s = el(`<div class="slot-cell${it ? ` r${it.rarity}` : " empty"}">${label && !it ? `<span class="slot-label">${label}</span>` : ""}</div>`);
     if (it) {
-      s.innerHTML = `<img src="${itemIcon(it.key, it.rarity)}" alt="">${it.qty > 1 ? `<span class="qty">${it.qty}</span>` : ""}${it.plus ? `<span class="plus">+${it.plus}</span>` : ""}${it.dur <= 0 ? `<span class="broken">!</span>` : ""}`;
+      s.innerHTML = `<img src="${itemIcon(it.key, it.rarity)}" alt="">${it.qty > 1 ? `<span class="qty">${it.qty}</span>` : ""}${it.plus ? `<span class="plus">+${it.plus}</span>` : ""}`;
       s.addEventListener("mouseenter", (e) => this.showTooltip(it, e.clientX, e.clientY));
       s.addEventListener("mouseleave", () => this.hideTooltip());
     }
@@ -319,15 +333,102 @@ export class GameUI {
       return;
     }
     if (b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm") this.room?.send("equip", it.uid);
+    else if (b.kind === "scroll") this.readScroll(it);
     else if (b.kind === "consumable") this.toast("Drink tonics with R — it takes a moment, so choose it well.");
     else if (b.kind === "key") this.toast(b.desc);
+    else if (relicOf(it.key)) this.useRelic(it);
   }
 
+  /** A Floor Boss trophy: the First Gate lets you pick a floor; the others take you home. */
+  private useRelic(it: Item) {
+    const relic = relicOf(it.key);
+    const inv = this.inv;
+    if (!relic || !inv) return;
+    if (this.adminKind && isDungeonRoom(this.adminKind)) return this.toast("Its pull can't reach you in here. Leave the dungeon first.", "error");
+    const left = (inv.relicAt ?? 0) - Date.now();
+    if (left > 0) return this.toast(`It is still gathering itself: ${Math.ceil(left / 60000)} more minute${left > 60000 ? "s" : ""}.`, "error");
+    if (!relic.gate) {
+      this.room?.send("relic:use", { key: it.key });
+      return;
+    }
+    this.root.querySelector(".menu")?.remove();
+    const m = el(`<div class="menu relic-menu"><div class="tt-dim">Step through the First Gate to…</div></div>`);
+    const top = Math.min(inv.floor, TOWER.length);
+    for (let n = 1; n <= top; n++) {
+      const f = TOWER[n - 1];
+      const btn = el(`<button>Floor ${n} · ${esc(f.town)}</button>`);
+      btn.addEventListener("click", () => {
+        m.remove();
+        this.room?.send("relic:use", { key: it.key, floor: n });
+      });
+      m.append(btn);
+    }
+    const cancel = el(`<button>Cancel</button>`);
+    cancel.addEventListener("click", () => m.remove());
+    m.append(cancel);
+    m.style.left = `${Math.round(window.innerWidth / 2 - 110)}px`;
+    m.style.top = `${Math.round(window.innerHeight / 3)}px`;
+    this.root.append(m);
+  }
+
+  /** A scroll in the pack teaches something new. */
+  unreadScroll() {
+    const inv = this.inv;
+    if (!inv) return false;
+    return inv.inventory.some((it) => {
+      const e = it ? scrollSkill(it.key) : undefined;
+      return !!e && !inv.skills.includes(e.id);
+    });
+  }
+
+  /** Read a skill scroll (learning its skill uses it up). */
+  private readScroll(it: Item) {
+    const e = scrollSkill(it.key);
+    if (!e) return;
+    if (this.inv?.skills.includes(e.id)) return this.toast(`You already know ${e.name}. Sell the scroll or trade it to someone who doesn't.`, "error");
+    this.room?.send("skills:read", it.uid);
+  }
+
+  /** Where the pointer last went down (to open menus next to what was clicked). */
+  private lastPointer = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+  /** The smith's work on one item: upgrade it, temper it up a rarity, or break it down. */
   private upgrade(it: Item) {
-    const cost = upgradeCost(it);
-    if (!cost) return this.toast("That can't be improved further.", "error");
-    const mats = cost.mats.map((m) => `${m.qty} ${itemBase(m.key)?.name}`).join(", ");
-    if (confirm(`Upgrade ${itemName(it)} to +${it.plus + 1} for ${cost.gold} gold and ${mats}?`)) this.room?.send("smith:upgrade", it.uid);
+    this.root.querySelector(".menu")?.remove();
+    const b = itemBase(it.key);
+    const worn = Object.values(this.inv?.equipment ?? {}).some((x) => x?.uid === it.uid);
+    const have = (key: string) => (this.inv?.inventory ?? []).reduce((n, x) => n + (x?.key === key ? x.qty : 0), 0);
+    const m = el(`<div class="menu smith-menu"><div class="tt-dim">${esc(itemName(it))}</div></div>`);
+    const add = (label: string, sub: string, ok: boolean, fn: () => void) => {
+      const btn = el(`<button class="${ok ? "" : "dim"}"><b>${label}</b><span>${sub}</span></button>`);
+      btn.addEventListener("click", () => {
+        m.remove();
+        fn();
+      });
+      m.append(btn);
+    };
+    const up = upgradeCost(it);
+    if (up) {
+      const ok = (this.inv?.gold ?? 0) >= up.gold && up.mats.every((x) => have(x.key) >= x.qty);
+      add(`Upgrade to +${it.plus + 1}`, `${up.gold}g · ${up.mats.map((x) => `${x.qty} ${esc(itemBase(x.key)?.name ?? x.key)} (${have(x.key)})`).join(" · ")}`, ok, () => this.room?.send("smith:upgrade", it.uid));
+    }
+    const tc = temperCost(it);
+    if (tc) {
+      const ok = (this.inv?.gold ?? 0) >= tc.gold && have("mat_essence") >= tc.essence;
+      add(`Temper to <span style="color:${RARITY_COLORS[it.rarity + 1]}">${RARITY_NAMES[it.rarity + 1]}</span>`, `${tc.gold}g · ${tc.essence} Arcane Essence (${have("mat_essence")}) · keeps upgrades and mastery`, ok, () => this.room?.send("smith:temper", it.uid));
+    }
+    const sy = salvageYield(it);
+    if (sy && !worn) {
+      add("Salvage", `Break it down for ${sy.map((x) => `${x.qty} ${esc(itemBase(x.key)?.name ?? x.key)}`).join(" + ")}`, true, () => {
+        if (it.rarity < 2 || confirm(`Break down ${itemName(it)}? It can't be undone.`)) this.room?.send("smith:salvage", it.uid);
+      });
+    }
+    if (!up && !tc && !(sy && !worn)) return this.toast(b?.bound ? "The smith won't touch that." : "There's nothing more the smith can do with that.", "error");
+    add("Cancel", "", true, () => {});
+    m.style.left = `${Math.min(window.innerWidth - 340, this.lastPointer.x + 8)}px`;
+    m.style.top = `${Math.min(window.innerHeight - 220, this.lastPointer.y + 8)}px`;
+    this.root.append(m);
+    setTimeout(() => document.addEventListener("click", () => m.remove(), { once: true }), 0);
   }
 
   private itemMenu(it: Item, x: number, y: number) {
@@ -343,6 +444,8 @@ export class GameUI {
       m.append(btn);
     };
     if (b && (b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm")) add("Equip", () => this.room?.send("equip", it.uid));
+    if (b?.kind === "scroll") add("Read", () => this.readScroll(it));
+    if (relicOf(it.key)) add("Use", () => this.useRelic(it));
     if (!b?.bound) add("Drop", () => confirm(`Drop ${itemName(it)} on the ground?`) && this.room?.send("discard", it.uid));
     add("Cancel", () => {});
     m.style.left = `${x}px`;
@@ -355,14 +458,15 @@ export class GameUI {
 
   /**
    * Item card: rarity header, main stats with a comparison against what you wear now,
-   * weapon mastery, durability, the item's story and what it sells for.
+   * weapon mastery, the item's story and what it sells for.
    */
   private showTooltip(it: Item, x: number, y: number) {
     const b = itemBase(it.key);
     if (!b) return;
     const st = itemStats(it);
     const gear = b.kind === "weapon" || b.kind === "armor" || b.kind === "helm" || b.kind === "charm";
-    const kind = b.kind === "weapon" ? `${WEAPONS.find((w) => w.key === b.weapon)?.name}` : b.kind === "consumable" ? "Tonic" : b.kind === "key" ? "Keepsake" : b.kind[0].toUpperCase() + b.kind.slice(1);
+    const sk = b.kind === "scroll" ? scrollSkill(it.key) : undefined;
+    const kind = b.kind === "weapon" ? `${WEAPONS.find((w) => w.key === b.weapon)?.name}` : b.kind === "consumable" ? "Tonic" : b.kind === "key" ? "Keepsake" : sk ? `Skill scroll · ${sk.kind === "passive" ? "passive" : sk.weapon ? WEAPONS.find((w) => w.key === sk.weapon)!.name.toLowerCase() : "every weapon"}` : b.kind[0].toUpperCase() + b.kind.slice(1);
     // Compare against the item in the same slot (unless this is that item).
     const worn = gear ? this.inv?.equipment[b.kind as EquipSlot] : undefined;
     const cmp = worn && worn.uid !== it.uid ? itemStats(worn) : undefined;
@@ -375,7 +479,7 @@ export class GameUI {
       `<div class="tt-stat">${iconImg(icon, 16)}<b>${sign && v > 0 ? "+" : ""}${Math.round(v)}</b><span>${label}</span>${delta(v, w)}</div>`;
     const lines: string[] = [];
     lines.push(`<div class="tt-head r${it.rarity}"><img src="${itemIcon(it.key, it.rarity)}" alt=""><div><div class="tt-name" style="color:${RARITY_COLORS[it.rarity]}">${esc(itemName(it))}</div>
-      <div class="tt-kind">${gear ? RARITY_NAMES[it.rarity] + " " : ""}${kind}${worn?.uid === it.uid ? " · <i>equipped</i>" : ""}</div></div></div>`);
+      <div class="tt-kind">${gear || sk ? RARITY_NAMES[it.rarity] + " " : ""}${kind}${worn?.uid === it.uid ? " · <i>equipped</i>" : ""}</div></div></div>`);
     const stats: string[] = [];
     if (b.kind === "weapon") stats.push(stat("sword", st.power, "Power", cmp?.power));
     if (st.defense || cmp?.defense) stats.push(stat("shield", st.defense, "Defense", cmp?.defense));
@@ -390,14 +494,33 @@ export class GameUI {
         <div class="tt-bar"><i style="width:${Math.round((mp.into / mp.need) * 100)}%"></i></div><div class="tt-dim">This weapon grows stronger the more you fight with it.</div></div>`);
       lines.push(`<div class="tt-dim">${esc(WEAPONS.find((w) => w.key === b.weapon)?.blurb ?? "")}</div>`);
     }
-    lines.push(b.effect ? `<div class="tt-effect">${esc(b.desc)}</div>` : `<div class="tt-desc">${esc(b.desc)}</div>`);
-    if (gear) {
-      lines.push(`<div class="tt-dur"><span>Durability</span><div class="tt-bar dur${it.dur <= 25 ? " low" : ""}"><i style="width:${it.dur}%"></i></div><span>${it.dur}%</span></div>`);
-      if (it.dur <= 0) lines.push(`<div class="tt-warn">Broken — half strength until the smith repairs it.</div>`);
+    if (sk) {
+      const m = sk.move;
+      if (m) {
+        const st2: string[] = [];
+        if (m.damage) st2.push(stat("kill", m.damage, "Damage"));
+        st2.push(`<div class="tt-stat">${iconImg("cooldown", 16)}<b>${((m.cooldown ?? 0) / 60).toFixed(1)}s</b><span>Cooldown</span></div>`);
+        lines.push(`<div class="tt-stats">${st2.join("")}</div>`);
+      }
+      lines.push(`<div class="tt-effect">${esc(sk.desc)}</div>`);
+      lines.push(this.inv?.skills.includes(sk.id) ? `<div class="tt-dim">You already know this skill.</div>` : `<div class="tt-up">Click to read it and learn ${esc(sk.name)}.</div>`);
+    } else lines.push(b.effect ? `<div class="tt-effect">${esc(b.desc)}</div>` : `<div class="tt-desc">${esc(b.desc)}</div>`);
+    const set = gearSetOf(it.key);
+    if (set) {
+      const eq = this.inv?.equipment;
+      const worn = [eq?.weapon?.key, eq?.armor?.key, eq?.helm?.key].filter((k) => k && set.pieces.includes(k)).length;
+      lines.push(`<div class="tt-set"><div class="tt-setname">${esc(set.name)} set <span class="tt-dim">(${worn}/3 worn)</span></div>
+        <div class="${worn >= 2 ? "tt-up" : "tt-dim"}">2 pieces: +${set.two.hp} health, +${set.two.defense} defense</div>
+        <div class="${worn >= 3 ? "tt-up" : "tt-dim"}">3 pieces: ${esc(set.three.desc)}</div></div>`);
+    }
+    const power = relicPower(it.key);
+    if (power) {
+      const left = (this.inv?.relicAt ?? 0) - Date.now();
+      lines.push(`<div class="tt-effect">${esc(power)}</div><div class="tt-dim">${left > 0 ? `Ready again in ${Math.ceil(left / 60000)} min.` : "Ready. Click to use (not mid-fight, not in a dungeon; trophies share a 5-minute rest)."}</div>`);
     }
     if (b.bound) lines.push(`<div class="tt-dim">Bound — never lost on death, can't be traded.</div>`);
     const price = sellPrice(it);
-    lines.push(`<div class="tt-foot">${price ? `<span class="tt-price"><img src="${goldIcon()}" alt="">${price}</span>` : "<span></span>"}<span class="tt-keys">${gear ? "Drag to equip" : b.kind === "consumable" ? `Drink with ${esc(keyLabel(settings.value.bindings.use[0]))}` : ""}</span></div>`);
+    lines.push(`<div class="tt-foot">${price ? `<span class="tt-price"><img src="${goldIcon()}" alt="">${price}</span>` : "<span></span>"}<span class="tt-keys">${gear ? "Drag to equip" : sk ? "Click to read" : b.kind === "consumable" ? `Drink with ${esc(keyLabel(settings.value.bindings.use[0]))}` : ""}</span></div>`);
     this.tooltip.innerHTML = lines.join("");
     this.tooltip.classList.remove("hidden");
     this.placeTooltip(x, y);
@@ -422,7 +545,7 @@ export class GameUI {
     body.append(el(`<div class="char-top"><div class="char-name">${esc(inv.name)}</div><div>Level ${inv.level}${inv.level < MAX_LEVEL ? ` · ${inv.xp}/${inv.xpNext} XP` : " (max)"}</div>
       <div class="tt-dim">Kills ${inv.stats.kills} · Parries ${inv.stats.parries} (${inv.stats.perfects} perfect) · Deaths ${inv.stats.deaths}</div></div>`));
     // Skills: a pointer to the skill tree.
-    const sk = el(`<div class="section char-skills"><h4>Skills</h4><div class="cs-row">${iconImg("xp", 22)}<span>${inv.points.left ? `<b>${inv.points.left}</b> skill point${inv.points.left === 1 ? "" : "s"} to spend` : "All skill points spent"} · ${inv.tree.length} learned</span><button>Open skill tree (${esc(keyLabel(settings.value.bindings.skills[0]))})</button></div></div>`);
+    const sk = el(`<div class="section char-skills"><h4>Skills</h4><div class="cs-row">${iconImg("skills", 22)}<span><b>${inv.skills.length}</b> skills known · <b>${inv.marks}</b> Marks</span><button>Open Skill Book (${esc(keyLabel(settings.value.bindings.skills[0]))})</button></div><div class="tt-dim">Learn skills by reading scrolls. Missions on the Mission Board pay Marks; the Archivist sells scrolls for gold and Marks.</div></div>`);
     sk.querySelector("button")!.addEventListener("click", () => this.toggle("skills", true));
     // Weapon mastery: each weapon grows stronger the more you fight with it.
     const mastery = el(`<div class="section"><h4>Weapon mastery</h4><div class="tt-dim">Every weapon keeps its own mastery: +3% damage per level, and a glow at 10.</div></div>`);
@@ -434,11 +557,23 @@ export class GameUI {
       mastery.append(row);
     }
     const perks = sk;
+    // Hunter's Lore: the kinds you've hunted most, and what you've learned about killing them.
+    const lore = el(`<div class="section"><h4>Hunter's Lore</h4><div class="tt-dim">Every kind you slay teaches you: ${HUNT_RANKS.map((t, i) => `${t} kills, +${Math.round(HUNT_BONUS[i + 1] * 100)}%`).join(" · ")} damage against it.</div><div class="hunts"></div></div>`);
+    const hl = lore.querySelector(".hunts")!;
+    const hunted = Object.entries(inv.hunts ?? {}).filter(([k, n]) => n > 0 && ENEMIES.some((e) => e.key === k)).sort((a, b) => b[1] - a[1]);
+    if (!hunted.length) hl.append(el(`<div class="tt-dim">Nothing hunted yet.</div>`));
+    for (const [k, n] of hunted.slice(0, 24)) {
+      const r = huntRank(n);
+      const next = HUNT_RANKS[r];
+      const prev = r ? HUNT_RANKS[r - 1] : 0;
+      const pct = next ? Math.round(((n - prev) / (next - prev)) * 100) : 100;
+      hl.append(el(`<div class="hunt"><b>${esc(ENEMIES.find((e) => e.key === k)!.name)}</b><span class="h-rank r${r}">${r ? `${HUNT_TITLES[r]} · +${Math.round(HUNT_BONUS[r] * 100)}%` : ""}</span><span class="h-n">${n}${next ? `/${next}` : ""}</span><div class="m-bar"><div style="width:${pct}%"></div></div></div>`));
+    }
     const got = new Set(inv.achievements ?? []);
     const ach = el(`<div class="section"><h4>Achievements (${got.size}/${ACHIEVEMENTS.length})</h4><div class="achievements"></div></div>`);
     const list = ach.querySelector(".achievements")!;
     for (const a of ACHIEVEMENTS) list.append(el(`<div class="ach${got.has(a.id) ? " got" : ""}"><b>${esc(a.name)}</b><span>${esc(a.desc)}</span></div>`));
-    body.append(perks, mastery, ach);
+    body.append(perks, mastery, lore, ach);
     this.panel("character", "Character", body, "left wide");
   }
 
@@ -463,6 +598,8 @@ export class GameUI {
 
   /** Names of NPCs on the current map (quest givers), set by the scene. */
   npcName?: (id: string) => string | undefined;
+  /** Which floor the player stands on (undefined in dungeons). */
+  currentFloor?: () => number | undefined;
 
   /** Last seen step of each tracked quest, so an advanced step can flash. */
   private trackerSteps = new Map<string, string>();
@@ -470,7 +607,7 @@ export class GameUI {
   private renderTracker() {
     const inv = this.inv;
     if (!inv) return;
-    const list = trackedQuests(inv);
+    const list = trackedQuests(inv, this.currentFloor?.());
     if (!list.length) {
       this.trackerEl.innerHTML = "";
       return;
@@ -554,7 +691,11 @@ export class GameUI {
   private renderXp() {
     const inv = this.inv;
     if (!inv) return;
-    (this.xpBar.firstElementChild as HTMLElement).style.transform = `scaleX(${inv.xpNext ? inv.xp / inv.xpNext : 1})`;
+    (this.xpBar.querySelector(".fill") as HTMLElement).style.transform = `scaleX(${inv.xpNext ? inv.xp / inv.xpNext : 1})`;
+    // Rested: the stretch of the bar that will fill twice as fast.
+    const rested = inv.xpNext && inv.rested ? Math.min(1, (inv.xp + inv.rested) / inv.xpNext) : 0;
+    (this.xpBar.querySelector(".rested") as HTMLElement).style.transform = `scaleX(${rested})`;
+    this.xpBar.title = inv.rested ? `Rested: kills pay double for the next ${inv.rested} XP` : "";
   }
 
   // --- Map ---------------------------------------------------------------------------
@@ -744,6 +885,22 @@ export class GameUI {
 
   // --- Dialog, shops, smith, bank -----------------------------------------------------
 
+  /** The bar's four drinks: one at a time, and a new one replaces the old. */
+  private drinkMenu(d: DialogMsg) {
+    const box = el(`<div class="drinks"><div class="tt-dim">Drinks at the bar (${d.drinkPrice ?? 0}g · lasts ${DRINK_MS / 60000} minutes · a new drink replaces the old)</div></div>`);
+    const cur = this.inv?.drink && this.inv.drink.until > Date.now() ? this.inv.drink : undefined;
+    for (const m of DRINKS) {
+      const drinking = cur?.id === m.id;
+      const row = el(`<button class="drink-row${drinking ? " active" : ""}"><i style="background:${m.color}"></i><b>${esc(m.name)}</b><span>${esc(m.desc)}${drinking ? ` · ${Math.ceil((cur!.until - Date.now()) / 60000)} min left` : ""}</span></button>`);
+      row.addEventListener("click", () => {
+        this.room?.send("bar:drink", { npc: d.npc, drink: m.id });
+        window.setTimeout(() => this.dialog === d && this.render("dialog"), 400);
+      });
+      box.append(row);
+    }
+    return box;
+  }
+
   showDialog(d: DialogMsg) {
     this.dialog = d;
     this.mode = "none";
@@ -776,20 +933,23 @@ export class GameUI {
       if (s.startsWith("shop:")) svc("Buy", () => this.setMode("shop"), this.mode === "shop");
       if (s === "sell") svc("Sell", () => this.setMode("sell"), this.mode === "sell");
       if (s === "smith") svc("Upgrade", () => this.setMode("smith"), this.mode === "smith");
-      if (s === "smith") svc("Repair all", () => this.room?.send("smith:repair"));
       if (s === "bank") svc("Open storage", () => {
         this.room?.send("bank:open");
         this.setMode("bank");
       });
     }
     if (services.childElementCount) body.append(services);
+    if (d.services.includes("drinks")) body.append(this.drinkMenu(d));
     if (this.mode === "shop" && d.shop) {
       const shopKey = d.services.find((s) => s.startsWith("shop:"))!.slice(5);
       const list = el(`<div class="shop"></div>`);
       d.shop.forEach((entry, idx) => {
-        const it: Item = { uid: "", key: entry.key, rarity: entry.rarity ?? 0, qty: 1, plus: 0, dur: 100, bonus: {} };
-        const owned = entry.key.startsWith("map_") && !!this.inv?.discovered.includes(`map:${entry.key.slice(4)}`);
-        const row = el(`<div class="shop-row${owned ? " owned" : ""}"><img src="${itemIcon(entry.key, it.rarity)}" alt=""><span style="color:${RARITY_COLORS[it.rarity]}">${esc(itemBase(entry.key)?.name ?? entry.key)}</span><b>${owned ? "Owned" : `${entry.price}g`}</b></div>`);
+        const it: Item = { uid: "", key: entry.key, rarity: entry.rarity ?? 0, qty: 1, plus: 0, bonus: {} };
+        const sk = scrollSkill(entry.key);
+        if (sk) it.rarity = sk.rarity;
+        const owned = (entry.key.startsWith("map_") && !!this.inv?.discovered.includes(`map:${entry.key.slice(4)}`)) || (!!sk && !!this.inv?.skills.includes(sk.id));
+        const cost = `${entry.price}g${entry.marks ? ` + ${entry.marks}<i class="mark-ico"></i>` : ""}`;
+        const row = el(`<div class="shop-row${owned ? " owned" : ""}"><img src="${itemIcon(entry.key, it.rarity)}" alt=""><span style="color:${RARITY_COLORS[it.rarity]}">${esc(itemBase(entry.key)?.name ?? entry.key)}</span><b>${owned ? (sk ? "Known" : "Owned") : cost}</b></div>`);
         row.addEventListener("mouseenter", (e) => this.showTooltip(it, e.clientX, e.clientY));
         row.addEventListener("mouseleave", () => this.hideTooltip());
         row.addEventListener("click", () => this.room?.send("shop:buy", { shop: shopKey, idx }));
@@ -797,7 +957,8 @@ export class GameUI {
       });
       body.append(list);
     }
-    if (this.mode === "smith") body.append(el(`<div class="tt-dim">Click gear in your pack or equipped slots to upgrade (+1 to +5). Upgrades need gold and materials. Repairs restore broken gear.</div>`));
+    if (this.mode === "shop" && d.role === "archivist") body.append(el(`<div class="tt-dim">You have <b>${this.inv?.marks ?? 0}</b> Marks and <b>${this.inv?.gold ?? 0}</b> gold. Missions on the Mission Board pay Marks. Legendary scrolls are never sold: ${esc(SCROLL_SOURCES[4].toLowerCase())}</div>`));
+    if (this.mode === "smith") body.append(el(`<div class="tt-dim">Click gear in your pack or equipped slots: <b>upgrade</b> it (+1 to +5, gold and materials), <b>temper</b> it up a rarity (up to Epic, with Arcane Essence), or <b>salvage</b> what you don't need into materials and essence.</div>`));
     if (this.mode === "sell") body.append(el(`<div class="tt-dim">Click items in your pack to sell them.</div>`));
     this.panel("dialog", d.name, body, "left");
   }
@@ -876,7 +1037,7 @@ export class GameUI {
     this.root.append(box);
   }
 
-  inspect(d: { name: string; level: number; equipment: Partial<Record<EquipSlot, Item>>; mastery: number; tree: string[]; stats: InvView["stats"]; floor: number }, sid: string) {
+  inspect(d: { name: string; level: number; equipment: Partial<Record<EquipSlot, Item>>; mastery: number; skills?: string[]; stats: InvView["stats"]; floor: number }, sid: string) {
     this.root.querySelector(".inspect")?.remove();
     const box = el(`<div class="lore inspect"><div class="lore-name">${esc(d.name)} — Level ${d.level}</div></div>`);
     const doll = el(`<div class="doll inspect-doll"></div>`);
@@ -886,7 +1047,7 @@ export class GameUI {
     for (const slot of EQUIP_SLOTS) eq.append(this.slotEl(d.equipment[slot], slot));
     box.append(eq);
     const wpn = d.equipment.weapon;
-    box.append(el(`<p class="tt-dim">${wpn ? `Fights with ${esc(itemName(wpn))} (mastery ${d.mastery}) · ` : ""}${d.tree.length} skills learned · Floor ${d.floor} reached · ${d.stats.perfects} perfect parries</p>`));
+    box.append(el(`<p class="tt-dim">${wpn ? `Fights with ${esc(itemName(wpn))} (mastery ${d.mastery}) · ` : ""}${d.skills?.length ?? 0} skills known · Floor ${d.floor} reached · ${d.stats.perfects} perfect parries</p>`));
     const row = el(`<div class="row"></div>`);
     const tradeBtn = el(`<button>Trade</button>`);
     tradeBtn.addEventListener("click", () => {
@@ -1068,14 +1229,11 @@ export class GameUI {
   }
 
   setInv(v: InvView) {
-    const before = this.inv?.points.left;
+    const before = this.inv?.marks;
     this.inv = v;
     this.refresh();
-    // Never interrupt play with a modal: announce new skill points and let the player spend them when ready.
-    if (before !== undefined && v.points.left > before) {
-      this.toast(`You earned a skill point! Open Skills (${keyLabel(settings.value.bindings.skills[0])}) to learn something new`, "good");
-    }
-    document.getElementById("vitals")?.classList.toggle("perk-ready", v.points.left > 0);
+    if (before !== undefined && v.marks > before) this.toast(`+${v.marks - before} Marks (${v.marks} in all) — spend them on skill scrolls at the Archivist`, "good");
+    document.getElementById("vitals")?.classList.toggle("perk-ready", this.unreadScroll());
     if (v.admin && !document.getElementById("admin-btn")) {
       const b = el(`<button id="admin-btn" title="Admin panel (F10 or &#96;)">ADMIN</button>`);
       b.addEventListener("click", () => this.toggle("admin"));
@@ -1085,8 +1243,7 @@ export class GameUI {
 }
 
 export function roomName(room?: string) {
-  return room === "dungeon" ? "Undercroft" : room === "stormspire" ? "Stormspire" : room === "floor2" ? "Floor 2" : "Floor 1";
+  return roomLabel(room ?? "world");
 }
 
-void repairCost;
 void questDef;

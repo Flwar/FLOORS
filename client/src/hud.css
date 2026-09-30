@@ -81,3 +81,13 @@ body { font-family: "Trebuchet MS", system-ui, sans-serif; color: var(--ink); us
 @media (max-width: 640px) {
   .slot { width: 44px; height: 44px; }
 }
+
+/* The drink you had at the bar, and how long it has left. */
+#drink { margin-top: 4px; font-size: 11px; color: #f3e6c4; text-shadow: 0 1px 2px #000; display: flex; align-items: center; gap: 5px; }
+#drink[hidden] { display: none; }
+#drink i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* The tower's clock, before the player count. */
+#clock i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+#clock i.sun { background: #ffd24a; box-shadow: 0 0 6px #ffb030; }
+#clock i.moon { background: transparent; box-shadow: inset -3px -1px 0 0 #e8ecff; }

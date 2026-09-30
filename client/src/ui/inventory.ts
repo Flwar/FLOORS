@@ -58,7 +58,6 @@ function cellInner(it: Item, isNew: boolean) {
   return `<img class="pk-icon" src="${itemIcon(it.key, it.rarity)}" alt="" draggable="false">
     ${it.qty > 1 ? `<span class="pk-qty">${it.qty}</span>` : ""}
     ${it.plus ? `<span class="pk-plus">+${it.plus}</span>` : ""}
-    ${it.dur <= 0 ? `<span class="pk-broken" title="Broken">!</span>` : ""}
     ${lvl >= 2 ? `<span class="pk-mastery" title="Weapon mastery">★${lvl}</span>` : ""}
     ${isNew ? `<span class="pk-new"></span>` : ""}`;
 }
@@ -268,7 +267,7 @@ export function buildPack(ctx: PackContext): HTMLElement {
   const hint =
     ctx.mode === "trade" ? "Drag or click items to offer them."
     : ctx.mode === "shop" || ctx.mode === "sell" ? "Drag or click an item to sell it."
-    : ctx.mode === "smith" ? "Click an item to upgrade it."
+    : ctx.mode === "smith" ? "Click an item to upgrade, temper or salvage it."
     : ctx.mode === "bank" ? "Drag or click an item to store it."
     : "Drag to equip or rearrange · Click to use · Right-click for more";
   right.append(el(`<div class="pk-foot"><div class="pk-gold"><img src="${goldIcon()}" alt=""><b>${inv.gold}</b></div><div class="pk-space${used >= inv.inventory.length ? " full" : ""}">${used}/${inv.inventory.length}</div></div>`));

@@ -1,9 +1,21 @@
 import { WEAPONS, type WeaponKey } from "./combat/weapons.ts";
 import { Mod } from "./sim/player.ts";
 
-export const MAX_LEVEL = 12;
+export const MAX_LEVEL = 36;
 /** XP needed to go from `level` to `level + 1`. */
-export const xpToNext = (level: number) => Math.round(70 * Math.pow(level, 1.45));
+export const xpToNext = (level: number) => Math.round(85 * Math.pow(level, 1.55));
+
+/**
+ * Rested: time away fills a pool of bonus experience, and kills pay double until it's spent.
+ * Logging out in a town fills it four times as fast as out in the wild; it holds at most a
+ * level and a half's worth.
+ */
+const RESTED_PER_HOUR = { town: 0.08, wild: 0.02 };
+export function restedGain(level: number, hours: number, town: boolean) {
+  if (level >= MAX_LEVEL || hours < 0.25) return 0;
+  return Math.round(xpToNext(level) * hours * (town ? RESTED_PER_HOUR.town : RESTED_PER_HOUR.wild));
+}
+export const restedCap = (level: number) => (level >= MAX_LEVEL ? 0 : Math.round(xpToNext(level) * 1.5));
 export const baseHp = (level: number) => 100 + (level - 1) * 10;
 export const baseStamina = (level: number) => 100 + (level - 1) * 3;
 
@@ -15,7 +27,7 @@ export interface PerkDef {
   mod?: number;
 }
 
-/** At these levels you choose one of two perks — each changes how you fight. */
+/** Passive skills (learned from scrolls like everything else; see skillbook.ts). */
 export const PERK_CHOICES: { level: number; options: [PerkDef, PerkDef] }[] = [
   {
     level: 3,
@@ -52,6 +64,55 @@ export const PERK_CHOICES: { level: number; options: [PerkDef, PerkDef] }[] = [
       { id: "wardensGrace", name: "Warden's Grace", desc: "+10% maximum health." },
     ],
   },
+  {
+    level: 13,
+    options: [
+      { id: "emberblood", name: "Emberblood", desc: "Your blows have a 15% chance to set enemies burning." },
+      { id: "scaleguard", name: "Scaleguard", desc: "+20 defense." },
+    ],
+  },
+  {
+    level: 15,
+    options: [
+      { id: "wyrmsbane", name: "Wyrmsbane", desc: "+15% damage against bosses and minibosses." },
+      { id: "lastStand", name: "Last Stand", desc: "+20% damage while below 35% health." },
+    ],
+  },
+  {
+    level: 17,
+    options: [
+      { id: "frostblood", name: "Frostblood", desc: "Your blows have a 20% chance to chill enemies: slower to move and to strike." },
+      { id: "glacialHide", name: "Glacial Hide", desc: "+25 defense and +8% maximum health." },
+    ],
+  },
+  {
+    level: 21,
+    options: [
+      { id: "umbralTouch", name: "Umbral Touch", desc: "Your blows have a 20% chance to curse enemies: they deal 30% less damage and take 10% more." },
+      { id: "nightveil", name: "Nightveil", desc: "One blow in ten passes through you like shadow, doing no harm." },
+    ],
+  },
+  {
+    level: 25,
+    options: [
+      { id: "stormcaller", name: "Stormcaller", desc: "Your blows on soaked enemies have a 25% chance to call lightning down on them." },
+      { id: "tidalGrace", name: "Tidal Grace", desc: "+20 maximum stamina, and every perfect dodge restores 10% of your health." },
+    ],
+  },
+  {
+    level: 29,
+    options: [
+      { id: "siegebreaker", name: "Siegebreaker", desc: "Your heavy attacks and skills sunder armour: the struck enemy's armour counts for nothing for 5 seconds." },
+      { id: "clockworkHeart", name: "Clockwork Heart", desc: "+25 maximum stamina and +8% maximum health." },
+    ],
+  },
+  {
+    level: 33,
+    options: [
+      { id: "sunstrike", name: "Sunstrike", desc: "Your ripostes and counters dazzle what they strike for 5 seconds, and you deal 10% more damage to the dazzled." },
+      { id: "oasisHeart", name: "Oasis Heart", desc: "+10% maximum health, and out of a fight your wounds close twice as fast." },
+    ],
+  },
 ];
 
 export const perkById = (id: string) => PERK_CHOICES.flatMap((c) => c.options).find((p) => p.id === id);
@@ -62,12 +123,12 @@ export const perkById = (id: string) => PERK_CHOICES.flatMap((c) => c.options).f
 export const MASTERY_MAX = 10;
 const MASTERY_THRESHOLDS = [0, 60, 150, 280, 450, 680, 950, 1300, 1700, 2200];
 /**
- * Mastery for felling an enemy, whatever its health: a normal kill is worth 10, so the
- * pace holds on every Floor (about 220 kills with one weapon for mastery 10). Damage
+ * Mastery for felling an enemy, whatever its health: a normal kill is worth 8, so the
+ * pace holds on every Floor (about 275 kills with one weapon for mastery 10). Damage
  * earns its share, so a party splits it. Minibosses and bosses are worth a lot more.
  */
 export const masteryWorth = (def: { boss?: { music?: string } }, elite: boolean) =>
-  def.boss ? (def.boss.music === "miniboss" ? 50 : 100) : elite ? 20 : 10;
+  def.boss ? (def.boss.music === "miniboss" ? 40 : 80) : elite ? 16 : 8;
 export const masteryLevel = (xp: number) => {
   let l = 1;
   for (let i = 1; i < MASTERY_THRESHOLDS.length; i++) if (xp >= MASTERY_THRESHOLDS[i]) l = i + 1;
@@ -114,12 +175,10 @@ export function masteryUnlocks(key: WeaponKey): MasteryUnlock[] {
   const w = WEAPONS.find((x) => x.key === key)!;
   const list: MasteryUnlock[] = [
     { level: 1, name: "Basics", desc: `Light chain and ${w.heavy.name}.` },
-    { level: 2, name: w.skills[0].name, desc: "Weapon skill (1)." },
-    { level: 3, name: w.comboHeavy.name, desc: "Press heavy mid-combo." },
+    { level: 2, name: w.comboHeavy.name, desc: "Press heavy mid-combo." },
   ];
   if (w.finisherMastery <= 10) list.push({ level: w.finisherMastery, name: w.lights[w.lights.length - 1].name, desc: "The chain gains its finisher." });
   list.push(PASSIVES[key][0]);
-  list.push({ level: 6, name: w.skills[1].name, desc: "Weapon skill (2)." });
   list.push(PASSIVES[key][1]);
   list.push({ level: 10, name: `${w.name} Master`, desc: "Your weapon glows with mastery." });
   return list.sort((a, b) => a.level - b.level);
@@ -129,10 +188,8 @@ export function masteryUnlocks(key: WeaponKey): MasteryUnlock[] {
 export function masteryMods(key: WeaponKey, level: number): number {
   const w = WEAPONS.find((x) => x.key === key)!;
   let m = 0;
-  if (level >= 2) m |= Mod.Skill1;
-  if (level >= 3) m |= Mod.ComboHeavy;
+  if (level >= 2) m |= Mod.ComboHeavy;
   if (level >= w.finisherMastery) m |= Mod.Finisher;
-  if (level >= 6) m |= Mod.Skill2;
   if (level >= 5 && key === "sword") m |= Mod.WideParry;
   if (level >= 5 && key === "daggers") m |= Mod.LightDodge;
   if (level >= 5 && key === "staff") m |= Mod.QuickCast;

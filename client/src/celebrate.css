@@ -1,0 +1,139 @@
+/* A floor opens for everyone (see ui/celebrate.ts). */
+#floor-open {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  animation: fo-in 0.35s ease-out both;
+}
+#floor-open.out { animation: fo-out 1.3s ease-in forwards; }
+
+.fo-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 44%, rgba(255, 240, 190, 0.7), rgba(255, 196, 90, 0.22) 34%, rgba(24, 16, 6, 0.6) 78%);
+  animation: fo-veil 7s ease-out both;
+}
+.fo-rays {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 220vmax;
+  height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 232, 160, 0.34) 0deg 3.5deg, rgba(255, 232, 160, 0) 3.5deg 12deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0, #000 12%, transparent 48%);
+  mask-image: radial-gradient(circle, #000 0, #000 12%, transparent 48%);
+  animation: fo-spin 16s linear infinite, fo-fade 1.4s ease-out both;
+}
+.fo-ring {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 244, 200, 0.95);
+  box-shadow: 0 0 50px rgba(255, 206, 100, 0.95), inset 0 0 36px rgba(255, 206, 100, 0.7);
+  animation: fo-ring 1.7s cubic-bezier(0.1, 0.7, 0.2, 1) 0.1s both;
+}
+.fo-ring.r2 { animation-delay: 0.5s; border-width: 3px; }
+.fo-ring.r3 { animation-delay: 0.95s; border-width: 2px; }
+
+.fo-text {
+  position: relative;
+  margin-top: -6vh;
+  text-align: center;
+  color: #fff4d0;
+  font-family: Georgia, "Times New Roman", serif;
+  text-shadow: 0 0 24px rgba(255, 200, 90, 0.9), 0 2px 0 #3b2a10, 0 4px 18px rgba(0, 0, 0, 0.6);
+}
+.fo-kicker {
+  font-size: clamp(13px, 1.7vw, 22px);
+  letter-spacing: 0.55em;
+  text-transform: uppercase;
+  animation: fo-rise 0.8s ease-out 0.5s both;
+}
+.fo-title {
+  margin: 0.1em 0;
+  font-size: clamp(64px, 11vw, 150px);
+  font-weight: bold;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  background: linear-gradient(180deg, #fffcea 0%, #ffe18c 45%, #d6952a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 18px rgba(255, 200, 90, 0.9)) drop-shadow(0 3px 0 #5a3c10);
+  animation: fo-slam 1s cubic-bezier(0.2, 1.4, 0.3, 1) 0.2s both;
+}
+.fo-name {
+  font-size: clamp(20px, 2.8vw, 38px);
+  font-style: italic;
+  animation: fo-rise 0.8s ease-out 0.9s both;
+}
+.fo-rule {
+  width: min(440px, 60vw);
+  height: 2px;
+  margin: 0.7em auto;
+  background: linear-gradient(90deg, transparent, #ffe08a, transparent);
+  animation: fo-grow 0.9s ease-out 1.1s both;
+}
+.fo-by {
+  font-size: clamp(14px, 1.6vw, 20px);
+  line-height: 1.6;
+  animation: fo-rise 0.8s ease-out 1.3s both;
+}
+.fo-by b { color: #ffe9a8; }
+
+.fo-sparks { position: absolute; left: 50%; top: 44%; }
+.fo-sparks i {
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2);
+  border-radius: 50%;
+  background: #fff3c4;
+  box-shadow: 0 0 10px 3px rgba(255, 200, 90, 0.9);
+  opacity: 0;
+  animation: fo-spark var(--t) cubic-bezier(0.1, 0.6, 0.3, 1) var(--w) both;
+}
+
+/* Sealed: the same moment in iron and ember. */
+#floor-open.sealed .fo-veil { background: radial-gradient(circle at 50% 44%, rgba(120, 30, 20, 0.55), rgba(40, 10, 8, 0.7) 60%, rgba(8, 4, 4, 0.8)); }
+#floor-open.sealed .fo-ring { border-color: rgba(255, 120, 90, 0.9); box-shadow: 0 0 50px rgba(200, 50, 30, 0.9); }
+#floor-open.sealed .fo-title { background: linear-gradient(180deg, #f2e6e0 0%, #b9a8a0 50%, #6e5a54 100%); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 0 16px rgba(200, 50, 30, 0.8)) drop-shadow(0 3px 0 #2a1410); }
+#floor-open.sealed .fo-text { color: #f4dcd4; text-shadow: 0 0 20px rgba(200, 50, 30, 0.8), 0 2px 0 #2a1410; }
+#floor-open.sealed .fo-rule { background: linear-gradient(90deg, transparent, #e0705a, transparent); }
+
+@keyframes fo-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fo-out { to { opacity: 0; } }
+@keyframes fo-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fo-veil { 0% { opacity: 0; } 8% { opacity: 1; } 70% { opacity: 0.8; } 100% { opacity: 0.65; } }
+@keyframes fo-spin { to { transform: rotate(360deg); } }
+@keyframes fo-ring {
+  from { width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: 1; }
+  to { width: 170vmax; height: 170vmax; margin: -85vmax 0 0 -85vmax; opacity: 0; }
+}
+@keyframes fo-slam {
+  0% { opacity: 0; transform: scale(2.8); }
+  55% { opacity: 1; transform: scale(0.93); }
+  75% { transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes fo-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes fo-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes fo-spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(0); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fo-rays { animation: fo-fade 1s ease-out both; }
+  .fo-sparks { display: none; }
+}

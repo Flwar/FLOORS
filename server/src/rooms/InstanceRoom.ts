@@ -1,5 +1,6 @@
 import type { Client } from "colyseus";
-import { Act, applyGates, EAct, EFlag, HazardKind, TILE, type GateDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { Act, applyGates, EAct, EFlag, floorDef, floorOfRoom, HazardKind, TILE, type FloorDef, type GateDef, type WorldMap, type WorldObject } from "@floors/shared";
+import { openFloor } from "../game/floors.ts";
 import type { Character } from "../game/character.ts";
 import { questEvent } from "../game/quests.ts";
 import type { EnemyData } from "../game/sim.ts";
@@ -38,7 +39,7 @@ export interface BossArena {
  * Subclasses add their own encounters and puzzles.
  */
 export abstract class InstanceRoom extends GameRoom {
-  abstract readonly kind: "dungeon" | "stormspire";
+  abstract readonly kind: string;
   protected allowed = new Set<string>();
   protected checkpoint = "brazier-0";
   protected open = 0;
@@ -46,13 +47,25 @@ export abstract class InstanceRoom extends GameRoom {
   protected boss?: EnemyData;
   protected cleared = false;
   private minibossFight = false;
+  private minibossDown = false;
   private bossFight = false;
   private bossWipeAt = 0;
   private trapAt = [400, 1200, 2000];
 
-  protected abstract title(): { name: string; sub: string };
-  /** Where leaving the instance puts you. */
-  protected abstract exitPos(ch: Character): NonNullable<Character["data"]["pos"]>;
+  /** The floor this dungeon belongs to. */
+  protected get floor(): FloorDef {
+    return floorOfRoom(this.kind)!;
+  }
+  protected buildMap(): WorldMap {
+    return this.floor.buildDungeon();
+  }
+  protected title() {
+    return { name: this.floor.dungeonName, sub: `Floor ${this.floor.n} — Boss Dungeon` };
+  }
+  /** Where leaving the instance puts you: outside the dungeon's door. */
+  protected exitPos(_ch: Character): NonNullable<Character["data"]["pos"]> {
+    return { room: this.floor.room, x: 0, y: 0, via: this.floor.door };
+  }
   protected abstract hall(): MinibossHall;
   protected abstract arena(): BossArena;
   /** Instance-specific setup (starting gates, puzzles). */
@@ -150,6 +163,24 @@ export abstract class InstanceRoom extends GameRoom {
     if (sid) this.save(sid);
   }
 
+  /** Bosses and minibosses count for everyone in the run, downed or not, near or not. */
+  protected sharesKillWithRoom(ed: EnemyData) {
+    return !!ed.def.boss;
+  }
+
+  /** The Floor Boss is dead (once per run): the next floor opens for everyone. */
+  protected onCleared(boss: EnemyData) {
+    const by = this.climbers();
+    if (by.length) openFloor(this.floor.n + 1, by, boss.def.name);
+  }
+
+  /** Names of the registered climbers in this run (dev guests don't open floors for the world). */
+  protected climbers() {
+    const names: string[] = [];
+    for (const [sid, ch] of this.chars) if (ch.accountId !== null && this.sim.players.has(sid)) names.push(ch.data.name);
+    return names;
+  }
+
   /** Per-character rewards for a boss kill (e.g. unlocking a floor). */
   protected onBossKilled(_ch: Character, _ed: EnemyData) {}
 
@@ -179,6 +210,33 @@ export abstract class InstanceRoom extends GameRoom {
 
   protected living() {
     return [...this.sim.players.values()].filter((pd) => pd.p.act !== Act.Dead);
+  }
+
+  /** A point `tiles` tiles north of a gate, i.e. just inside the room it seals, centred on it. */
+  protected insideGate(id: number, tiles = 2) {
+    const g = this.gmap.gates.find((x) => x.id === id)!;
+    const xs = g.tiles.map(([x]) => x);
+    return { x: ((Math.min(...xs) + Math.max(...xs)) / 2) * TILE + TILE / 2, y: (g.tiles[0][1] - tiles) * TILE + TILE / 2 };
+  }
+
+  /**
+   * An encounter is sealing its entrance: bring every living party member who is still
+   * outside to just inside it, so nobody is locked out of the fight.
+   */
+  protected gatherParty(inside: (x: number, y: number) => boolean, at: { x: number; y: number }, where: string) {
+    let n = 0;
+    for (const pd of this.living()) {
+      if (inside(pd.p.x, pd.p.y)) continue;
+      const x = at.x + ((n % 5) - 2) * 28;
+      const y = at.y - Math.floor(n / 5) * 28;
+      this.emitNear("fx", { k: "warp", x: pd.p.x, y: pd.p.y }, pd.p.x, pd.p.y);
+      pd.p.x = Math.fround(x);
+      pd.p.y = Math.fround(y);
+      this.emitNear("fx", { k: "warp", x, y }, x, y);
+      const c = this.clients.getById(pd.sid);
+      if (c) this.notify(c, `Your party is fighting in ${where}. You were brought to them.`, "good");
+      n++;
+    }
   }
 
   protected emitAll(type: string, data: Record<string, unknown>) {
@@ -212,7 +270,9 @@ export abstract class InstanceRoom extends GameRoom {
     const w = this.miniboss;
     const h = this.hall();
     if (!w || w.e.act === EAct.Dead) {
-      if (this.minibossFight) {
+      // (However it fell: even struck down from outside its hall, the way on opens.)
+      if (w && !this.minibossDown) {
+        this.minibossDown = true;
         this.minibossFight = false;
         this.gate(h.southGate, true);
         this.gate(h.northGate, true);
@@ -224,6 +284,7 @@ export abstract class InstanceRoom extends GameRoom {
     const inside = this.living().filter((pd) => inRect(pd.p.x, pd.p.y, h.room));
     if (!this.minibossFight && inside.length) {
       this.minibossFight = true;
+      this.gatherParty((x, y) => inRect(x, y, h.room), this.insideGate(h.southGate), h.stage);
       this.gate(h.southGate, false);
       this.state.stage = h.stage;
       this.scaleBoss(w);
@@ -249,6 +310,7 @@ export abstract class InstanceRoom extends GameRoom {
       this.gate(a.gate, true);
       this.sim.clearHazards();
       this.emitAll("victory", { boss: b.def.name, title: a.victory.title, sub: a.victory.sub });
+      this.onCleared(b);
       return;
     }
     const inside = this.living().filter((pd) => a.inArena(pd.p.x, pd.p.y));
@@ -261,7 +323,9 @@ export abstract class InstanceRoom extends GameRoom {
       this.emitAll("bossIntro", a.intro);
       // The party gets a moment to step inside before the gate falls.
       this.clock.setTimeout(() => {
-        if (this.bossFight) this.gate(a.gate, false);
+        if (!this.bossFight) return;
+        this.gatherParty(a.inArena, this.insideGate(a.gate, 3), a.stage);
+        this.gate(a.gate, false);
       }, 2500);
       b.target = inside[0].sid;
       b.e.flags |= EFlag.Aggro;
@@ -298,6 +362,9 @@ export abstract class InstanceRoom extends GameRoom {
     ed.phase = 0;
     ed.target = undefined;
     ed.contrib.clear();
+    ed.threat.clear();
+    ed.strayAt = 0;
+    ed.restAt = 0;
     ed.attacks.length = 0;
     e.x = Math.fround(ed.homeX);
     e.y = Math.fround(ed.homeY);
@@ -322,6 +389,16 @@ export abstract class InstanceRoom extends GameRoom {
         return;
       case "lore":
         client.send("lore", { name: obj.name, text: obj.text });
+        return;
+      case "gate":
+        // The stair up: open once the Floor Boss is dead (and the floor above exists).
+        if (obj.id === "ascent") {
+          const next = floorDef(this.floor.n + 1);
+          if (this.cleared && next) client.send("travel", { room: next.room });
+          else client.send("lore", { name: obj.name, text: obj.text ?? "" });
+          return;
+        }
+        this.useObject(client, obj);
         return;
       case "door":
         if (obj.id === "exit") {

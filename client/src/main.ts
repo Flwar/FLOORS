@@ -4,6 +4,7 @@ import "./skills.css";
 import "./admin.css";
 import "./inventory.css";
 import "./tutorial.css";
+import "./celebrate.css";
 import * as Phaser from "phaser";
 import { music } from "./audio/music.ts";
 import { sfx } from "./audio/sfx.ts";
@@ -12,6 +13,11 @@ import { WorldScene } from "./scenes/WorldScene.ts";
 import { settings } from "./settings.ts";
 import { showLogin } from "./ui/login.ts";
 import { GameUI } from "./ui/ui.ts";
+import { installCursors } from "./ui/cursor.ts";
+import { installPhaserFixes } from "./render/phaserFixes.ts";
+
+installPhaserFixes();
+installCursors();
 
 const status = document.querySelector<HTMLElement>("#status")!;
 const session = new Session();

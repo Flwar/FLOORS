@@ -106,7 +106,7 @@ async function main() {
   aim = radToAim(Math.PI);
 
   const seenCount = new Map<string, number>();
-  const results: { attack: string; plan: string; got: string }[] = [];
+  const results: { attack: string; plan: string; got: string; perfectDodge?: boolean }[] = [];
   let lastStart = 0;
   let readySince = room.clock.serverNow();
   const deadline = performance.now() + 40000;
@@ -136,17 +136,19 @@ async function main() {
     } else press(Btn.Parry);
     // Wait for the server's verdict on this swing.
     let got = "none";
+    let perfectDodge = false;
     for (let i = 0; i < 120 && got === "none"; i++) {
       await wait(10);
       for (const ev of events.slice(mark)) {
         if (ev.type === "parry" && ev.msg.p === room.sessionId) got = ev.msg.perfect ? "perfect" : "parry";
         else if (ev.type === "practice" && ev.msg.p === room.sessionId) got = "hit";
         else if (ev.type === "evade" && ev.msg.p === room.sessionId) got = "evade";
+        if (ev.type === "fx" && ev.msg.k === "perfectdodge" && ev.msg.p === room.sessionId) perfectDodge = true;
       }
     }
     const dist = Math.hypot(me.state.x - knight.x, me.state.y - knight.y);
     if (got === "none" && dist > 90) got = "out of reach";
-    results.push({ attack: atk.name, plan, got });
+    results.push({ attack: atk.name, plan, got, perfectDodge });
     readySince = 0;
     await wait(500);
     await walkTo(post.x, post.y);
@@ -156,6 +158,8 @@ async function main() {
   const want: Record<string, string> = { perfect: "perfect", normal: "parry", early: "hit", dodge: "evade" };
   for (const r of results) if (r.got === "out of reach") console.log(`SKIP  ${r.attack} / ${r.plan} — bot was out of reach at impact`);
   for (const r of results.filter((x) => x.got !== "out of reach")) check(`${r.attack} / ${r.plan}`, r.got === want[r.plan], `expected ${want[r.plan]}, server said ${r.got}`);
+  const dodges = results.filter((r) => r.plan === "dodge" && r.got === "evade");
+  if (dodges.length) check("a last-moment dodge is a perfect dodge", dodges.some((r) => r.perfectDodge), `${dodges.filter((r) => r.perfectDodge).length}/${dodges.length} perfect`);
   check("covered every case", new Set(results.map((r) => r.plan)).size === 4, `plans seen: ${[...new Set(results.map((r) => r.plan))].join(", ")}`);
 
   running = false;
