@@ -289,6 +289,8 @@ export abstract class GameRoom extends Room<{ state: WorldState; input: PlayerIn
     if (auth.admin) this.admins.add(client.sessionId);
     client.send("inv", ch.view({ key: auth.key, admin: !!auth.admin }));
     client.send("settings", ch.data.settings ?? null);
+    // The tower's clock (day and night), so every player sees the same sky.
+    client.send("clock", { now: Date.now() });
     if (restedNews > 0) this.notify(client, `You come back rested: kills pay double experience for the next ${ch.data.rested} XP.`, "good");
     if (ch.skillbookNews) {
       const n = ch.skillbookNews;

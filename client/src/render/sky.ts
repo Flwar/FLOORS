@@ -9,6 +9,8 @@ export class Sky {
   private layers: { img: Phaser.GameObjects.TileSprite; speed: number; parallax: number; rise?: number }[] = [];
   private bg: Phaser.GameObjects.Graphics;
   private islands: Phaser.GameObjects.Image[] = [];
+  /** Stars that come out at night (not on the Umbral Wilds, which has its own). */
+  private nightStars?: Phaser.GameObjects.TileSprite;
 
   constructor(private scene: Phaser.Scene, tint: SkyKind = "day") {
     const COLORS: Record<SkyKind, [number, number]> = {
@@ -102,6 +104,17 @@ export class Sky {
     const onResize = () => this.resize();
     scene.scale.on("resize", onResize);
     scene.events.once("shutdown", () => scene.scale.off("resize", onResize));
+  }
+
+  /** Night falls (0 day – 1 midnight): the stars come out. */
+  setNight(n: number) {
+    if (n < 0.01 && !this.nightStars) return;
+    if (!this.nightStars) {
+      paintStars(this.scene);
+      this.nightStars = this.scene.add.tileSprite(0, 0, this.scene.scale.width * 2, this.scene.scale.height * 2, "skyStars").setOrigin(0).setScrollFactor(0).setDepth(-89);
+      this.layers.push({ img: this.nightStars, speed: 1, parallax: 0.05 });
+    }
+    this.nightStars.setAlpha(n).setVisible(n > 0.01);
   }
 
   private resize() {

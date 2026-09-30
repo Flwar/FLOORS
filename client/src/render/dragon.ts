@@ -1,4 +1,5 @@
 import * as Phaser from "phaser";
+import { castShadow } from "./sunlight.ts";
 import { RES } from "../art/characters.ts";
 
 /**
@@ -282,6 +283,8 @@ export class DragonRig {
   private wingNear: Phaser.GameObjects.Image;
   private legs: Phaser.GameObjects.Image[];
   private shadow: Phaser.GameObjects.Image;
+  /** The shadow the light casts (see sunlight.ts). */
+  private cast: Phaser.GameObjects.Image;
   private images: Phaser.GameObjects.Image[];
   private flip = false;
   private flashUntil = 0;
@@ -292,6 +295,7 @@ export class DragonRig {
     paintDragon(scene, key, scale, dark, belly, glow);
     const k = 1 / RES;
     this.shadow = scene.add.image(0, 0, "shadow").setScale(k * 2.2, k * 1.2);
+    this.cast = scene.add.image(0, 0, "shadow").setVisible(false);
     this.wingFar = scene.add.image(0, 0, `${key}:wing`).setOrigin(0.11, 0.92).setScale(k).setTint(0x9a8a8a);
     this.legs = [0, 1, 2, 3].map((i) => scene.add.image(0, 0, `${key}:leg`).setOrigin(0.5, 0).setScale(k).setTint(i % 2 ? 0xffffff : 0xb0a0a0));
     this.tail2 = scene.add.image(0, 0, `${key}:tail2`).setOrigin(0.97, 0.5).setScale(k);
@@ -302,7 +306,7 @@ export class DragonRig {
     this.head = scene.add.image(0, 0, `${key}:head`).setOrigin(0.2, 0.55).setScale(k);
     this.wingNear = scene.add.image(0, 0, `${key}:wing`).setOrigin(0.11, 0.92).setScale(k);
     this.root = scene.add.container(0, 0, [
-      this.shadow, this.wingFar, this.legs[0], this.legs[2], this.tail2, this.tail1, this.body, this.neck, this.jaw, this.head, this.legs[1], this.legs[3], this.wingNear,
+      this.cast, this.shadow, this.wingFar, this.legs[0], this.legs[2], this.tail2, this.tail1, this.body, this.neck, this.jaw, this.head, this.legs[1], this.legs[3], this.wingNear,
     ]);
     this.root.setScale(size);
     this.images = [this.body, this.neck, this.head, this.jaw, this.tail1, this.tail2, this.wingFar, this.wingNear, ...this.legs];
@@ -456,6 +460,7 @@ export class DragonRig {
     });
     const sh = 1 + lift / 50;
     this.shadow.setScale(k * 2.2 * sh, k * 1.2 * sh);
+    castShadow(this.cast, k * 2.2, k * 1.2, 1.2, 1);
     this.root.setAlpha(alpha);
   }
 

@@ -58,7 +58,41 @@ interface ChunkView {
   /** Tall occluders that fade when a character walks behind them. */
   tall: Phaser.GameObjects.Image[];
   texKey: string;
+  /** The shadows this chunk's trees, stones, props and buildings cast (worlds with a sky only). */
+  shade?: Phaser.GameObjects.RenderTexture;
+  casters?: Caster[];
+  blocks?: Block[];
+  /** The light the shadows were last drawn for. */
+  shadeFor?: { dir: number; len: number };
 }
+
+/** Something upright that casts its own silhouette as a shadow (a tree, an obelisk, a lamp). */
+interface Caster {
+  key: string;
+  frame: string | number;
+  x: number;
+  y: number;
+  ox: number;
+  oy: number;
+  sx: number;
+  sy: number;
+}
+/** A box standing on the ground (a wall, a ruin block, a building): its shadow is its footprint swept along the light. */
+interface Block {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  h: number;
+}
+
+/** Shadows reach this far past their chunk; they're drawn at this resolution (soft enough), this dark at full sun. */
+const SHADE_PAD = 200;
+const SHADE_RES = 0.5;
+const SHADE_ALPHA = 0.3;
+/** How far the light may move before a chunk's shadows are redrawn (radians, and length). */
+const SHADE_TURN = 0.03;
+const SHADE_GROW = 0.04;
 
 /**
  * Streams the world in 16×16-tile chunks around the camera: each chunk's ground is
@@ -105,6 +139,88 @@ export class Terrain {
     scene.events.once("shutdown", () => {
       for (const [k, c] of [...this.chunks]) this.unload(k, c);
     });
+  }
+
+  /** Does this map have a sky (and so the sun casts shadows)? Dungeons don't. */
+  sunlit = false;
+  private sun = { dir: -Math.PI / 2, len: 0.3, shade: 0 };
+  private shadeG?: Phaser.GameObjects.Graphics;
+  private maskG?: Phaser.GameObjects.Graphics;
+
+  /** Where the light comes from now (see sunlight.ts). Chunks redraw their shadows a few at a time. */
+  setSun(dir: number, len: number, shade: number) {
+    this.sun = { dir, len, shade };
+    let budget = 2;
+    for (const c of this.chunks.values()) {
+      if (!c.shade) continue;
+      const on = shade > 0.02;
+      c.shade.setVisible(on);
+      if (!on) continue;
+      c.shade.setAlpha(shade * SHADE_ALPHA);
+      const f = c.shadeFor;
+      const turned = !f || Math.abs(Math.atan2(Math.sin(f.dir - dir), Math.cos(f.dir - dir))) > SHADE_TURN || Math.abs(f.len - len) > SHADE_GROW;
+      if (turned && budget-- > 0) this.drawShade(c);
+    }
+  }
+
+  /** Draw a chunk's shadows for the current light: silhouettes laid along the ground, boxes swept along it. */
+  private drawShade(c: ChunkView) {
+    const rt = c.shade!;
+    const S = SHADE_RES;
+    const X0 = c.cx * CHUNK_PX - SHADE_PAD;
+    const Y0 = c.cy * CHUNK_PX - SHADE_PAD;
+    const { dir, len } = this.sun;
+    rt.clear();
+    for (const k of c.casters ?? []) {
+      rt.stamp(k.key, k.frame, (k.x - X0) * S, (k.y - Y0) * S, { originX: k.ox, originY: k.oy, scaleX: k.sx * S, scaleY: k.sy * S * len, rotation: dir + Math.PI / 2, tint: 0x000000, alpha: 1 });
+    }
+    const blocks = c.blocks ?? [];
+    if (blocks.length) {
+      const g = (this.shadeG ??= this.scene.make.graphics({ x: 0, y: 0 }, false));
+      g.clear();
+      g.fillStyle(0x000000, 1);
+      const vx = Math.cos(dir) * len;
+      const vy = Math.sin(dir) * len;
+      for (const b of blocks) {
+        const dx = vx * b.h * S;
+        const dy = vy * b.h * S;
+        const x0 = (b.x0 - X0) * S;
+        const y0 = (b.y0 - Y0) * S;
+        const x1 = (b.x1 - X0) * S;
+        const y1 = (b.y1 - Y0) * S;
+        // The footprint, the roof's shadow, and each wall swept between them.
+        g.fillRect(x0, y0, x1 - x0, y1 - y0);
+        g.fillRect(x0 + dx, y0 + dy, x1 - x0, y1 - y0);
+        const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+        for (let i = 0; i < 4; i++) {
+          const [ax, ay] = corners[i];
+          const [bx, by] = corners[(i + 1) % 4];
+          g.beginPath();
+          g.moveTo(ax, ay);
+          g.lineTo(bx, by);
+          g.lineTo(bx + dx, by + dy);
+          g.lineTo(ax + dx, ay + dy);
+          g.closePath();
+          g.fillPath();
+        }
+      }
+      rt.draw(g, 0, 0);
+    }
+    // No shadow falls on the open sky beyond the isles.
+    const e = (this.maskG ??= this.scene.make.graphics({ x: 0, y: 0 }, false));
+    e.clear();
+    e.fillStyle(0xffffff, 1);
+    const span = CHUNK + Math.ceil((2 * SHADE_PAD) / TILE);
+    const tx0 = Math.floor(X0 / TILE);
+    const ty0 = Math.floor(Y0 / TILE);
+    for (let ty = ty0; ty <= ty0 + span; ty++) {
+      for (let tx = tx0; tx <= tx0 + span; tx++) {
+        if (this.map.get(tx, ty) === Tile.Void) e.fillRect((tx * TILE - X0) * S, (ty * TILE - Y0) * S, TILE * S + 0.5, TILE * S + 0.5);
+      }
+    }
+    rt.erase(e, 0, 0);
+    rt.render();
+    c.shadeFor = { dir, len };
   }
 
   /** Fade trees and roofs standing between the camera and a character behind them. */
@@ -258,10 +374,50 @@ export class Terrain {
       if (pr.kind === "lamp" || pr.kind === "well" || pr.kind === "stall" || pr.kind === "board" || pr.kind === "rack") tall.push(img);
     }
     for (const d of decor) if (d instanceof Object && (d as Phaser.GameObjects.Image).texture?.key?.startsWith("building:")) tall.push(d as Phaser.GameObjects.Image);
-    this.chunks.set(`${cx},${cy}`, { cx, cy, ground, decor, tall, texKey: key });
+    const view: ChunkView = { cx, cy, ground, decor, tall, texKey: key };
+    if (this.sunlit && cy * CHUNK < m.outdoorHeight) this.prepareShade(view);
+    this.chunks.set(`${cx},${cy}`, view);
+  }
+
+  /** What in this chunk casts a shadow, and a layer to draw the shadows into. */
+  private prepareShade(c: ChunkView) {
+    const m = this.map;
+    const casters: Caster[] = [];
+    const blocks: Block[] = [];
+    for (const obj of c.decor) {
+      const d = obj as Phaser.GameObjects.Image;
+      if (!d.texture || d.type !== "Image") continue;
+      const k = d.texture.key;
+      if (k.startsWith("building:")) {
+        const b = m.buildings.find((x) => d.x === x.tx * TILE && d.y === (x.ty + x.th) * TILE);
+        if (b) blocks.push({ x0: b.tx * TILE, y0: b.ty * TILE, x1: (b.tx + b.tw) * TILE, y1: (b.ty + b.th) * TILE, h: Math.max(48, d.displayHeight - b.th * TILE) });
+      } else if (k.startsWith("tree") || k.startsWith("crystal") || (c.tall.includes(d) && !k.startsWith("building:"))) {
+        // Upright things: their silhouette, pivoting on the middle of their base.
+        casters.push({ key: k, frame: d.frame.name, x: d.x + (0.5 - d.originX) * d.displayWidth, y: d.y, ox: 0.5, oy: d.originY, sx: d.scaleX, sy: d.scaleY });
+      } else if (k.startsWith("ruin") || k === "wallFront" || k === "wallTop" || k === "palisade") {
+        blocks.push({ x0: d.x, y0: d.y - TILE, x1: d.x + TILE, y1: d.y, h: k === "palisade" ? 28 : 18 });
+      } else if (k === "fenceH" || k === "fenceV") {
+        blocks.push({ x0: d.x + 12, y0: d.y - 20, x1: d.x + 20, y1: d.y - 12, h: 12 });
+      }
+    }
+    if (!casters.length && !blocks.length) return;
+    c.casters = casters;
+    c.blocks = blocks;
+    const size = Math.ceil((CHUNK_PX + 2 * SHADE_PAD) * SHADE_RES);
+    c.shade = this.scene.add
+      .renderTexture(c.cx * CHUNK_PX - SHADE_PAD, c.cy * CHUNK_PX - SHADE_PAD, size, size)
+      .setOrigin(0)
+      .setScale(1 / SHADE_RES)
+      .setDepth(-9)
+      .setVisible(false);
+    if (this.sun.shade > 0.02) {
+      c.shade.setVisible(true).setAlpha(this.sun.shade * SHADE_ALPHA);
+      this.drawShade(c);
+    }
   }
 
   private unload(k: string, c: ChunkView) {
+    c.shade?.destroy();
     c.ground.destroy();
     for (const d of c.decor) d.destroy();
     this.chunks.delete(k);

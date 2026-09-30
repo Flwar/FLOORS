@@ -3,7 +3,7 @@ import { Callbacks, Predict, type InputHandle, type Reconciler, type Room } from
 import {
   AFFIXES, Act, aimToRad, applyGates, EMOTES, isEmote, type Emote, floorOfRoom, roomLabel, TOWER, EAct, EFlag, ENEMIES, getMove, HazardKind, impactMs, INTERP_DELAY,
   isActiveTick, itemBase, keyLabel, Mod, NO_SKILL, parryDef, PLAYER_RADIUS, skillById, skillEntry, skillMove, streetPoint, ProjKind, radToAim, RARITY_COLORS, shapeHits, stepPlayer, Tile, TICK_MS, TILE, TIMING_TOLERANCE_MS,
-  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, drinkById, RARITY_NAMES, HUNT_BONUS, HUNT_TITLES } from "@floors/shared";
+  WEAPONS, windupTicks, type Bindings, type Body, type GateDef, type PlayerCommand, type PlayerSim, type WorldMap, type Zone, drinkById, RARITY_NAMES, HUNT_BONUS, HUNT_TITLES, dayPhase, sunAt, clockLabel, isWorldRoom, type SunState } from "@floors/shared";
 import type { Enemy, Hazard, Player, Projectile, WorldState } from "../../../server/src/state.ts";
 import { ambience } from "../audio/ambience.ts";
 import { Minimap } from "../ui/minimap.ts";
@@ -27,6 +27,7 @@ function materialOf(ev: EnemyView): Material {
 }
 import { Fx } from "../render/fx.ts";
 import { Lighting, type Light } from "../render/lighting.ts";
+import { SUN } from "../render/sunlight.ts";
 import { mapFloor, QuestMarkers, questTarget, trackedQuests } from "../render/objective.ts";
 import { floorOpenedOverlay, floorSealedOverlay } from "../ui/celebrate.ts";
 import { Ambient } from "../render/ambient.ts";
@@ -87,6 +88,10 @@ export class WorldScene extends Phaser.Scene {
   private session!: Session;
   private ui!: GameUI;
   private kind: RoomKind = "world";
+  /** The server's clock minus ours, so everyone's sky agrees. */
+  private clockOffset = 0;
+  /** The light over the map this frame (undefined underground and indoors). */
+  private sunNow?: SunState;
   private objects!: WorldObjects;
   private ambient!: Ambient;
   private tutorial?: Tutorial;
@@ -122,6 +127,8 @@ export class WorldScene extends Phaser.Scene {
     this.map = inDungeon ? floor.buildDungeon() : floor.build();
     this.sky = new Sky(this, inDungeon ? floor.dungeonSky : floor.sky);
     this.terrain = new Terrain(this, this.map);
+    // Worlds have a sky, and the sun casts shadows there; dungeons don't.
+    this.terrain.sunlit = isWorldRoom(this.kind);
     this.objects = new WorldObjects(this, this.map);
     this.ambient = new Ambient(this, this.map);
     if (this.kind === "world") this.tutorial = new Tutorial(this, this.map, this.room, this.session.name ?? this.session.guest ?? "you");
@@ -497,6 +504,7 @@ export class WorldScene extends Phaser.Scene {
         cam.fadeIn(260, 0, 0, 0);
       }
     }
+    this.updateSun();
     this.terrain.update(cam);
     const occluded: { x: number; y: number }[] = [];
     state.players.forEach((p) => occluded.push({ x: this.predict.value(p, "x"), y: this.predict.value(p, "y") - 10 }));
@@ -643,9 +651,46 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Day and night: the tower's clock, except where the story says otherwise — the Umbral Wilds
+   * are a night that never ends, and on the Sunscorched Sands it is noon until the Sun Pharaoh
+   * falls (for you). Dungeons and interiors have no sky.
+   */
+  private skyPhase(): number | undefined {
+    if (!isWorldRoom(this.kind)) return undefined;
+    if (this.map.theme === "shadow") return 0;
+    if (this.map.theme === "sand" && !this.ui.inv?.bossKills?.includes("solkaris")) return 0.5;
+    return dayPhase(Date.now() + this.clockOffset);
+  }
+
+  private updateSun() {
+    const phase = this.skyPhase();
+    const indoors = !!this.me && this.me.value("y") >= this.map.outdoorHeight * TILE;
+    const sun = phase === undefined ? undefined : sunAt(phase);
+    this.sunNow = indoors ? undefined : sun;
+    SUN.dir = this.sunNow?.dir ?? -Math.PI / 2;
+    SUN.len = this.sunNow?.len ?? 0.3;
+    SUN.shade = this.sunNow?.shade ?? 0;
+    this.terrain.setSun(SUN.dir, SUN.len, SUN.shade);
+    this.sky.setNight(this.map.theme === "shadow" ? 0 : (sun?.night ?? 0));
+    const frozen = this.map.theme === "shadow" ? "Endless night" : this.map.theme === "sand" && phase === 0.5 && !this.ui.inv?.bossKills?.includes("solkaris") ? "Endless noon" : undefined;
+    this.hud.clock(phase === undefined ? undefined : frozen ?? clockLabel(phase), (sun?.night ?? 0) > 0.5);
+  }
+
   private updateLighting(delta: number) {
     const zone = this.me ? this.map.zoneAt(this.me.state.x, this.me.state.y) : undefined;
-    this.lighting.target = typeof zone?.dark === "number" ? zone.dark : zone?.dark ? 0.8 : 0;
+    const zoneDark = typeof zone?.dark === "number" ? zone.dark : zone?.dark ? 0.8 : 0;
+    // Night: moonlit blue, deepest at midnight (the Umbral Wilds keep their own dark). Dawn and dusk: a warm dim.
+    const sun = this.sunNow;
+    const night = sun && this.map.theme !== "shadow" ? sun.night * 0.66 : 0;
+    const dusk = sun ? sun.glow * 0.26 : 0;
+    this.lighting.target = Math.max(zoneDark, night, dusk);
+    if (zoneDark >= night && zoneDark >= dusk) this.lighting.color = 0x05070c;
+    else {
+      const t = night / Math.max(1e-6, night + dusk);
+      const mix = (a: number, b: number, s: number) => Math.round(a + (b - a) * t) << s;
+      this.lighting.color = mix(0x7a, 0x06, 16) | mix(0x3a, 0x10, 8) | mix(0x18, 0x3a, 0);
+    }
     if (this.lighting.target === 0 && delta > 0) {
       this.lighting.update(this.cameras.main, [], delta);
       return;
@@ -658,13 +703,15 @@ export class WorldScene extends Phaser.Scene {
     const t0y = Math.floor((cam.y - 100) / TILE);
     const t1y = Math.ceil((cam.bottom + 100) / TILE);
     for (let ty = t0y; ty <= t1y; ty++)
-      for (let tx = t0x; tx <= t1x; tx++) if (this.map.get(tx, ty) === Tile.Crystal) lights.push({ x: tx * TILE + 16, y: ty * TILE, r: 70, color: this.map.theme === "shadow" ? 0xd8b8ff : 0x6fd0ff });
+      for (let tx = t0x; tx <= t1x; tx++) if (this.map.theme !== "brass" && this.map.theme !== "sand" && this.map.get(tx, ty) === Tile.Crystal) lights.push({ x: tx * TILE + 16, y: ty * TILE, r: 70, color: this.map.theme === "shadow" ? 0xd8b8ff : 0x6fd0ff });
     for (const pr of this.map.props) {
       if (pr.kind !== "lamp" || pr.tx < t0x - 4 || pr.tx > t1x + 4 || pr.ty < t0y - 4 || pr.ty > t1y + 4) continue;
       lights.push({ x: pr.tx * TILE + 16, y: pr.ty * TILE - 8, r: 170, flicker: 0.4, color: 0xffc870 });
     }
     for (const o of this.map.objects) {
       if (o.kind === "lever" && o.name === "Moon Lantern") lights.push({ x: o.x, y: o.y - 30, r: 130, flicker: 0.2, color: 0xe0d8ff });
+      // Doorways glow warm at night: someone's home.
+      if (o.kind === "entry" && o.id.startsWith("enter-")) lights.push({ x: o.x, y: o.y - 18, r: 120, flicker: 0.25, color: 0xffc870 });
       if (o.kind === "campfire" || o.kind === "gate" || o.kind === "waystone") lights.push({ x: o.x, y: o.y - 20, r: o.kind === "campfire" ? 180 : 110, flicker: 0.5, color: o.kind === "campfire" ? 0xffa040 : 0xffe0a0 });
     }
     this.room.state.projectiles?.forEach((pr) => {
@@ -717,6 +764,7 @@ export class WorldScene extends Phaser.Scene {
       sfx.chime(1);
     });
     r.onMessage("settings", (m: unknown) => settings.fromServer(m));
+    r.onMessage("clock", (m: { now: number }) => (this.clockOffset = m.now - Date.now()));
     r.onMessage("bank", (m: { bank: InvView["inventory"]; bankGold: number }) => ui.setBank(m.bank, m.bankGold));
     r.onMessage("dialog", (d: DialogMsg) => ui.showDialog(d));
     r.onMessage("lore", (m: { name: string; text: string }) => ui.lore(m.name, m.text));

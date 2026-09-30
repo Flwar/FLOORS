@@ -149,6 +149,13 @@ export class Hud {
     this.set("bossPosture", posture, () => ($("#boss .posture-fill").style.transform = `scaleX(${posture / 255})`));
   }
 
+  /** The tower's clock: a sun or a moon, and the time (or nothing, underground). */
+  clock(text: string | undefined, night: boolean) {
+    this.set("clock", text ? `${text}|${night}` : "", () => {
+      $("#clock").innerHTML = text ? `<i class="${night ? "moon" : "sun"}"></i>${text} · ` : "";
+    });
+  }
+
   online(count: number) {
     this.set("online", count, () => ($("#online").textContent = String(count)));
   }
